@@ -1,0 +1,12 @@
+# The local profile supplies the detected compiler, architecture, and SDK platform.
+include(sipi-2-local)
+
+[settings]
+build_type=Debug
+compiler.cppstd=20
+
+[conf]
+tools.cmake.cmaketoolchain:generator=Ninja
+# Apple Clang 21 marks future::get() nodiscard. Trantor 1.5.28 enables -Werror;
+# retain this warning without failing its build. This applies only to Trantor.
+trantor/*:tools.build:cxxflags=["-Wno-error=unused-result"]

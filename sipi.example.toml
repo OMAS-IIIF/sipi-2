@@ -1,0 +1,20 @@
+# Log severity: trace, debug, info, warn, error, critical, off.
+log-level = "info"
+
+# Local plain-HTTP listener (HTTPS is provided by the reverse proxy).
+port = 8080
+
+# Public origin; add a mount path only if the proxy strips it before forwarding.
+# Defaults to http://127.0.0.1:<port>. Host/Forwarded headers never override it.
+# public-base-url = "https://images.example.org"
+
+# Permit actual IIIF enlargement when the request explicitly uses ^.
+size-upscaling = false
+
+# Optional trusted Lua policy; relative paths use the process working directory.
+# Startup validates the script; IIIF GET/HEAD requests execute it before source lookup.
+# preflight-script = "examples/preflight.lua"
+
+# Optional existing image repository, relative to the process working directory.
+# Default identifier mapping and relative Lua source paths use this directory.
+# iiif-root = "data/images"

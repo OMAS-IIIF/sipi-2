@@ -1,0 +1,11 @@
+# Generated command-line and CLion build directories.
+/build/
+/cmake-build-*/
+
+# Local IDE settings and Conan-generated user presets.
+/.idea/
+/CMakeUserPresets.json
+
+# Drogon default runtime upload directory.
+/uploads/
+/.DS_Store
