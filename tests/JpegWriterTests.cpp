@@ -62,16 +62,37 @@ void gradient(const sipi::RgbImage8& image, unsigned ox, unsigned oy, unsigned w
         }
     }
 }
+/** Independent common-grid averaging of the known separable TIFF gradient. */
+void resized_gradient(const sipi::RgbImage8& image, unsigned ox, unsigned oy,
+                      unsigned sw, unsigned sh, unsigned w, unsigned h) {
+    require(image.width == w && image.height == h, "Resized JPEG dimensions");
+    for (unsigned y = 0; y < h; ++y)
+        for (unsigned x = 0; x < w; ++x) {
+            unsigned red = 0, green = 0;
+            for (unsigned i = 0; i < sw; ++i) red += 255 * (ox + (x * sw + i) / w) / 319;
+            for (unsigned j = 0; j < sh; ++j) green += 255 * (oy + (y * sh + j) / h) / 199;
+            const auto index = (static_cast<std::size_t>(y) * w + x) * 3;
+            require(std::abs(int(image.pixels[index]) - int((2 * red + sw) / (2 * sw))) <= 5, "Scaled red pixel");
+            require(std::abs(int(image.pixels[index + 1]) - int((2 * green + sh) / (2 * sh))) <= 5, "Scaled green pixel");
+            require(std::abs(int(image.pixels[index + 2]) - 128) <= 5, "Scaled blue pixel");
+        }
+}
+
 }
 
 /** Without arguments: encoder contract tests. With a file and crop coordinates:
  * decode an HTTP response and validate the known TIFF fixture's actual pixels. */
 int main(int argc, char** argv) {
     try {
-        if (argc == 6) {
+        if (argc == 6 || argc == 8) {
             std::ifstream input(argv[1], std::ios::binary);
             require(bool(input), "cannot open HTTP JPEG");
             const std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(input), {}};
+            if (argc == 8) {
+                resized_gradient(decode(bytes), std::stoul(argv[2]), std::stoul(argv[3]), std::stoul(argv[4]),
+                                 std::stoul(argv[5]), std::stoul(argv[6]), std::stoul(argv[7]));
+                return 0;
+            }
             gradient(decode(bytes), std::stoul(argv[2]), std::stoul(argv[3]), std::stoul(argv[4]), std::stoul(argv[5]));
             return 0;
         }
@@ -119,6 +140,11 @@ int main(int argc, char** argv) {
             image.icc_profile.clear();
             bytes.clear();
             sipi::write_jpeg(image, collect);
+            if (argc == 8) {
+                resized_gradient(decode(bytes), std::stoul(argv[2]), std::stoul(argv[3]), std::stoul(argv[4]),
+                                 std::stoul(argv[5]), std::stoul(argv[6]), std::stoul(argv[7]));
+                return 0;
+            }
             gradient(decode(bytes), 0, 0, 320, 200);
         }
         std::cout << "JPEG pixel, ICC, block and failure checks passed\n";

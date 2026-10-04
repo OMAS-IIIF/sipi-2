@@ -154,3 +154,5 @@ then uses the existing TIFF/geometry/JPEG pipeline. `/museum/tiled.tif/...` read
 key `tiled.tif`: IIIF URL prefixes are excluded from default mapping. Explicit
 project mapping belongs in preflight. See [configuration](command-line.md#repository-selection-local-or-s3)
 and [Lua source selection](preflight.md).
+
+JPEG delivery now supports area-weighted reductions after crop reading, on both local and S3 sources. See [area resizing](area-resize.md) for channel semantics and memory limits. Delivery selects a suitable supported TIFF pyramid level and resamples the exact fractional crop within its integer read rectangle.

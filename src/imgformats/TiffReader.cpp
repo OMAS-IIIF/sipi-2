@@ -278,20 +278,41 @@ std::size_t rgb_bytes(std::uint32_t width, std::uint32_t height, std::size_t lim
 }
 } // namespace
 
-RgbImage8 read_tiff_region(const ByteSource& source, const PixelRegion& region,
-                           std::size_t max_decoded_bytes) {
+bool supports_tiff_region(const TiffDirectory& directory) {
+    return std::holds_alternative<TiffTiles>(directory.layout) &&
+        directory.orientation == TiffOrientation::top_left &&
+        directory.bits_per_sample == 8 && directory.samples_per_pixel == 3 &&
+        directory.sample_format == SAMPLEFORMAT_UINT && directory.photometric == PHOTOMETRIC_RGB &&
+        directory.planar_config == PLANARCONFIG_CONTIG && directory.extra_samples.empty() &&
+        TIFFIsCODECConfigured(directory.compression);
+}
+
+namespace {
+RgbImage8 decode_region(const ByteSource& source, const PixelRegion& region,
+                        const TiffDirectory* selected, std::size_t max_decoded_bytes) {
     TiffInput input{source, 0, {}, {}};
     auto file = open_tiff(input);
+    // The main image owns the color interpretation; compatible reduced IFDs
+    // may omit ICC. Keep it even after switching to a main-chain IFD or SubIFD.
+    auto profile = read_profile(file.get());
+    if (selected && (!selected->offset || !TIFFSetSubDirectory(file.get(), selected->offset))) {
+        input.check_source();
+        throw TiffReadError("Cannot select TIFF image directory");
+    }
     const auto metadata = read_directory(file.get());
+    if (selected && (metadata.width != selected->width || metadata.height != selected->height ||
+        metadata.orientation != selected->orientation))
+        throw TiffReadError("TIFF directory differs from the read plan");
+    if (selected) {
+        const auto level_profile = read_profile(file.get());
+        if (!level_profile.empty() && level_profile != profile)
+            throw TiffUnsupportedError("TIFF level has a different color profile");
+    }
     const auto* tiles = std::get_if<TiffTiles>(&metadata.layout);
     std::uint32_t depth = 1, tile_depth = 1;
     TIFFGetFieldDefaulted(file.get(), TIFFTAG_IMAGEDEPTH, &depth);
     TIFFGetFieldDefaulted(file.get(), TIFFTAG_TILEDEPTH, &tile_depth);
-    if (!tiles || metadata.orientation != TiffOrientation::top_left ||
-        metadata.bits_per_sample != 8 || metadata.samples_per_pixel != 3 ||
-        metadata.sample_format != SAMPLEFORMAT_UINT || metadata.photometric != PHOTOMETRIC_RGB ||
-        metadata.planar_config != PLANARCONFIG_CONTIG || !metadata.extra_samples.empty() ||
-        depth != 1 || tile_depth != 1) {
+    if (!supports_tiff_region(metadata) || depth != 1 || tile_depth != 1) {
         throw TiffUnsupportedError("Unsupported TIFF: expected tiled top-left unsigned 8-bit contiguous RGB without alpha");
     }
     if (region.width == 0 || region.height == 0 || region.x >= metadata.width || region.y >= metadata.height ||
@@ -304,7 +325,6 @@ RgbImage8 read_tiff_region(const ByteSource& source, const PixelRegion& region,
         TIFFTileSize64(file.get()) != tile_bytes) {
         throw TiffReadError("Unexpected TIFF decoded tile size");
     }
-    auto profile = read_profile(file.get());
     input.check_source();
     if (input.diagnostic.error[0] != '\0') { throw TiffReadError(input.diagnostic.error.data()); }
     RgbImage8 output{region.width, region.height, std::vector<std::uint8_t>(output_bytes), std::move(profile)};
@@ -340,5 +360,16 @@ RgbImage8 read_tiff_region(const ByteSource& source, const PixelRegion& region,
     }
     input.check_source();
     return output;
+}
+} // namespace
+
+RgbImage8 read_tiff_region(const ByteSource& source, const PixelRegion& region,
+                           std::size_t max_decoded_bytes) {
+    return decode_region(source, region, nullptr, max_decoded_bytes);
+}
+
+RgbImage8 read_tiff_region(const ByteSource& source, const TiffDirectory& directory,
+                           const PixelRegion& region, std::size_t max_decoded_bytes) {
+    return decode_region(source, region, &directory, max_decoded_bytes);
 }
 } // namespace sipi

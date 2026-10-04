@@ -42,12 +42,18 @@ target_include_directories(iiifparser PUBLIC src)
 target_compile_features(iiifparser PUBLIC cxx_std_20)
 set_target_properties(iiifparser PROPERTIES CXX_EXTENSIONS OFF)
 
-add_library(tiffreader src/imgformats/TiffReader.cpp src/imgformats/TiffReader.h src/imgformats/TiffMetadata.h
+add_library(tiffreader src/imgformats/TiffReadPlan.cpp src/imgformats/TiffReadPlan.h
+    src/imgformats/TiffReader.cpp src/imgformats/TiffReader.h src/imgformats/TiffMetadata.h
     src/image/PixelRegion.h src/image/RgbImage.h)
 target_include_directories(tiffreader PUBLIC src)
 target_link_libraries(tiffreader PRIVATE TIFF::TIFF)
 target_compile_features(tiffreader PUBLIC cxx_std_20)
 set_target_properties(tiffreader PROPERTIES CXX_EXTENSIONS OFF)
+
+add_library(imageprocessing src/image/PixelWindow.h src/image/AreaResize.h src/image/AreaResize.cpp)
+target_include_directories(imageprocessing PUBLIC src)
+target_compile_features(imageprocessing PUBLIC cxx_std_20)
+set_target_properties(imageprocessing PROPERTIES CXX_EXTENSIONS OFF)
 
 add_library(jpegwriter src/imgformats/JpegWriter.cpp src/imgformats/JpegWriter.h)
 target_include_directories(jpegwriter PUBLIC src)
@@ -58,7 +64,7 @@ set_target_properties(jpegwriter PROPERTIES CXX_EXTENSIONS OFF)
 add_executable(sipi-2 src/main.cpp src/CommandLine.h
         src/CommandLine.cpp src/HttpServer.h src/HttpServer.cpp
         src/http/IiifWorker.h src/http/IiifWorker.cpp src/http/IiifInfo.h src/http/IiifInfo.cpp)
-target_link_libraries(sipi-2 PRIVATE spdlog::spdlog CLI11::CLI11 Drogon::Drogon iiifparser preflight imagesource imagestorage s3storage tiffreader jpegwriter)
+target_link_libraries(sipi-2 PRIVATE spdlog::spdlog CLI11::CLI11 Drogon::Drogon iiifparser preflight imagesource imagestorage s3storage tiffreader jpegwriter imageprocessing)
 target_compile_definitions(sipi-2 PRIVATE SIPI_VERSION="${PROJECT_VERSION}")
 
 # Require standard C++20 for this target, without compiler-specific extensions.
@@ -67,6 +73,9 @@ set_target_properties(sipi-2 PROPERTIES CXX_EXTENSIONS OFF)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(area-resize-tests tests/AreaResizeTests.cpp)
+    target_link_libraries(area-resize-tests PRIVATE imageprocessing)
+    add_test(NAME area-resize COMMAND area-resize-tests)
     add_executable(jpeg-writer-tests tests/JpegWriterTests.cpp)
     target_link_libraries(jpeg-writer-tests PRIVATE jpegwriter JPEG::JPEG)
     set_target_properties(jpeg-writer-tests PROPERTIES CXX_EXTENSIONS OFF)
@@ -82,7 +91,7 @@ if(BUILD_TESTING)
     add_test(NAME byte-source COMMAND byte-source-tests "${CMAKE_CURRENT_BINARY_DIR}/byte-source-test-data")
     set_tests_properties(byte-source PROPERTIES TIMEOUT 15)
     add_executable(iiif-worker-tests tests/http/IiifWorkerTests.cpp src/http/IiifWorker.cpp src/http/IiifInfo.cpp)
-    target_link_libraries(iiif-worker-tests PRIVATE preflight imagesource imagestorage s3storage tiffreader jpegwriter iiifparser Drogon::Drogon spdlog::spdlog Threads::Threads)
+    target_link_libraries(iiif-worker-tests PRIVATE preflight imagesource imagestorage s3storage tiffreader jpegwriter imageprocessing iiifparser Drogon::Drogon spdlog::spdlog Threads::Threads)
     set_target_properties(iiif-worker-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME iiif-worker COMMAND iiif-worker-tests
              "${CMAKE_CURRENT_BINARY_DIR}/worker-test-data")
@@ -97,6 +106,16 @@ if(BUILD_TESTING)
     target_link_libraries(tiff-region-tests PRIVATE tiffreader imagestorage iiifparser TIFF::TIFF)
     set_target_properties(tiff-region-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME tiff-region COMMAND tiff-region-tests "${CMAKE_CURRENT_BINARY_DIR}/tiff-region-data")
+    add_executable(tiff-pyramid-tests tests/TiffPyramidTests.cpp)
+    target_link_libraries(tiff-pyramid-tests PRIVATE tiffreader imagestorage imageprocessing TIFF::TIFF)
+    set_target_properties(tiff-pyramid-tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME tiff-pyramid COMMAND tiff-pyramid-tests "${CMAKE_CURRENT_BINARY_DIR}/pyramid-test-data")
+
+    add_executable(tiff-read-plan-tests tests/TiffReadPlanTests.cpp)
+    target_link_libraries(tiff-read-plan-tests PRIVATE tiffreader)
+    set_target_properties(tiff-read-plan-tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME tiff-read-plan COMMAND tiff-read-plan-tests)
+
     add_executable(tiff-metadata-tests tests/TiffMetadataTests.cpp src/CommandLine.cpp)
     target_link_libraries(tiff-metadata-tests PRIVATE tiffreader imagestorage iiifparser TIFF::TIFF CLI11::CLI11)
     set_target_properties(tiff-metadata-tests PROPERTIES CXX_EXTENSIONS OFF)

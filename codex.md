@@ -10,7 +10,7 @@ echoes the backend URL with HTML escaping. Port defaults to 8080 and is configur
 through --port, SIPI_PORT, or TOML. The listener binds only to 127.0.0.1. The initial executable ran successfully in CLion
 according to the owner. A standalone IIIF Image API 3 syntax parser now produces
 owning typed image/info requests. The HTTP catch-all maps invalid syntax to 400 JSON and applies configured
-preflight to valid requests, returning information JSON or JPEG for supported tiled RGB8 TIFF crops; exact /health returns liveness/version JSON. Scaling, rotation
+preflight to valid requests, returning information JSON or JPEG for supported tiled RGB8 TIFF crops; exact /health returns liveness/version JSON. Area-weighted reduction is integrated; rotation
 and socket streaming are not integrated yet. A standalone TIFF metadata reader
 and pure IIIF region/size resolver are implemented and tested together. The HTTP
 worker now resolves sources, reads TIFF headers, and validates geometry.
@@ -240,8 +240,8 @@ and geometry. Default mapping uses only identifier, never prefix segments.
 
 ## First TIFF crop decoder (2026-10-03)
 
-`read_tiff_region` decodes only intersecting tiles from the first full-resolution
-image: top-left unsigned RGB8, contiguous three-channel layout without alpha.
+`read_tiff_region` decodes only intersecting tiles from the first image or an
+explicitly selected compatible pyramid directory: top-left unsigned RGB8, contiguous three-channel layout without alpha.
 Unsupported variants fail explicitly. The format-neutral PixelRegion is shared
 with geometry via an IIIF namespace alias; RgbImage8 owns RGB pixels and source
 ICC bytes. No implicit sRGB conversion. CMake target tiffreader replaces
@@ -252,7 +252,7 @@ parameter); libtiff/metadata limits remain separate. Crop bounds must already be
 resolved; the decoder validates, never clips. Source-file stability between reads
 is the caller's responsibility. Pixel-exact tests cover edges, tile crossings,
 lossless compression, corruption outside/inside the crop, and unsupported formats.
-Pyramid selection, other orientations/layouts and scaling remain open. Initial
+Pyramid selection, other orientations/layouts and enlargement remain open; area-weighted reduction is implemented. Initial
 JPEG encoding and HTTP pixel delivery are now integrated. Evaluate Grok next before expanding a generic pixel model.
 
 ## Preflight startup configuration (2026-10-03)
@@ -328,7 +328,8 @@ intersecting TIFF tiles and collects JPEG blocks into a <=64 MiB string. Publish
 200 image/jpeg/no-store only after success. TIFF raster + tile limit remains
 256 MiB. JPEG dimensions are limited to 65500; codec/response-limit errors are 500.
 Top-left, unsigned RGB8, contiguous, three channels, tiled TIFF only; no alpha.
-Any region syntax works; any size resolving to unchanged crop dimensions works.
+Any region syntax works; resolved output dimensions may stay unchanged or shrink independently.
+Reduction uses the format-independent AreaResize module in stored channel values.
 Rotation 0/360, no mirroring, default/color JPG only. Other requests return 501;
 TiffUnsupportedError distinguishes layout support from corrupt data (500).
 HEAD still performs encoding for identical status/headers; optimize later with a
@@ -454,3 +455,43 @@ docs/command-line.md#repository-selection-local-or-s3, docs/preflight.md and
 docs/source-resolution.md for the contract. Opt-in s3-http tests compare JPEG
 bytes, info/HEAD, explicit prefix translation, mixed sources and denial with an
 unreachable backend. All 16 suites and relevant ASan/UBSan checks pass.
+
+## Area-weighted reduction (2026-10-04)
+
+src/image/AreaResize.h/.cpp implements downsample_area for owning RGB8 images,
+independent of storage/codecs/IIIF. Direct box/area weights use uint64_t common-grid
+coordinates and double sums, rounding half up once. No enlarged intermediate.
+Identity reuses storage; ICC bytes move unchanged. This explicitly averages stored
+channel values, NOT linear light, with no sRGB assumption. Future profile-aware
+color processing must define its working space before changing this behavior.
+
+Worker now reads the crop, reduces to the geometry's output size and encodes JPEG,
+locally or from S3. Each axis may shrink or stay unchanged; enlargement is still
+unsupported even when allowed by policy. Resize budget is 256 MiB for input +
+output pixels + ICC, excluding capacity/allocator overhead; failure is 500
+processing_failed. TIFF crop-tile selection now uses suitable pyramid levels
+(see below); nonpyramidal sources still pay the full-resolution crop cost.
+Remote range buffering remains separate work.
+
+See docs/area-resize.md. All 17 CTest suites pass; unit tests use an independent
+integer-grid oracle, HTTP tests decode reduced JPEGs, and MinIO compares local/S3
+outputs. Relevant ASan/UBSan checks pass (dependencies uninstrumented).
+
+
+## TIFF read planning (2026-10-04)
+
+`src/imgformats/TiffReadPlan.h/.cpp` adds a pure metadata + IIIF geometry planner.
+It owns the selected directory, an orientation-normalized integer enclosing crop,
+and exact rational offsets/extents within that crop. Choose the smallest-area
+compatible level sufficient in both axes using integer cross-products; otherwise
+retain full resolution. This is geometry only, not a decoder capability promise.
+The worker now removes unsupported candidate layouts/codecs and uses the plan
+to decode the selected IFD via the directory overload of read_tiff_region.
+Main-image ICC is inherited; selected corrupt data fails without silent fallback.
+PixelWindow/PixelInterval in src/image/PixelWindow.h represent the rational crop
+independently of TIFF. AreaResize accepts that window, preserving exact pixel
+boundary selection and weighting partial edges in stored channel values.
+Only top-left tiled RGB8 delivery remains supported. Remote range buffering,
+additional pixel layouts and color conversion remain next steps.
+All 19 suites pass, including real main-chain/SubIFD, HTTP and MinIO pyramid tests.
+See `docs/tiff-metadata-and-geometry.md` for the contract and examples.

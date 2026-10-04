@@ -30,4 +30,20 @@ namespace sipi {
                                         const PixelRegion& region,
                                         std::size_t max_decoded_bytes = 256 * 1024 * 1024);
 
+/** Metadata-level capability check for selecting readable pyramid candidates.
+ * Checks sample layout, orientation and configured compression codec. Does not
+ * validate encoded data or depth tags; the actual read still checks these. */
+[[nodiscard]] bool supports_tiff_region(const TiffDirectory& directory);
+
+/** Decode from an explicitly selected main IFD or SubIFD of the SAME source
+ * version that produced directory. The integer region is local to that level.
+ * Same supported subset, tile selection and budget as the first-image overload.
+ * Validates directory dimensions/orientation and rechecks actual decode tags.
+ * ICC comes from the main image; conflicting level profiles are rejected.
+ * Use only compatible levels returned by read_tiff_metadata. Fractional cropping
+ * and scaling of the returned enclosure belong to the subsequent resampler. */
+[[nodiscard]] RgbImage8 read_tiff_region(const ByteSource& source,
+    const TiffDirectory& directory, const PixelRegion& region,
+    std::size_t max_decoded_bytes = 256 * 1024 * 1024);
+
 } // namespace sipi

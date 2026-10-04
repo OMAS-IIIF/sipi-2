@@ -66,8 +66,8 @@ def server(args, variables=None):
 
 s3('PUT')
 try:
-    for key in ('tiled.tif', 'museum/selected.tif'):
-        s3('PUT', key, fixtures / 'tiled.tif')
+    for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif'):
+        s3('PUT', key, fixtures / ('pyramid.tif' if key == 'pyramid.tif' else 'tiled.tif'))
     with tempfile.TemporaryDirectory() as directory:
         policy = Path(directory, 'policy.lua')
         # Lua performs the project-specific prefix mapping explicitly.
@@ -81,10 +81,13 @@ try:
           end
           return {decision='allow'}
         end''')
-        crop = '/50,30,100,80/max/0/default.jpg'
+        crop = '/50,30,100,80/37,29/0/default.jpg'
         with server(['--iiif-root', str(fixtures)]) as local:
             expected = get(local, '/tiled.tif' + crop)
             assert expected[0] == 200
+            pyramid_path = '/pyramid.tif/3,5,65,49/15,12/0/default.jpg'
+            expected_pyramid = get(local, pyramid_path)
+            assert expected_pyramid[0] == 200
         with server(['--preflight-script', str(policy)], {
             'SIPI_IIIF_STORAGE': 's3', 'SIPI_S3_BUCKET': bucket, 'SIPI_S3_REGION': 'us-east-1',
             'SIPI_S3_ENDPOINT': endpoint, 'SIPI_S3_PATH_STYLE': 'true',
@@ -93,6 +96,8 @@ try:
             for path in ('/tiled.tif', '/museum/tiled.tif', '/museum/alias', '/local'):
                 result = get(remote, path + crop)
                 assert result[0] == 200 and result[2] == expected[2], (path, result[0])
+            actual_pyramid = get(remote, pyramid_path)
+            assert actual_pyramid[0] == 200 and actual_pyramid[2] == expected_pyramid[2]
             status, _, data = get(remote, '/museum/tiled.tif/info.json')
             info = json.loads(data)
             assert status == 200 and info['width'] == 320 and info['height'] == 200
@@ -109,7 +114,7 @@ try:
         with server(offline + ['--iiif-storage=s3', '--preflight-script', str(policy)]) as denied:
             assert get(denied, '/deny/info.json')[0] == 403
 finally:
-    for key in ('tiled.tif', 'museum/selected.tif'):
+    for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif'):
         s3('DELETE', key)
     s3('DELETE')
 print('S3 HTTP info, JPEG, HEAD, Lua overrides and prefix mapping passed')

@@ -1,4 +1,5 @@
 #include <tiffio.h>
+#include "TiffPyramidFixture.h"
 #include <algorithm>
 #include <filesystem>
 #include <memory>
@@ -63,6 +64,14 @@ int main(int argc, char** argv) {
     try {
         const std::filesystem::path directory(argv[1]);
         std::filesystem::create_directories(directory);
+        fixture::pyramid(directory/"pyramid.tif", true, true);
+        fixture::pyramid(directory/"pyramid-stripped.tif", false, false, true);
+        {
+            std::unique_ptr<TIFF, decltype(&TIFFClose)> flat(
+                TIFFOpen((directory/"pyramid-level.tif").c_str(), "w"), TIFFClose);
+            if (!flat) throw std::runtime_error("Cannot create flat reference");
+            fixture::pyramid_directory(flat.get(), 26, 20, 2, false, false, true);
+        }
         write_image(directory/"tiled.tif", "w", 320, 200, ORIENTATION_TOPLEFT, true);
         write_image(directory/"broken-tile.tif", "w", 320, 200, ORIENTATION_TOPLEFT, true, true);
         write_image(directory/"sample.tif", "w", 320, 200, ORIENTATION_TOPLEFT);

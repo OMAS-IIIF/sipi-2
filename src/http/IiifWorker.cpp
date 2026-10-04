@@ -3,7 +3,10 @@
 #include <spdlog/spdlog.h>
 #include <utility>
 #include "storage/LocalFileSource.h"
+#include "image/AreaResize.h"
 #include <array>
+#include <algorithm>
+#include "imgformats/TiffReadPlan.h"
 #include "imgformats/TiffMetadata.h"
 #include "imgformats/TiffReader.h"
 #include "imgformats/JpegWriter.h"
@@ -103,7 +106,7 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) const {
              (magic[0] == 'M' && magic[1] == 'M' && magic[2] == 0 && (magic[3] == 42 || magic[3] == 43)));
         if (!tiff) return response(drogon::k501NotImplemented, "source_format_not_supported",
                                    "Only TIFF sources are supported at present");
-        const auto metadata = read_tiff_metadata(*source);
+        auto metadata = read_tiff_metadata(*source);
         if (std::holds_alternative<iiif::InfoRequest>(request.query)) {
             auto result = drogon::HttpResponse::newHttpJsonResponse(make_info_document(resource,
                 metadata.image.display_width(), metadata.image.display_height(), public_base_url_));
@@ -130,11 +133,22 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) const {
             if (image->format != iiif::Format::jpg ||
                 (image->quality != iiif::Quality::default_quality && image->quality != iiif::Quality::color) ||
                 image->rotation.mirrored || (image->rotation.degrees != 0 && image->rotation.degrees != 360) ||
-                plan.output_width != plan.region.width || plan.output_height != plan.region.height)
+                plan.output_width > plan.region.width || plan.output_height > plan.region.height)
                 return response(drogon::k501NotImplemented, "not_implemented",
-                    "Only unscaled, unmirrored RGB JPEG output without rotation is supported");
+                    "Only unchanged or reduced RGB JPEG output without mirroring or rotation is supported");
 
-            const auto pixels = read_tiff_region(*source, plan.region);
+            // Preserve base-image support rules and skip levels whose layouts
+            // cannot be decoded. Corrupt selected data still fails visibly.
+            if (!supports_tiff_region(metadata.image))
+                throw TiffUnsupportedError("Unsupported TIFF main image layout");
+            std::erase_if(metadata.levels, [](const auto& level) { return !supports_tiff_region(level); });
+            const auto read_plan = plan_tiff_read(metadata, plan);
+            spdlog::debug("TIFF directory {}: read {},{},{},{}", read_plan.directory.offset,
+                read_plan.read_region.x, read_plan.read_region.y,
+                read_plan.read_region.width, read_plan.read_region.height);
+            auto pixels = read_tiff_region(*source, read_plan.directory, read_plan.read_region);
+            pixels = downsample_area(std::move(pixels),
+                PixelWindow{read_plan.horizontal, read_plan.vertical}, plan.output_width, plan.output_height);
             std::string encoded;
             // Buffer until encoding succeeds: never publish partial JPEGs as 200.
             // A later streaming/cache sink can use the same codec interface.
@@ -173,6 +187,8 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) const {
         return response(drogon::k501NotImplemented, "not_implemented", "TIFF pixel layout is not supported yet");
     } catch (const TiffReadError&) {
         return response(drogon::k500InternalServerError, "invalid_image_source", "TIFF data could not be read");
+    } catch (const ResizeError&) {
+        return response(drogon::k500InternalServerError, "processing_failed", "Image resizing could not be completed");
     } catch (const JpegWriteError&) {
         return response(drogon::k500InternalServerError, "encoding_failed", "JPEG output could not be produced");
     } catch (const std::exception&) {

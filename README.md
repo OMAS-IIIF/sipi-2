@@ -2,7 +2,7 @@
 
 A high-performance, versatile IIIF server, developed in small, explainable steps.
 The current executable resolves startup configuration and runs a local Drogon HTTP
-server with HTML hello, JSON health, and IIIF syntax routes. Initial tiled RGB8 TIFF-to-JPEG delivery is implemented; scaling and streaming come later.
+server with HTML hello, JSON health, and IIIF syntax routes. Initial tiled RGB8 TIFF-to-JPEG delivery is implemented; area-weighted reduction is supported; enlargement and streaming come later.
 
 ## Build and run
 
@@ -176,8 +176,8 @@ The first pixel reader is now available in `src/imgformats/TiffReader.h`:
 `read_tiff_region` reads only intersecting tiles from top-left, contiguous RGB8
 TIFFs into a format-neutral `RgbImage8`. It preserves ICC bytes and rejects other
 layouts explicitly. `tests/TiffRegionTests.cpp` verifies exact pixels, selective
-access, and error paths. No scaling or output encoding yet; HTTP preflight can
-select a local file; metadata reading is integrated, pixel decoding is not.
+access, and error paths. HTTP preflight selects local or S3 sources; TIFF crop
+reading, [area-weighted reduction](docs/area-resize.md) and JPEG output are integrated.
 
 ## Lua preflight
 
@@ -245,3 +245,8 @@ MinIO integration tests are opt-in with `-DSIPI_TEST_S3=ON`.
 S3 credentials support `--s3-access-key`, `--s3-secret-key` and
 `--s3-session-token`, their `SIPI_S3_*` environment equivalents and matching TOML
 keys, with the usual precedence. See [credential configuration](docs/command-line.md#s3-credentials).
+
+
+A [pure TIFF read planner](docs/tiff-metadata-and-geometry.md#pure-tiff-read-planning)
+now selects suitable pyramid levels and preserves exact fractional crop edges.
+Delivery uses the selected IFD and exact fractional-window resampling, locally and over S3.

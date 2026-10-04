@@ -8,13 +8,16 @@ codec increment, not a general image transformation engine.
 
 Source: tiled TIFF/BigTIFF, top-left orientation, unsigned 8-bit contiguous RGB,
 exactly three samples, no extra samples/alpha, no volume depth. The existing TIFF
-reader selects only tiles intersecting the crop, at full source resolution.
-Strips, other orientations/sample layouts, and pyramid selection remain separate
-steps. Metadata reading still supports more layouts than pixel delivery.
+reader selects only tiles intersecting the crop in a suitable pyramid level
+(main-chain reduced IFDs or SubIFDs). It skips levels with unsupported layouts or
+unavailable compression codecs and falls back to the base if necessary. Corrupt
+selected data fails explicitly. Strips and other orientations/sample layouts
+remain separate steps. Metadata reading still supports more layouts than pixel delivery.
 
 All existing region forms (full, square, pixel and percentage) work through the
 geometry resolver, including clipping at image edges. The resolved output size
-must equal the crop dimensions: no scaling is performed. Rotation 0 or 360 is
+may equal or reduce the crop dimensions on each axis. Reductions use
+[area-weighted stored-channel averaging](area-resize.md); enlargement is not implemented. Rotation 0 or 360 is
 accepted as identity; mirroring and other rotations return 501. JPEG with default
 or color quality is supported; gray/bitonal and other output formats return 501.
 Invalid geometry retains its previous 400/501 error mapping before rendering.
@@ -29,7 +32,7 @@ After building and running CTest, from the repository root:
 - `/project/tiled.tif/50,30,100,80/max/0/default.jpg`: 100 x 80 crop.
 - `/tiled.tif/square/max/0/default.jpg`: centered 200 x 200 square.
 - `/tiled.tif/pct:25,25,50,50/max/0/default.jpg`: 160 x 100 crop.
-- `/tiled.tif/full/160,/0/default.jpg`: 501, resizing not implemented.
+- `/tiled.tif/full/160,/0/default.jpg`: 160 x 100 JPEG, area-weighted reduction.
 - `/sample.tif/full/max/0/default.jpg`: 501, the older fixture uses strips.
 
 Preflight can select the source as before. Information requests are unchanged;
@@ -99,3 +102,5 @@ edge clipping, square/percentage regions, identity size/rotation, source overrid
 GET/HEAD parity, unsupported operations, corrupt tiles inside/outside the crop,
 and successful delivery after errors. TIFF fixtures are generated locally with
 libtiff; no external image or Python imaging package is required.
+
+The resize stage bounds input + output RGB bytes + ICC to 256 MiB and reports failures as 500 `processing_failed`. TIFF reads intersecting tiles in the selected level; exact fractional-window resampling preserves the requested field of view. Reduced levels inherit the main image ICC profile.

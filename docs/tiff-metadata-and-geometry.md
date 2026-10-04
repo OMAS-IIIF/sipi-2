@@ -128,7 +128,7 @@ size-upscaling = true
 Only lowercase `true` and `false` are accepted, with the usual CLI > environment
 > file > default precedence. `ServerConfig::size_upscaling` supplies the geometry
 policy as shown above. The HTTP handler applies metadata and geometry validation;
-this option permits enlargement in geometry checks but cannot yet enable resizing.
+this option permits enlargement in geometry checks but cannot yet enable enlargement rendering. Reductions are implemented separately.
 Actual output currently requires the resolved size to equal the crop dimensions. See [source resolution](source-resolution.md).
 
 ## Feature target
@@ -217,6 +217,64 @@ layouts, invalid regions, allocation boundaries, ICC ownership, and the complete
 metadata -> parser -> geometry -> pixel-crop path.
 
 JPEG encoding and HTTP delivery are integrated. Pyramid selection, orientation
-transforms, other pixel layouts, and scaling remain subsequent increments. The
+transforms, other pixel layouts, and enlargement remain subsequent increments.
+Area-weighted RGB8 reduction is integrated after crop reading; see [resizing](area-resize.md). The
 byte-source boundary supports the tested S3 adapter without changing TIFF APIs.
 Evaluate Grok before generalizing the pixel model beyond concrete requirements.
+
+## Pure TIFF read planning
+
+`src/imgformats/TiffReadPlan.h/.cpp` provides `plan_tiff_read(metadata, geometry)`.
+It performs no I/O; the HTTP worker now uses its result for decoder selection. Its
+inputs are the compatible directories produced by `read_tiff_metadata` and the
+resolved `iiif::ImageGeometry`. The returned value owns a copy of the selected
+`TiffDirectory`; it must be used with the same source version as the metadata.
+
+Selection uses the smallest directory area for which the mapped crop has at
+least `output_width` and `output_height` pixels, checked separately using exact
+integer cross-products. Directory order need not be sorted; equal-area candidates
+retain their input order. If no reduced level suffices, use the main image. If
+the request itself needs enlargement, the plan still retains the main image;
+upscaling policy and rendering support remain separate checks.
+
+Coordinates refer to pixel edges in orientation-normalized space. For each axis,
+map full-resolution edges by `level_dimension / base_dimension`. Floor the left
+edge and ceil the right edge to obtain the smallest enclosing integer
+`read_region`. The exact interval inside that rectangle is retained as:
+
+- `offset_numerator / denominator`: offset from the read origin;
+- `extent_numerator / denominator`: requested extent;
+- `denominator`: full-resolution dimension of this axis.
+
+For example, a horizontal crop `x=3, width=503` in a 1001-pixel image maps into a
+251-pixel level with integer read interval `[0,127)`, offset `753/1001` and extent
+`126253/1001`. It can supply 126 output pixels without enlargement, but not 127.
+The extra edge pixels belong to the enclosure, not to the requested crop.
+Different ratios on the two axes correctly handle rounded odd pyramid dimensions.
+Validated 32-bit dimensions and 64-bit products avoid floating-point selection
+errors; ceiling uses quotient/remainder rather than potentially overflowing sums.
+
+This is a geometric plan, not a decoder-capability check. It can describe strip
+layouts and all metadata orientations without claiming that the current pixel
+reader can decode them. The worker checks base support and removes unsupported
+levels before planning. `read_tiff_region(source, directory, region, budget)`
+selects the planned IFD by offset, rechecks actual tags and validates planned
+dimensions/orientation. It retains the main ICC profile when reduced IFDs omit it.
+Top-left RGB8 remains the supported pixel subset, so no orientation translation
+is needed yet. The fractional-window overload of `downsample_area` then resamples
+the **exact fractional window** using the format-neutral `PixelWindow` type.
+Scaling the whole enclosing rectangle would shift/expand the requested view.
+No interpolation halo is included; a later filter needing neighboring pixels
+must explicitly extend its read region.
+
+`tests/TiffReadPlanTests.cpp` covers odd pyramids, exact thresholds in both axes,
+fractional crops, unordered levels, base fallback, all orientation dimensions,
+exhaustive small rectangles and products near the uint32 limit. These tests need
+no image file, local repository or S3 connection.
+
+`tests/TiffPyramidTests.cpp` exercises actual decoding of main-chain and BigTIFF
+SubIFD pyramids, odd dimensions, fractional resampling, inherited ICC, skipped
+unsupported layouts, selected-directory validation, tile isolation and memory
+limits. A deliberately damaged base tile proves reduced delivery does not decode
+the main image. HTTP tests compare reduced-IFD output with a flat reference and
+check GET/HEAD; MinIO tests compare fractional pyramid delivery with local output.

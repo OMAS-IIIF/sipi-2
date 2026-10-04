@@ -29,7 +29,7 @@ def run(executable: Path, fixtures: Path, verifier: Path, configured: bool = Fal
     with tempfile.TemporaryDirectory(prefix="sipi-http-") as directory:
         root = Path(directory, "images")
         root.mkdir()
-        for name in ("sample.tif", "rotated.tif", "large.tif", "tiled.tif", "broken-tile.tif"):
+        for name in ("sample.tif", "rotated.tif", "large.tif", "tiled.tif", "broken-tile.tif", "pyramid.tif", "pyramid-level.tif", "pyramid-stripped.tif"):
             shutil.copyfile(fixtures / name, root / name)
         for name in ("id", "hello-world", "a/b", "a%2Fb", "a+b", "café.tif", "source with spaces.tif"):
             target = root / name
@@ -52,7 +52,7 @@ def run(executable: Path, fixtures: Path, verifier: Path, configured: bool = Fal
 function preflight(request)
     local id = request.identifier
     if id == 'jpeg-alias' then return {decision='allow', source='tiled.tif'} end
-    if id == 'tiled.tif' or id == 'broken-tile.tif' then return {decision='allow', source=id} end
+    if id == 'tiled.tif' or id == 'broken-tile.tif' or id:match('^pyramid') then return {decision='allow', source=id} end
     if id == 'denied' then return {decision='deny'} end
     if id == 'script-error' then error('secret-token /private/source.tif') end
     if id == 'invalid-result' then return {decision='allow', restrictions={}} end
@@ -187,6 +187,13 @@ end
                     ("pct:25,25,50,50/max/0/default.jpg", (80, 50, 160, 100)),
                     ("310,190,50,50/max/0/default.jpg", (310, 190, 10, 10)),
                     ("full/320,200/360/color.jpg", (0, 0, 320, 200)),
+                    ("full/160,/0/default.jpg", (0, 0, 320, 200, 160, 100)),
+                    ("full/pct:25/0/default.jpg", (0, 0, 320, 200, 80, 50)),
+                    ("full/!90,70/0/default.jpg", (0, 0, 320, 200, 90, 56)),
+                    ("full/,50/0/default.jpg", (0, 0, 320, 200, 80, 50)),
+                    ("50,30,100,80/37,29/0/default.jpg", (50, 30, 100, 80, 37, 29)),
+                    ("full/1,1/0/default.jpg", (0, 0, 320, 200, 1, 1)),
+                    ("full/320,1/0/default.jpg", (0, 0, 320, 200, 320, 1)),
                 ):
                     path = "/project/tiled.tif/" + suffix
                     status, headers, body = request(path)
@@ -201,7 +208,18 @@ end
                     assert head_status == 200 and not head_body
                     for field in ("content-type", "content-length", "cache-control"):
                         assert head_headers.get(field) == headers.get(field)
-                for suffix in ("full/160,/0/default.jpg", "full/max/90/default.jpg",
+                # The base contains a corrupt tile. Success plus identical JPEG
+                # bytes proves that the reduced SubIFD and inherited ICC are used.
+                status, headers, body = request("/pyramid.tif/full/26,20/0/default.jpg")
+                assert status == 200
+                assert body == request("/pyramid-level.tif/full/max/0/default.jpg")[2]
+                assert request("/pyramid.tif/full/max/0/default.jpg")[0] == 500
+                assert request("/pyramid.tif/3,5,65,49/15,12/0/default.jpg")[0] == 200
+                assert request("/pyramid-stripped.tif/full/26,20/0/default.jpg")[0] == 200
+                status, head_headers, head_body = request("/pyramid.tif/full/26,20/0/default.jpg", "HEAD")
+                assert status == 200 and not head_body
+                assert head_headers["content-length"] == str(len(body))
+                for suffix in ("full/max/90/default.jpg",
                                "full/max/!0/default.jpg", "full/max/0/gray.jpg",
                                "full/max/0/bitonal.jpg", "full/max/0/default.png"):
                     _, body = json_request("/tiled.tif/" + suffix, 501)
