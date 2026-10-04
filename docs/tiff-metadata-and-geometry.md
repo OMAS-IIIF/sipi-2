@@ -9,9 +9,11 @@ See [JPEG delivery](jpeg-delivery.md).
 
 ## TIFF reader
 
-`read_tiff_metadata(path)` in `src/imgformats/TiffMetadata.h` uses libtiff 4.7.2
-from Conan. It returns owning values, closes the file on success and failure, and
-throws `TiffReadError` for file/header failures. Error callbacks use bounded
+`read_tiff_metadata(source)` in `src/imgformats/TiffMetadata.h` uses libtiff 4.7.2
+from Conan. It borrows a `ByteSource`, returns owning values, and releases its TIFF
+handle on success and failure. The caller owns the source. `TiffReadError` reports
+codec/header failures; `ByteSourceError` reports storage failures. See
+[byte sources](byte-source.md). Error callbacks use bounded
 per-handle storage and do not throw across C callbacks or modify global handlers.
 Independent concurrent reads are supported.
 
@@ -60,7 +62,8 @@ It is independent of libtiff, HTTP, filesystem access, and color management.
 Inputs are interpreted against the orientation-normalized full image.
 
 ```cpp
-const auto metadata = sipi::read_tiff_metadata(path);
+const sipi::LocalFileSource source(path);
+const auto metadata = sipi::read_tiff_metadata(source);
 const auto& image = std::get<sipi::iiif::ImageRequest>(parsed_request);
 const sipi::iiif::SizePolicy policy{
     .allow_upscaling = config.size_upscaling
@@ -160,7 +163,7 @@ and geometry without inventing a URL-to-filesystem mapping.
 
 ## First pixel reader: tiled RGB8
 
-`read_tiff_region(path, region, max_decoded_bytes)` in `TiffReader.h` decodes the
+`read_tiff_region(source, region, max_decoded_bytes)` in `TiffReader.h` decodes the
 first image directory at its full stored resolution. Supported inputs are classic
 TIFF or BigTIFF with tiles, unsigned 8-bit RGB, three contiguous samples, no extra
 samples, and top-left orientation. Other layouts raise `TiffReadError` explicitly.
@@ -173,12 +176,13 @@ RGB samples are not implicitly sRGB. Profile validation and conversion are later
 work. Both types are usable by another format reader without TIFF or IIIF types.
 
 ```cpp
-const auto metadata = sipi::read_tiff_metadata(path);
+const sipi::LocalFileSource source(path);
+const auto metadata = sipi::read_tiff_metadata(source);
 const auto resolved = sipi::iiif::resolve_geometry(
     request.region, request.size,
     metadata.image.display_width(), metadata.image.display_height(), policy);
 if (const auto* geometry = std::get_if<sipi::iiif::ImageGeometry>(&resolved)) {
-    auto crop = sipi::read_tiff_region(path, geometry->region);
+    auto crop = sipi::read_tiff_region(source, geometry->region);
     // crop.width/height describe the source crop. Resizing to output_width/height
     // has not happened; this step only reads pixels.
 }
@@ -194,8 +198,9 @@ edge tiles never becomes part of the returned raster.
 The combined output-plus-tile allocation is bounded by the supplied byte limit
 (default 256 MiB). Products are checked before multiplication/allocation. libtiff
 and metadata limits are separate. Tile errors or short reads throw before any
-partial image is returned. Source files must remain stable between metadata
-planning and the subsequent reopen for decoding; there is no snapshot guarantee.
+partial image is returned. Reuse the same open source for metadata
+planning and decoding. Local atomic replacement preserves this opened file;
+in-place writes remain prohibited.
 
 Metadata and region reads share opening, diagnostics, tag/profile reading, and
 RAII code in `TiffReader.cpp`. The CMake library is now named `tiffreader` (formerly
@@ -211,6 +216,7 @@ prevent a crop elsewhere, but fails a crop touching it. Tests also check unsuppo
 layouts, invalid regions, allocation boundaries, ICC ownership, and the complete
 metadata -> parser -> geometry -> pixel-crop path.
 
-Pyramid selection, orientation transforms, other pixel layouts, scaling, output
-encoding, and HTTP delivery remain subsequent increments. Next, add another
-format (Grok) before generalizing the pixel model beyond concrete requirements.
+JPEG encoding and HTTP delivery are integrated. Pyramid selection, orientation
+transforms, other pixel layouts, and scaling remain subsequent increments. The
+byte-source boundary supports the tested S3 adapter without changing TIFF APIs.
+Evaluate Grok before generalizing the pixel model beyond concrete requirements.

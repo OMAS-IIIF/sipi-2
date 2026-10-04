@@ -18,7 +18,13 @@ void filesystem_error(const std::error_code& error) {
 }
 } // namespace
 
-SourceResolver::SourceResolver(const std::optional<std::filesystem::path>& root) {
+SourceResolver::SourceResolver(const std::optional<std::filesystem::path>& root,
+                               StorageKind storage, std::optional<std::string> bucket)
+    : storage_(storage), bucket_(std::move(bucket)) {
+    if (bucket_ && (bucket_->empty() || bucket_->find('\0') != std::string::npos))
+        throw SourceError(SourceErrorCode::configuration, "Invalid configured S3 bucket");
+    if (storage_ == StorageKind::s3 && !bucket_)
+        throw SourceError(SourceErrorCode::configuration, "s3 storage requires s3-bucket");
     if (!root) return;
     if (root->empty() || root->string().find('\0') != std::string::npos)
         throw SourceError(SourceErrorCode::configuration, "iiif-root must name an existing directory");
@@ -58,5 +64,17 @@ std::filesystem::path SourceResolver::resolve(
     if (!std::filesystem::is_regular_file(status))
         throw SourceError(SourceErrorCode::not_found, "Image source was not found");
     return canonical;
+}
+ImageSource SourceResolver::resolve_source(std::string_view identifier,
+    const std::optional<SourceOverride>& override) const {
+    if (override && std::holds_alternative<std::filesystem::path>(*override))
+        return LocalSource{resolve(identifier, std::get<std::filesystem::path>(*override))};
+    if (!override && storage_ == StorageKind::local) return LocalSource{resolve(identifier)};
+    if (!bucket_ || bucket_->empty())
+        throw SourceError(SourceErrorCode::configuration, "S3 source requires s3-bucket");
+    const auto key = override ? std::get<S3Key>(*override).key : std::string(identifier);
+    if (key.empty() || key.find('\0') != std::string::npos)
+        throw SourceError(SourceErrorCode::invalid_path, "Invalid S3 object key");
+    return S3Source{*bucket_, key};
 }
 } // namespace sipi

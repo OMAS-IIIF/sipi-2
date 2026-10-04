@@ -19,12 +19,14 @@ namespace sipi {
  * max_decoded_bytes bounds output plus that buffer (default 256 MiB); metadata
  * and libtiff's own allocations retain the separate metadata reader limits.
  * Short/corrupt tile reads fail without exposing partial results. Allocation
- * failures may propagate. Concurrent calls own independent file handles.
+ * failures may propagate. Concurrent calls own independent TIFF handles and cursors.
  *
- * The file is reopened and its current tags checked. Callers must keep repository
- * files stable between metadata planning and decoding; no snapshot is implied.
+ * Borrows an already opened ByteSource; no path is opened or reopened. Tags are
+ * checked through a fresh TIFF handle/cursor against that same source version.
+ * Reuse the source used for metadata planning. ByteSourceError propagates for I/O
+ * failures. Local atomic replacement is safe; in-place file writes are excluded.
  */
-[[nodiscard]] RgbImage8 read_tiff_region(const std::filesystem::path& path,
+[[nodiscard]] RgbImage8 read_tiff_region(const ByteSource& source,
                                         const PixelRegion& region,
                                         std::size_t max_decoded_bytes = 256 * 1024 * 1024);
 

@@ -79,8 +79,9 @@ Unsupported TIFF layout raises TiffUnsupportedError (a TiffReadError subtype),
 mapped to 501 `not_implemented`. Detected corruption and decoded-byte limit errors
 map to 500 `invalid_image_source`. Encoder failures and encoded-byte limit errors
 map to 500 `encoding_failed`. No codec diagnostics or local paths reach clients.
-Repository files must remain stable between metadata planning and reopening for
-pixel reads, as already required by source resolution.
+Metadata planning and pixel reads borrow the same opened [byte source](byte-source.md).
+Atomic path replacement is safe; in-place file writes remain prohibited. Storage
+read failures map to 500 `source_error`.
 
 HEAD currently performs the same decoding/encoding as GET, so status and content
 length match, then Drogon suppresses its body. A future optimization needs to keep

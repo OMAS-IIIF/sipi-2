@@ -2,6 +2,7 @@
 #define SIPI_PREFLIGHT_LUA_PREFLIGHT_H
 
 #include "iiifparser/IIIFParser.h"
+#include "image/ImageSource.h"
 
 #include <filesystem>
 #include <optional>
@@ -23,11 +24,11 @@ struct Request {
     std::map<std::string, std::string> cookies{};
 };
 
-/** Access granted, with an optional local source override. No source means that
+/** Access granted, with an optional local path or S3 key override. No source means that
  * the caller must resolve the resource using its configured mapping. Paths are
  * copied, not opened, normalized, or checked against repository policy here. */
 struct Allow {
-    std::optional<std::filesystem::path> source;
+    std::optional<SourceOverride> source;
 };
 
 /** An explicit policy refusal, distinct from a broken or missing script. */

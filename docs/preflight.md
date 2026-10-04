@@ -70,17 +70,22 @@ return { decision = "allow", source = "/srv/images/example.tif" }
 ```
 
 `decision` must be exactly the string `allow` or `deny`. An allowed result can
-contain `source`, a nonempty string without NUL bytes. A denied result must not
+contain `source`: either a nonempty local path string without NUL bytes, or
+`{type="s3", key="literal-object-key"}`. The key must also be a nonempty string
+without NUL bytes. The source table accepts only `type` and `key`, has no metatable,
+and requires exactly `type="s3"`. Scripts cannot set buckets, endpoints or credentials. A denied result must not
 contain a source. Unknown fields, numeric/string coercions, multiple return values,
 and unsupported decisions are rejected. This catches misspelled or prematurely
 introduced policy fields rather than silently ignoring restrictions.
 
-`Allow` owns an optional `std::filesystem::path`; `Deny` is a separate value type.
+`Allow` owns an optional `SourceOverride` (local path or `S3Key`); `Deny` is a separate value type.
 No source on allow means the caller must apply an explicitly configured resource
 mapping. The module does not open/check the source, resolve relative paths, enforce
 repository boundaries, or treat an identifier as a path. Those responsibilities
 belong to [source resolution](source-resolution.md): relative/default sources use
-iiif-root, and explicit absolute script sources may bypass it. Restriction/variant and watermark
+iiif-root, and explicit absolute script paths may bypass it. A string source
+ALWAYS remains local, even with `iiif-storage="s3"`. An S3 table selects its key
+in the configured bucket, even with `iiif-storage="local"`. Restriction/variant and watermark
 fields are not implemented yet; adding them requires an explicit contract update.
 
 ## Lifetime and errors
@@ -133,3 +138,31 @@ validation are described in [startup configuration](command-line.md). Add reduce
 verification/signing, and outbound HTTPS in separate understandable increments.
 The [delivery architecture](iiif-delivery-architecture.md) remains the guide for
 the eventual processing order and authorization/cache boundaries.
+
+## Explicit project-prefix mapping
+
+**The IIIF URL prefix stays outside the default mapping. Project-specific
+translation belongs in the preflight script.** Without a source override,
+`/museum/subpart/tiled.tif/info.json` selects local `<iiif-root>/tiled.tif` or
+S3 key `tiled.tif`, depending on `iiif-storage`. The prefix remains available as
+`request.prefix` and remains part of the public service identity.
+
+A trusted policy can explicitly opt into project-dependent S3 key mapping:
+
+```lua
+function preflight(request)
+    local parts = {}
+    for i, segment in ipairs(request.prefix) do parts[i] = segment end
+    parts[#parts + 1] = request.identifier
+    return {
+        decision = "allow",
+        source = { type = "s3", key = table.concat(parts, "/") }
+    }
+end
+```
+
+With this script, the example selects `museum/subpart/tiled.tif`. This is an
+operator-defined naming policy, not automatic IIIF behavior. Apply any required
+project authorization in the same policy before returning allow. `deny` prevents
+source lookup, including S3 HEAD/GET. Missing S3 configuration for an allowed S3
+source produces `source_not_configured`; malformed Lua tables fail the contract.

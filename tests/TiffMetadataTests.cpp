@@ -1,4 +1,5 @@
 #include "imgformats/TiffMetadata.h"
+#include "storage/LocalFileSource.h"
 #include "iiifparser/IIIFGeometry.h"
 #include "CommandLine.h"
 
@@ -75,7 +76,7 @@ int main(int argc, char** argv) {
     try {
         const auto strips = root / "strips.tif";
         { auto file = create(strips); directory(file.get(), 32, 24, false, false, 1, true, true); }
-        const auto info = sipi::read_tiff_metadata(strips);
+        const auto info = sipi::read_tiff_metadata(sipi::LocalFileSource{strips});
         check(info.image.width == 32 && info.image.height == 24, "dimensions");
         check(info.image.display_width() == 32 && info.image.display_height() == 24, "normal display dimensions");
         check(info.image.samples_per_pixel == 4 && info.image.bits_per_sample == 8 &&
@@ -88,7 +89,7 @@ int main(int argc, char** argv) {
         for (std::uint16_t orientation = 1; orientation <= 8; ++orientation) {
             const auto path = root / ("orientation-" + std::to_string(orientation) + ".tif");
             { auto file = create(path); directory(file.get(), 32, 24, true, false, orientation); }
-            const auto rotated = sipi::read_tiff_metadata(path);
+            const auto rotated = sipi::read_tiff_metadata(sipi::LocalFileSource{path});
             check(rotated.image.display_width() == (orientation >= 5 ? 24 : 32) &&
                   rotated.image.display_height() == (orientation >= 5 ? 32 : 24), "orientation dimensions");
             const auto tiles = std::get<sipi::TiffTiles>(rotated.image.layout);
@@ -106,12 +107,12 @@ int main(int argc, char** argv) {
             directory(file.get(), 64, 48, true); // Next full page terminates selection.
             directory(file.get(), 8, 6, true, true);
         }
-        const auto levels = sipi::read_tiff_metadata(pyramid);
+        const auto levels = sipi::read_tiff_metadata(sipi::LocalFileSource{pyramid});
         check(levels.levels.size() == 2 && levels.levels[0].width == 32 && levels.levels[1].width == 16,
               "reduced levels sorted; incompatible and next-page levels excluded");
         const auto multipage = root / "pages.tif";
         { auto file = create(multipage); directory(file.get(), 64, 48); directory(file.get(), 32, 24); }
-        check(sipi::read_tiff_metadata(multipage).levels.empty(), "smaller page is not a pyramid");
+        check(sipi::read_tiff_metadata(sipi::LocalFileSource{multipage}).levels.empty(), "smaller page is not a pyramid");
         const auto subifds = root / "subifds.tif";
         {
             auto file = create(subifds, true);
@@ -121,17 +122,15 @@ int main(int argc, char** argv) {
             directory(file.get(), 32, 24, true, true);
             directory(file.get(), 16, 12, true, true);
         }
-        const auto sublevels = sipi::read_tiff_metadata(subifds);
+        const auto sublevels = sipi::read_tiff_metadata(sipi::LocalFileSource{subifds});
         check(sublevels.levels.size() == 2 && sublevels.levels[1].width == 16, "BigTIFF SubIFD pyramid");
         const auto compressed = root / "broken-pixels.tif";
         { auto file = create(compressed); directory(file.get(), 32, 24, false, false, 1, false, false, true); }
-        check(sipi::read_tiff_metadata(compressed).image.compression == COMPRESSION_LZW,
+        check(sipi::read_tiff_metadata(sipi::LocalFileSource{compressed}).image.compression == COMPRESSION_LZW,
               "compressed pixel data is not decoded");
         const auto broken = root / "broken-header.tif";
         { std::ofstream file(broken, std::ios::binary); file << "II*"; }
-        rejects([&] { (void)sipi::read_tiff_metadata(broken); }, "truncated header");
-        rejects([&] { (void)sipi::read_tiff_metadata(root / "absent.tif"); }, "missing file");
-        rejects([&] { (void)sipi::read_tiff_metadata(std::filesystem::path(std::string("bad\0path", 8))); }, "NUL in path");
+        rejects([&] { (void)sipi::read_tiff_metadata(sipi::LocalFileSource{broken}); }, "truncated header");
 
         // Composition test: configuration -> real TIFF metadata -> parsed request
         // -> geometry. The HTTP resource resolver is intentionally not involved.
@@ -152,7 +151,7 @@ int main(int argc, char** argv) {
         for (int i = 0; i < 8; ++i) {
             readers.push_back(std::async(std::launch::async, [&, i] {
                 try {
-                    const auto metadata = sipi::read_tiff_metadata(i % 2 == 0 ? subifds : broken);
+                    const auto metadata = sipi::read_tiff_metadata(sipi::LocalFileSource{i % 2 == 0 ? subifds : broken});
                     return i % 2 == 0 && metadata.levels.size() == 2;
                 } catch (const sipi::TiffReadError&) { return i % 2 != 0; }
             }));

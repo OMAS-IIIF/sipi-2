@@ -1,4 +1,5 @@
 #include "imgformats/TiffReader.h"
+#include "storage/LocalFileSource.h"
 #include "iiifparser/IIIFGeometry.h"
 
 #include <tiffio.h>
@@ -97,7 +98,7 @@ void write_fixture(const std::filesystem::path& path, const Fixture& spec) {
 }
 
 void verify(const std::filesystem::path& path, const sipi::PixelRegion& region) {
-    const auto result = sipi::read_tiff_region(path, region);
+    const auto result = sipi::read_tiff_region(sipi::LocalFileSource{path}, region);
     bool identical = result.width == region.width && result.height == region.height &&
         result.pixels.size() == static_cast<std::size_t>(region.width) * region.height * 3 && result.icc_profile == profile;
     for (std::uint32_t y = 0; identical && y < region.height; ++y) {
@@ -149,28 +150,27 @@ int main(int argc, char** argv) {
         verify(big, {33, 30, 20, 11});
         const auto broken = make("corrupt-last.tif", {.corrupt_last_tile = true, .compression = COMPRESSION_LZW});
         verify(broken, {0, 0, 16, 32}); // Proves the unrelated damaged tile is never decoded.
-        rejects([&] { (void)sipi::read_tiff_region(broken, {48, 32, 5, 9}); }, "Cannot decode complete TIFF tile");
+        rejects([&] { (void)sipi::read_tiff_region(sipi::LocalFileSource{broken}, {48, 32, 5, 9}); }, "Cannot decode complete TIFF tile");
         const auto short_tile = make("short-last.tif", {.corrupt_last_tile = true});
-        rejects([&] { (void)sipi::read_tiff_region(short_tile, {48, 32, 5, 9}); }, "Cannot decode complete TIFF tile");
+        rejects([&] { (void)sipi::read_tiff_region(sipi::LocalFileSource{short_tile}, {48, 32, 5, 9}); }, "Cannot decode complete TIFF tile");
         const std::vector<Fixture> unsupported{
             {.tiled = false}, {.bits = 16}, {.samples = 4}, {.planar = PLANARCONFIG_SEPARATE},
             {.orientation = ORIENTATION_RIGHTTOP}, {.samples = 1, .photometric = PHOTOMETRIC_MINISBLACK},
             {.sample_format = SAMPLEFORMAT_INT}};
         for (std::size_t i = 0; i < unsupported.size(); ++i) {
             const auto path = make("unsupported-" + std::to_string(i) + ".tif", unsupported[i]);
-            rejects([&] { (void)sipi::read_tiff_region(path, {0, 0, 1, 1}); }, "Unsupported TIFF");
+            rejects([&] { (void)sipi::read_tiff_region(sipi::LocalFileSource{path}, {0, 0, 1, 1}); }, "Unsupported TIFF");
         }
         for (const sipi::PixelRegion region : {sipi::PixelRegion{0, 0, 0, 1}, {0, 0, 1, 0},
              {53, 0, 1, 1}, {0, 41, 1, 1}, {52, 40, 2, 1}, {0, 0, std::numeric_limits<std::uint32_t>::max(), 1}}) {
-            rejects([&] { (void)sipi::read_tiff_region(big, region); }, "crop must be nonempty");
+            rejects([&] { (void)sipi::read_tiff_region(sipi::LocalFileSource{big}, region); }, "crop must be nonempty");
         }
         const std::size_t budget = 16 * 32 * 3 + 3;
-        const auto one = sipi::read_tiff_region(big, {0, 0, 1, 1}, budget);
+        const auto one = sipi::read_tiff_region(sipi::LocalFileSource{big}, {0, 0, 1, 1}, budget);
         check(one.pixels.size() == 3, "exact combined allocation budget");
-        rejects([&] { (void)sipi::read_tiff_region(big, {0, 0, 1, 1}, budget - 1); }, "decoded-byte limit");
-        rejects([&] { (void)sipi::read_tiff_region(big, {0, 0, 1, 1}, 0); }, "decoded-byte limit");
-        rejects([&] { (void)sipi::read_tiff_region(root / "absent.tif", {0, 0, 1, 1}); }, "Cannot open TIFF");
-        const auto metadata = sipi::read_tiff_metadata(big);
+        rejects([&] { (void)sipi::read_tiff_region(sipi::LocalFileSource{big}, {0, 0, 1, 1}, budget - 1); }, "decoded-byte limit");
+        rejects([&] { (void)sipi::read_tiff_region(sipi::LocalFileSource{big}, {0, 0, 1, 1}, 0); }, "decoded-byte limit");
+        const auto metadata = sipi::read_tiff_metadata(sipi::LocalFileSource{big});
         const auto parsed = sipi::iiif::parse_path("/id/33,30,100,100/max/0/default.jpg");
         const auto& request = std::get<sipi::iiif::ImageRequest>(parsed);
         const auto resolved = sipi::iiif::resolve_geometry(request.region, request.size,

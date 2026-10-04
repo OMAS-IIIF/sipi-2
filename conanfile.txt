@@ -5,10 +5,20 @@ drogon/1.9.13
 libtiff/4.7.2
 libjpeg/9f
 lua/5.4.8
+aws-sdk-cpp/1.11.692
 
 [options]
 drogon/*:with_boost=False
 drogon/*:with_orm=False
+aws-sdk-cpp/*:s3=True
+aws-sdk-cpp/*:monitoring=False
+aws-sdk-cpp/*:access-management=False
+aws-sdk-cpp/*:identity-management=False
+aws-sdk-cpp/*:queues=False
+aws-sdk-cpp/*:s3-encryption=False
+aws-sdk-cpp/*:text-to-speech=False
+aws-sdk-cpp/*:transfer=False
+aws-sdk-cpp/*:s3-crt=False
 
 [generators]
 CMakeDeps

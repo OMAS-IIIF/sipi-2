@@ -1,5 +1,8 @@
 #pragma once
 
+#include "storage/S3ByteSource.h"
+#include "image/ImageSource.h"
+
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -18,6 +21,11 @@ enum class LogLevel { trace, debug, info, warn, error, critical, off };
 
 /** Fully resolved server settings, with defaults for absent values. */
 struct ServerConfig {
+    // Credentials resolve here; constructing an S3 client is a separate step.
+    // Empty credentials retain the SDK provider chain. Never log this object.
+    S3Config s3;
+    StorageKind iiif_storage = StorageKind::local;
+    std::optional<std::string> s3_bucket;
     LogLevel log_level = LogLevel::info;
     std::uint16_t port = 8080;
     bool size_upscaling = false;
@@ -44,6 +52,22 @@ struct ParseError {
 
 using ParseResult = std::variant<StartupOptions, ParseError>;
 
+/** Caller-supplied S3 credential environment snapshot. Views live for one load.
+ * nullopt means unset; a selected empty value is invalid, as for other settings.
+ * These are SIPI_S3_* variables, separate from the SDK's AWS_* provider chain.
+ */
+struct S3CredentialEnvironment {
+    std::optional<std::string_view> access_key;
+    std::optional<std::string_view> secret_key;
+    std::optional<std::string_view> session_token;
+};
+
+/** Optional SIPI_IIIF_STORAGE and SIPI_S3_{BUCKET,REGION,ENDPOINT,PATH_STYLE}
+ * snapshots; resolution uses the same per-field priority as all other settings. */
+struct RepositoryEnvironment {
+    std::optional<std::string_view> storage, bucket, region, endpoint, path_style;
+};
+
 /**
  * Resolve startup options in CLI > environment > TOML file > default order.
  *
@@ -56,6 +80,10 @@ using ParseResult = std::variant<StartupOptions, ParseError>;
  * env_iiif_root supplies SIPI_IIIF_ROOT, with the same path syntax validation.
  * env_public_base_url supplies SIPI_PUBLIC_BASE_URL, an absolute HTTP(S) URL
  * without credentials, query or fragment. The URL path must already be encoded.
+ * s3_environment supplies SIPI_S3_ACCESS_KEY, SIPI_S3_SECRET_KEY and
+ * SIPI_S3_SESSION_TOKEN. Resolve each field independently, then require the
+ * access/secret pair; a session token requires that pair. Help/version validate
+ * supplied CLI field syntax but skip pair checks and environment/file loading.
  * Input views need only live for this call. The returned result owns its data.
  * Reads only an explicitly requested --config file; does not print, log, mutate
  * the environment, or set logging levels. CLI errors are checked even for help
@@ -71,6 +99,8 @@ using ParseResult = std::variant<StartupOptions, ParseError>;
     std::optional<std::string_view> env_size_upscaling = std::nullopt,
     std::optional<std::string_view> env_preflight_script = std::nullopt,
     std::optional<std::string_view> env_iiif_root = std::nullopt,
-    std::optional<std::string_view> env_public_base_url = std::nullopt);
+    std::optional<std::string_view> env_public_base_url = std::nullopt,
+    S3CredentialEnvironment s3_environment = {},
+    RepositoryEnvironment repository_environment = {});
 
 } // namespace sipi

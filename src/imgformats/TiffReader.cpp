@@ -7,6 +7,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <exception>
 #include <limits>
 #include <memory>
 #include <unordered_set>
@@ -25,20 +26,93 @@ int capture_error(TIFF*, void* context, const char*, const char* format, va_list
 }
 int ignore_warning(TIFF*, void*, const char*, const char*, va_list) noexcept { return 1; }
 
-/** Keep diagnostics alive in the caller until the handle has been closed. */
+/** Each libtiff handle borrows one source and owns its own logical cursor.
+ * C callbacks capture exceptions; the enclosing C++ reader rethrows them only
+ * after libtiff returns. A failed source is never read again by this handle.
+ */
+struct TiffInput {
+    const ByteSource& source;
+    std::uint64_t position = 0;
+    std::exception_ptr failure;
+    Diagnostics diagnostic;
+
+    void check_source() const { if (failure) std::rethrow_exception(failure); }
+};
+
+tmsize_t read_bytes(thandle_t handle, void* buffer, tmsize_t count) noexcept {
+    auto& input = *static_cast<TiffInput*>(handle);
+    if (input.failure) return -1;
+    try {
+        if (count < 0 || (count > 0 && !buffer))
+            throw ByteSourceError(ByteSourceErrorCode::invalid_argument, "Invalid TIFF source read");
+        const auto size = input.source.info().size;
+        const auto wanted = input.position >= size ? 0 :
+            std::min<std::uint64_t>(static_cast<std::uint64_t>(count), size - input.position);
+        const auto read = input.source.read_at(input.position,
+            {static_cast<std::byte*>(buffer), static_cast<std::size_t>(count)});
+        if (read != wanted)
+            throw ByteSourceError(ByteSourceErrorCode::io, "Byte source returned an unexpected read length");
+        input.position += read; // bounded by source size, already checked
+        return static_cast<tmsize_t>(read);
+    } catch (...) {
+        input.failure = std::current_exception();
+        return -1;
+    }
+}
+tmsize_t reject_write(thandle_t, void*, tmsize_t) noexcept { return -1; }
+
+/** libtiff passes negative relative offsets encoded in unsigned toff_t.
+ * Handle both directions explicitly without signed casts or arithmetic overflow.
+ * Seeking past EOF is allowed; reading there returns zero. -1 is reserved for
+ * failure and cannot be a valid cursor position.
+ */
+toff_t seek_bytes(thandle_t handle, toff_t offset, int origin) noexcept {
+    auto& input = *static_cast<TiffInput*>(handle);
+    constexpr auto invalid = std::numeric_limits<toff_t>::max();
+    if (input.failure) return invalid;
+    std::uint64_t base;
+    switch (origin) {
+    case SEEK_SET:
+        if (offset == invalid) return invalid;
+        input.position = offset;
+        return offset;
+    case SEEK_CUR: base = input.position; break;
+    case SEEK_END: base = input.source.info().size; break;
+    default: return invalid;
+    }
+    if (offset > invalid / 2) {
+        const auto distance = invalid - offset + 1;
+        if (distance > base) return invalid;
+        input.position = base - distance;
+    } else {
+        if (offset >= invalid - base) return invalid;
+        input.position = base + offset;
+    }
+    return input.position;
+}
+int close_input(thandle_t) noexcept { return 0; } // source belongs to caller
+toff_t source_size(thandle_t handle) noexcept {
+    return static_cast<TiffInput*>(handle)->source.info().size;
+}
+int no_mapping(thandle_t, void**, toff_t*) noexcept { return 0; }
+void unmap_input(thandle_t, void*, toff_t) noexcept {}
+
+/** Context must outlive the TIFF handle; closing it never closes the source. */
 using TiffHandle = std::unique_ptr<TIFF, decltype(&TIFFClose)>;
-TiffHandle open_tiff(const std::filesystem::path& path, Diagnostics& diagnostic) {
-    const auto name = path.string();
-    if (name.find('\0') != std::string::npos) { throw TiffReadError("NUL in TIFF path"); }
+TiffHandle open_tiff(TiffInput& input) {
+    if (input.source.info().size == std::numeric_limits<toff_t>::max())
+        throw TiffReadError("TIFF source size exceeds offset range");
     std::unique_ptr<TIFFOpenOptions, decltype(&TIFFOpenOptionsFree)> options(TIFFOpenOptionsAlloc(), TIFFOpenOptionsFree);
     if (!options) { throw std::bad_alloc{}; }
-    TIFFOpenOptionsSetErrorHandlerExtR(options.get(), capture_error, &diagnostic);
+    TIFFOpenOptionsSetErrorHandlerExtR(options.get(), capture_error, &input.diagnostic);
     TIFFOpenOptionsSetWarningHandlerExtR(options.get(), ignore_warning, nullptr);
     TIFFOpenOptionsSetMaxSingleMemAlloc(options.get(), 64 * 1024 * 1024);
     TIFFOpenOptionsSetMaxCumulatedMemAlloc(options.get(), 64 * 1024 * 1024);
-    // 'm' disables mmap, 'c' disables strip chopping: preserve stored layout.
-    std::unique_ptr<TIFF, decltype(&TIFFClose)> file(TIFFOpenExt(name.c_str(), "rmc", options.get()), TIFFClose);
-    if (!file) { throw TiffReadError("Cannot open TIFF: " + std::string(diagnostic.error.data())); }
+    // No mmap and no strip chopping. Diagnostic name reveals no storage identity.
+    TiffHandle file(TIFFClientOpenExt("image source", "rmc", &input, read_bytes, reject_write,
+        seek_bytes, close_input, source_size, no_mapping, unmap_input, options.get()), TIFFClose);
+    input.check_source();
+    if (!file) { throw TiffReadError("Cannot open TIFF: " + std::string(input.diagnostic.error.data())); }
     return file;
 }
 
@@ -139,9 +213,9 @@ std::uint32_t TiffDirectory::display_height() const noexcept {
     return static_cast<std::uint16_t>(orientation) >= 5 ? width : height;
 }
 
-TiffMetadata read_tiff_metadata(const std::filesystem::path& path) {
-    Diagnostics diagnostic;
-    auto file = open_tiff(path, diagnostic);
+TiffMetadata read_tiff_metadata(const ByteSource& source) {
+    TiffInput input{source, 0, {}, {}};
+    auto file = open_tiff(input);
     TiffMetadata result;
     result.image = read_directory(file.get());
     result.icc_profile = read_profile(file.get());
@@ -149,7 +223,10 @@ TiffMetadata read_tiff_metadata(const std::filesystem::path& path) {
     append_subifds(file.get(), pending);
     std::unordered_set<std::uint64_t> visited{result.image.offset};
     while (!TIFFLastDirectory(file.get())) {
-        if (!TIFFReadDirectory(file.get())) { throw TiffReadError("Cannot read TIFF main directory"); }
+        if (!TIFFReadDirectory(file.get())) {
+            input.check_source();
+            throw TiffReadError("Cannot read TIFF main directory");
+        }
         if (!visited.insert(TIFFCurrentDirOffset(file.get())).second || visited.size() > directory_limit) {
             throw TiffReadError("Cyclic or excessive TIFF directory chain");
         }
@@ -168,6 +245,7 @@ TiffMetadata read_tiff_metadata(const std::filesystem::path& path) {
             throw TiffReadError("Invalid or repeated TIFF SubIFD offset");
         }
         if (visited.size() > directory_limit || !TIFFSetSubDirectory(file.get(), offset)) {
+            input.check_source();
             throw TiffReadError("Cannot read TIFF SubIFD or directory limit exceeded");
         }
         if (marked_reduced(file.get())) {
@@ -180,7 +258,8 @@ TiffMetadata read_tiff_metadata(const std::filesystem::path& path) {
             }
         }
     }
-    if (diagnostic.error[0] != '\0') { throw TiffReadError(diagnostic.error.data()); }
+    input.check_source();
+    if (input.diagnostic.error[0] != '\0') { throw TiffReadError(input.diagnostic.error.data()); }
     std::sort(result.levels.begin(), result.levels.end(), [](const auto& a, const auto& b) {
         return static_cast<std::uint64_t>(a.width) * a.height > static_cast<std::uint64_t>(b.width) * b.height;
     });
@@ -199,10 +278,10 @@ std::size_t rgb_bytes(std::uint32_t width, std::uint32_t height, std::size_t lim
 }
 } // namespace
 
-RgbImage8 read_tiff_region(const std::filesystem::path& path, const PixelRegion& region,
+RgbImage8 read_tiff_region(const ByteSource& source, const PixelRegion& region,
                            std::size_t max_decoded_bytes) {
-    Diagnostics diagnostic;
-    auto file = open_tiff(path, diagnostic);
+    TiffInput input{source, 0, {}, {}};
+    auto file = open_tiff(input);
     const auto metadata = read_directory(file.get());
     const auto* tiles = std::get_if<TiffTiles>(&metadata.layout);
     std::uint32_t depth = 1, tile_depth = 1;
@@ -226,7 +305,8 @@ RgbImage8 read_tiff_region(const std::filesystem::path& path, const PixelRegion&
         throw TiffReadError("Unexpected TIFF decoded tile size");
     }
     auto profile = read_profile(file.get());
-    if (diagnostic.error[0] != '\0') { throw TiffReadError(diagnostic.error.data()); }
+    input.check_source();
+    if (input.diagnostic.error[0] != '\0') { throw TiffReadError(input.diagnostic.error.data()); }
     RgbImage8 output{region.width, region.height, std::vector<std::uint8_t>(output_bytes), std::move(profile)};
     std::vector<std::uint8_t> tile(tile_bytes);
     // Use 64-bit positions even at UINT32_MAX image edges. Tile origins supplied
@@ -240,8 +320,9 @@ RgbImage8 read_tiff_region(const std::filesystem::path& path, const PixelRegion&
             const auto index = TIFFComputeTile(file.get(), static_cast<std::uint32_t>(tx),
                                                 static_cast<std::uint32_t>(ty), 0, 0);
             const auto count = TIFFReadEncodedTile(file.get(), index, tile.data(), static_cast<tmsize_t>(tile_bytes));
-            if (count < 0 || static_cast<std::size_t>(count) != tile_bytes || diagnostic.error[0] != '\0') {
-                throw TiffReadError("Cannot decode complete TIFF tile: " + std::string(diagnostic.error.data()));
+            if (count < 0 || static_cast<std::size_t>(count) != tile_bytes || input.diagnostic.error[0] != '\0') {
+                input.check_source();
+                throw TiffReadError("Cannot decode complete TIFF tile: " + std::string(input.diagnostic.error.data()));
             }
             // Intersect in absolute image coordinates, then translate separately
             // into tile-local and crop-local offsets (the legacy code mixed these).
@@ -257,6 +338,7 @@ RgbImage8 read_tiff_region(const std::filesystem::path& path, const PixelRegion&
             }
         }
     }
+    input.check_source();
     return output;
 }
 } // namespace sipi

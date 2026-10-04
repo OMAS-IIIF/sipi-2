@@ -102,7 +102,8 @@ remain untested and are separate increments.
 ## IIIF preflight and source resolution
 
 For both image and info requests, including HEAD: parse syntax, run the configured
-preflight if present, resolve the source, read TIFF metadata, and validate geometry. Health/hello and rejected methods
+preflight if present, resolve and open one byte source, read TIFF metadata, and validate geometry.
+Format probing and pixel decoding reuse that source (see [byte sources](byte-source.md)). Health/hello and rejected methods
 never enter preflight. Authorization is evaluated on each request, without a cache.
 The Authorization header is copied without validation by the HTTP layer. Drogon
 parses Cookie separately and does not retain its raw header: use request.cookies
@@ -117,7 +118,7 @@ semantics; raw header ordering/duplicates cannot be recovered by this adapter.
 | Required iiif-root absent | 500 / source_not_configured |
 | Forbidden relative path / escaping symlink | 403 / source_not_allowed |
 | Missing source or non-regular file | 404 / image_not_found |
-| Other filesystem status failure | 500 / source_error |
+| Other filesystem status/open/read failure | 500 / source_error |
 | Unsupported source format | 501 / source_format_not_supported |
 | Invalid TIFF metadata | 500 / invalid_image_source |
 | Invalid region/size for the image | 400 / invalid_iiif_geometry |
@@ -144,3 +145,12 @@ Tests additionally exercise denied/failed GET and HEAD, source selection, cookie
 encoded identifiers, quota failures, responsiveness of health during queued work,
 recovery after failures, and absence of sensitive diagnostics. A deterministic
 worker test covers the 64-job bound and shutdown rejection.
+
+## S3 delivery
+
+`iiif-storage=s3` selects the configured S3 bucket; a local default can also use
+Lua S3 overrides. The worker authorizes before opening one version-bound source,
+then uses the existing TIFF/geometry/JPEG pipeline. `/museum/tiled.tif/...` reads
+key `tiled.tif`: IIIF URL prefixes are excluded from default mapping. Explicit
+project mapping belongs in preflight. See [configuration](command-line.md#repository-selection-local-or-s3)
+and [Lua source selection](preflight.md).

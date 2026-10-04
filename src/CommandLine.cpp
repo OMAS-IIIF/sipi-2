@@ -70,7 +70,9 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                                 std::optional<std::string_view> env_size_upscaling,
                                 std::optional<std::string_view> env_preflight_script,
                                 std::optional<std::string_view> env_iiif_root,
-                                std::optional<std::string_view> env_public_base_url) {
+                                std::optional<std::string_view> env_public_base_url,
+                                S3CredentialEnvironment s3_environment,
+                                RepositoryEnvironment repository_environment) {
     StartupOptions result;
     bool help = false;
     bool version = false;
@@ -78,6 +80,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     std::string preflight_script;
     std::string iiif_root;
     std::string public_base_url;
+    std::string storage = "local", bucket, path_style = "false";
     std::string log_level = "info";
     std::string size_upscaling = "false";
     CLI::App app{"SIPI-2 IIIF server", "sipi-2"};
@@ -119,6 +122,55 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     auto* public_url_option = app.add_option("--public-base-url", public_base_url,
         "Public origin and proxy mount (SIPI_PUBLIC_BASE_URL; default: local listener)")
         ->check(CLI::Validator(validate_public_base_url, "URL"))->type_name("URL");
+    auto* storage_option = app.add_option("--iiif-storage", storage,
+        "Default repository: local or s3 (SIPI_IIIF_STORAGE; default: local)")
+        ->check(CLI::IsMember({"local", "s3"}));
+    auto* bucket_option = app.add_option("--s3-bucket", bucket,
+        "Repository bucket (SIPI_S3_BUCKET; required for S3 sources)")
+        ->check(CLI::Validator([](const std::string& value) {
+            static const std::regex pattern{R"(^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$)"};
+            return value.size() < 3 || value.size() > 63 || !std::regex_match(value, pattern) ||
+                value.find("..") != std::string::npos || value.find(".-") != std::string::npos ||
+                value.find("-.") != std::string::npos
+                ? std::string{"Invalid S3 bucket name"} : std::string{};
+        }, "BUCKET"));
+    auto* region_option = app.add_option("--s3-region", result.config.s3.region,
+        "S3 signing region (SIPI_S3_REGION; default: us-east-1)")
+        ->check(CLI::Validator([](const std::string& value) {
+            static const std::regex pattern{R"(^[a-z0-9]+(-[a-z0-9]+)*$)"};
+            return std::regex_match(value, pattern) ? std::string{} : std::string{"Invalid S3 region"};
+        }, "REGION"));
+    auto* endpoint_option = app.add_option("--s3-endpoint", result.config.s3.endpoint,
+        "S3 HTTP(S) origin (SIPI_S3_ENDPOINT; default: AWS regional endpoint)")
+        ->check(CLI::Validator([](const std::string& value) {
+            const auto error = validate_public_base_url(value);
+            if (!error.empty()) return error;
+            return value.find('/', value.find("://") + 3) == std::string::npos
+                ? std::string{} : std::string{"S3 endpoint must not contain a path"};
+        }, "ORIGIN"));
+    auto* path_style_option = app.add_option("--s3-path-style", path_style,
+        "Use path-style S3 addressing (SIPI_S3_PATH_STYLE; default: false)")
+        ->check(CLI::IsMember({"true", "false"}))->type_name("BOOL");
+    const auto save_repository = [&] {
+        result.config.iiif_storage = storage == "s3" ? StorageKind::s3 : StorageKind::local;
+        result.config.s3.path_style = path_style == "true";
+        if (!bucket_option->empty()) result.config.s3_bucket = bucket;
+    };
+    const auto credential_validator = CLI::Validator([](const std::string& value) {
+        // Do not trim or normalize credential bytes. Reject header controls.
+        for (const unsigned char byte : value)
+            if (byte < 0x20 || byte == 0x7f) return std::string{"Credential contains a control byte"};
+        return value.empty() ? std::string{"Credential must not be empty"} : std::string{};
+    }, "CREDENTIAL");
+    auto* access_option = app.add_option("--s3-access-key", result.config.s3.access_key,
+        "S3 access key (SIPI_S3_ACCESS_KEY; default: SDK provider chain)")
+        ->check(credential_validator)->type_name("KEY");
+    auto* secret_option = app.add_option("--s3-secret-key", result.config.s3.secret_key,
+        "S3 secret key (SIPI_S3_SECRET_KEY; requires access key)")
+        ->check(credential_validator)->type_name("SECRET");
+    auto* token_option = app.add_option("--s3-session-token", result.config.s3.session_token,
+        "Optional S3 session token (SIPI_S3_SESSION_TOKEN; requires key pair)")
+        ->check(credential_validator)->type_name("TOKEN");
     const auto save_public_url = [&] {
         if (public_url_option->empty()) return;
         if (public_base_url.ends_with('/')) public_base_url.pop_back();
@@ -136,6 +188,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
             if (!preflight_option->empty()) result.config.preflight_script = preflight_script;
             if (!root_option->empty()) result.config.iiif_root = iiif_root;
             save_public_url();
+            save_repository();
             result.command = help ? Command::help : Command::version;
             if (help) {
                 result.help_text = app.help();
@@ -183,6 +236,22 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
             public_url_option->add_result(std::string{*env_public_base_url});
             public_url_option->run_callback();
         }
+        // Same per-field precedence as existing settings, without reading the
+        // process environment or consulting the AWS SDK inside this loader.
+        const auto load_setting = [](CLI::Option* option, std::optional<std::string_view> value) {
+            if (option->empty() && value) {
+                option->add_result(std::string{*value});
+                option->run_callback();
+            }
+        };
+        load_setting(storage_option, repository_environment.storage);
+        load_setting(bucket_option, repository_environment.bucket);
+        load_setting(region_option, repository_environment.region);
+        load_setting(endpoint_option, repository_environment.endpoint);
+        load_setting(path_style_option, repository_environment.path_style);
+        load_setting(access_option, s3_environment.access_key);
+        load_setting(secret_option, s3_environment.secret_key);
+        load_setting(token_option, s3_environment.session_token);
         if (!config_option->empty()) {
             std::ifstream input{config_path};
             if (!input) {
@@ -194,8 +263,20 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
             }
         }
     } catch (const CLI::ParseError& error) {
-        return ParseError{error.what()};
+        // CLI11 diagnostics may echo arbitrary argument/file values, including
+        // secrets on duplicate, conversion or unknown-option errors. Keep only
+        // the library's fixed error category, never the raw diagnostic.
+        return ParseError{"Invalid startup configuration (" + error.get_name() +
+                          "). Check option names, values and duplicates; use --help."};
     }
+    save_repository();
+    if (result.config.iiif_storage == StorageKind::s3 && !result.config.s3_bucket)
+        return ParseError{"iiif-storage=s3 requires s3-bucket"};
+    const auto& credentials = result.config.s3;
+    if (credentials.access_key.empty() != credentials.secret_key.empty())
+        return ParseError{"S3 access key and secret key must both be configured"};
+    if (!credentials.session_token.empty() && credentials.access_key.empty())
+        return ParseError{"S3 session token requires an access key and secret key"};
     if (!preflight_option->empty()) result.config.preflight_script = preflight_script;
     if (!root_option->empty()) result.config.iiif_root = iiif_root;
     save_public_url();

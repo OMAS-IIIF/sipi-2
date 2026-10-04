@@ -18,3 +18,20 @@ size-upscaling = false
 # Optional existing image repository, relative to the process working directory.
 # Default identifier mapping and relative Lua source paths use this directory.
 # iiif-root = "data/images"
+
+# Optional explicit S3 credentials. Omit all three to use the AWS SDK provider chain.
+# Each field follows CLI > SIPI_S3_* environment > TOML > absent.
+# Access and secret keys must both be present; a session token requires that pair.
+# Example values below are PUBLIC local MinIO test credentials only.
+# s3-access-key = "sipi-test"
+# s3-secret-key = "sipi-local-test-password"
+# s3-session-token = "temporary-session-token"
+
+# Default mapping: local (default) or s3. S3 requires s3-bucket.
+# The IIIF URL prefix NEVER participates in default mapping; only identifier does.
+# Project-specific prefix translation belongs in the preflight script.
+# iiif-storage = "s3"
+# s3-bucket = "sipi-test-images"
+# s3-region = "us-east-1"
+# s3-endpoint = "http://127.0.0.1:9000"  # Omit for AWS regional endpoint; no trailing slash.
+# s3-path-style = true                  # Default false; use true for local MinIO.

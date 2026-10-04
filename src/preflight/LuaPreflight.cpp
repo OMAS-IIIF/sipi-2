@@ -139,14 +139,28 @@ int evaluate_protected(lua_State* state) {
     raw_field(state, 1, "source");
     if (!lua_isnil(state, 3)) {
         if (!allowed) return luaL_error(state, "deny must not include a source");
-        if (lua_type(state, 3) != LUA_TSTRING) {
-            return luaL_error(state, "source must be a nonempty string without NUL bytes");
+        int value_index = 3;
+        if (lua_type(state, 3) == LUA_TTABLE) {
+            if (lua_getmetatable(state, 3)) return luaL_error(state, "source must not have a metatable");
+            lua_pushnil(state);
+            while (lua_next(state, 3)) {
+                if (!is_string(state, -2, "type") && !is_string(state, -2, "key"))
+                    return luaL_error(state, "unknown field in source");
+                lua_pop(state, 1);
+            }
+            raw_field(state, 3, "type");
+            if (!is_string(state, -1, "s3")) return luaL_error(state, "source type must be s3");
+            lua_pop(state, 1);
+            raw_field(state, 3, "key");
+            value_index = 4;
         }
+        if (lua_type(state, value_index) != LUA_TSTRING)
+            return luaL_error(state, "source path/key must be a string");
         std::size_t length = 0;
-        const char* source = lua_tolstring(state, 3, &length);
-        if (length == 0 || std::memchr(source, '\0', length)) {
-            return luaL_error(state, "source must be a nonempty string without NUL bytes");
-        }
+        const char* source = lua_tolstring(state, value_index, &length);
+        if (length == 0 || std::memchr(source, '\0', length))
+            return luaL_error(state, "source path/key must be nonempty without NUL bytes");
+        if (value_index == 4) lua_pop(state, 1);
     }
     return 2;
 }
@@ -255,6 +269,13 @@ Decision LuaPreflight::evaluate(const Request& request) const {
     if (is_string(state.get(), 1, "deny")) return Deny{};
     if (lua_isnil(state.get(), 2)) return Allow{std::nullopt};
     std::size_t length = 0;
+    // Contract was checked inside the protected Lua call. Read existing fields
+    // without invoking metamethods; owning C++ values are constructed afterwards.
+    if (lua_type(state.get(), 2) == LUA_TTABLE) {
+        raw_field(state.get(), 2, "key");
+        const char* key = lua_tolstring(state.get(), -1, &length);
+        return Allow{S3Key{std::string(key, length)}};
+    }
     const char* source = lua_tolstring(state.get(), 2, &length);
     return Allow{std::filesystem::path(std::string(source, length))};
 }

@@ -46,6 +46,9 @@ ExternalProject build wholesale; adopt libraries and source modules incrementall
 
 ## Key files and next steps
 
+- `src/storage/S3ByteSource.h`, `.cpp`, `docs/s3-byte-source.md`: AWS SDK-backed version-bound reads and MinIO tests.
+- `src/storage/ByteSource.h`, `LocalFileSource.*`, `docs/byte-source.md`: version-bound positioned reads, local RAII storage and TIFF callback integration.
+
 - `src/image/SourceResolver.h`, `.cpp`, `docs/source-resolution.md`: root mapping, containment, and manual TIFF/HTTP examples.
 - `src/http/IiifInfo.h`, `.cpp`, `docs/iiif-info.md`: format-neutral information document and public identity.
 - `src/http/IiifWorker.h`, `.cpp`: bounded worker for optional preflight, sources, metadata, and geometry.
@@ -116,7 +119,7 @@ routes are case-insensitive, while IIIF parameter parsing remains case-sensitive
 Health reports liveness, not readiness. IIIF preflight selects/checks a source,
 and info generation returns metadata; supported TIFF crops produce JPEG. Debug logs record parsed values.
 
-Next: review first TIFF/JPEG delivery with the owner, then discuss scaling or further TIFF layouts. The first tiled RGB8 TIFF crop decoder is
+Next: measure remote request counts and add bounded range buffering as justified. The first tiled RGB8 TIFF crop decoder is
 implemented; Grok remains the next format to evaluate. Evaluate streaming/cancellation
 separately. Tests cover configuration, the HTTP route, and IIIF syntax. The owner already knows C++; focus on design choices and unfamiliar
 modern features. Logging remains synchronous console output; Drogon now provides the initial HTTP layer; codec integration remains open.
@@ -282,8 +285,9 @@ Default source is root/decoded-identifier, ignoring prefix. Relative Lua source
 results now use root, replacing the old cwd rule. Reject traversal and root-escaping
 symlinks via canonical component checks. Only explicit absolute script overrides
 may bypass root; missing required root is a request error, not a cwd fallback.
-Canonical paths are not atomic open handles: repository trees must stay trusted
-and stable across resolution/probing/header reads and eventual decoding.
+Canonicalization and open are separate: repository directories/symlinks must stay
+trusted. Once open, the same LocalFileSource serves probing, metadata and pixels;
+atomic file replacement is safe, but in-place writes are prohibited.
 
 Drogon strips raw Cookie into its cookie map: expose request.cookies in Lua; retain
 optional raw headers.cookie for standalone callers. Responses use no-store and do
@@ -336,3 +340,117 @@ failure recovery and corruption inside/outside requested tiles. See
 src/imgformats/JpegWriter.h, tests/JpegWriterTests.cpp and docs/jpeg-delivery.md.
 info.json still omits profile pending per-resource conformance review; do not infer
 output support for every metadata-readable source from this first decoder subset.
+
+## Persistent cache design (agreed 2026-10-04; not implemented)
+
+See docs/iiif-delivery-architecture.md#cache-architecture-agreed-2026-10-04 for the
+agreed contract. Start with one local cache per server instance, persistent image
+files plus SQLite index. Keep versioned source metadata separate from encoded
+response entries (key, relative path, bytes, media type, output dimensions, last use).
+Preflight and definitive source-version checks precede metadata/output reuse;
+geometry and current policy remain validated on hits. Key includes source/version,
+effective variant, normalized operations, encoder/color/watermark settings and an
+explicit rendering-recipe version, not just the canonical URL or raw credentials.
+
+Evict by byte usage with a lower cleanup target and approximate, batched LRU;
+100/90 GiB is an example, not a default. Budget in-progress writes, skip oversized
+entries, protect active readers and coalesce concurrent generation for one key.
+Write temp -> complete/close -> same-filesystem atomic rename -> publish index.
+Recover orphan/missing files and temp remnants after crashes; cache failures should
+permit uncached delivery. Cache survives restart but is disposable, not repository
+storage. SQLite/filesystem are not one atomic transaction.
+
+Allow same-ID source replacement via complete-file atomic replacement. Initially
+use file identity/size/high-resolution timestamps as a practical fingerprint, not
+content proof; later prefer import-assigned source versions. Planning/decoding
+now share one open local descriptor, supporting atomic replacement while reads
+are in flight; in-place writes remain prohibited. Preserve the option of versioned public identities for
+citations/annotations. Implementation details (schema, configuration defaults,
+reservations, durability, handle/retry strategy) remain open. No distributed cache,
+backend abstraction, changed browser cache policy or cache implementation added.
+
+## S3-ready repository reading (agreed 2026-10-04)
+
+S3 is a firm architectural requirement from the outset, not an assumption to
+retrofit after extending local-path readers. HTTP source selection supports local files and S3.
+The small ByteSource boundary is implemented (info and offset reads, immutable
+identity/version/size, explicit ownership, thread safety and storage errors).
+LocalFileSource uses open/fstat/pread with RAII; TIFF uses TIFFClientOpenExt and
+independent cursors while preserving storage exceptions across C callbacks.
+Source identity uses device/inode; version uses size and nanosecond mtime/ctime,
+a practical fingerprint rather than a content hash. S3ByteSource now uses AWS SDK
+for C++ 1.11.692 (S3 service plus core dependencies). A shared S3Client hides all
+AWS types and owns connections; HEAD captures size/ETag/VersionId, GET uses pinned
+versions or If-Match (including mutable null versions). Ranges are capped at 1 MiB
+and streamed into caller buffers with length/range/validator checks. Requests use
+2s connect/10s HTTP timeouts, no redirects and zero SDK retries. HTTP source
+selection supports both backends. See docs/s3-byte-source.md. Inspect Grok I/O
+before designing its adapter. SourceResolver returns ImageSource (LocalSource or S3Source); Lua overrides
+are either local path strings or {type="s3", key="..."}.
+
+Bound and reuse remote reads, coalesce nearby ranges and limit parallel requests.
+Pin one source version throughout metadata/planning/decoding, using VersionId or
+conditional reads with a defined retry contract. Include backend/source identity
+and version in cache keys; retain the result cache and SQLite locally. Source-range
+caching is separate and bounded. Avoid a speculative generic storage framework.
+
+Use a small local MinIO store for early integration tests of ranges, consistency,
+replacement, errors and local/remote output equivalence. The optional dev/minio/compose.yaml setup now builds a pinned MinIO community
+source commit and stores data in a Docker named volume, with loopback-only ports.
+See docs/minio-development.md. Source build, readiness, authenticated TIFF upload,
+range reads and persistence across container recreation were verified on Docker
+Desktop ARM64. The local bucket sipi-test-images contains tiled.tif. Later
+validate production-provider behavior and realistic network latency separately.
+Both pyramidal tiled TIFF and Grok JPEG 2000 remain targets. TIFF is the provisional
+default; distinguish supported inputs from recommended efficient layouts and from
+implemented capabilities. Use COG layout principles without requiring geospatial
+metadata or GDAL. Select recommendations through comparable-quality local/S3
+benchmarks covering file size, transferred bytes, request count, CPU and latency
+with cold/warm caches. A later repository validator should share input rules with
+import/delivery. Details: docs/iiif-delivery-architecture.md, repository/S3 section.
+
+S3 verification: offline protocol fault tests run in normal CTest; opt-in
+SIPI_TEST_S3 enables disposable local MinIO buckets, replacement/version tests
+and local/remote TIFF pixel equivalence. All 16 suites pass with integration
+enabled, and S3 checks pass ASan/UBSan (dependencies uninstrumented). AWS/HTTPS
+and production credential providers remain unverified; no read-ahead/cache yet.
+
+## S3 credential configuration (2026-10-04)
+
+ServerConfig.s3 reuses S3Config; access_key, secret_key and optional session_token
+resolve per field from --s3-* CLI > SIPI_S3_* environment > matching TOML root keys
+> absent. Explicit empty/control-containing values fail; final access/secret pair
+must be complete and tokens require the pair. All absent leaves the SDK provider
+chain intact; AWS_* variables are SDK inputs, not SIPI precedence sources.
+Help/version skip environment/file/pair checks but validate CLI field syntax.
+CLI11 diagnostics use fixed error categories without raw values; never log config.
+Tests cover source precedence, redaction and actual main environment wiring.
+No SDK client/network access occurs during parsing. HTTP source selection and
+endpoint/bucket configuration are now integrated. Details in
+docs/command-line.md#s3-credentials and sipi.example.toml.
+
+## Local/S3 delivery selection (2026-10-04)
+
+--iiif-storage / SIPI_IIIF_STORAGE / TOML iiif-storage selects local (default) or s3.
+S3 backend settings s3-bucket, s3-region (us-east-1), s3-endpoint (AWS regional
+endpoint when absent), s3-path-style (false) have matching CLI/environment/TOML
+priority. S3 default requires a bucket; local default may also configure a bucket
+for Lua S3 overrides. One configured backend/bucket and one shared SDK client.
+
+IMPORTANT: The IIIF URL prefix stays outside the default mapping. Project-specific
+translation belongs in the preflight script. /museum/subpart/tiled.tif/... selects
+local root/tiled.tif or S3 key tiled.tif; request.prefix is available to Lua and
+still participates in public identity. No second URL decoding of identifiers/keys.
+
+SourceOverride distinguishes legacy local paths from S3Key. String sources always
+remain local, even with S3 default; {type="s3", key="..."} always selects the
+configured bucket, even with local default. No script-supplied bucket/endpoint or
+credentials. Strict Lua tables reject unknown fields/metatables/coercions. Source
+resolution returns owning ImageSource variants; worker opens one ByteSource only
+after authorization, then reuses existing TIFF/geometry/JPEG pipeline.
+
+See examples/minio.toml for immediate local MinIO delivery and
+docs/command-line.md#repository-selection-local-or-s3, docs/preflight.md and
+docs/source-resolution.md for the contract. Opt-in s3-http tests compare JPEG
+bytes, info/HEAD, explicit prefix translation, mixed sources and denial with an
+unreachable backend. All 16 suites and relevant ASan/UBSan checks pass.

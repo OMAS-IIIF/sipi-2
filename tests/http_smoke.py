@@ -25,8 +25,7 @@ def run(executable: Path, fixtures: Path, verifier: Path, configured: bool = Fal
         probe.bind(("127.0.0.1", 0))
         port = probe.getsockname()[1]
     version = subprocess.check_output([str(executable), "--version"], text=True).strip().split()[-1]
-    env = {key: value for key, value in os.environ.items()
-           if key not in {"SIPI_LOG_LEVEL", "SIPI_PORT", "SIPI_SIZE_UPSCALING", "SIPI_PREFLIGHT_SCRIPT", "SIPI_IIIF_ROOT", "SIPI_PUBLIC_BASE_URL"}}
+    env = {key: value for key, value in os.environ.items() if not key.startswith("SIPI_")}
     with tempfile.TemporaryDirectory(prefix="sipi-http-") as directory:
         root = Path(directory, "images")
         root.mkdir()
@@ -353,6 +352,20 @@ def startup_errors(executable: Path) -> None:
             result = subprocess.run([str(executable), "--iiif-root", root], cwd=directory,
                                     env=env, capture_output=True, text=True, timeout=5)
             assert result.returncode == 2 and "Image repository startup error:" in result.stderr, result
+        # Exercise main's actual environment snapshot, not only the loader API.
+        secret = "do-not-disclose-this-value"
+        for variables in ({"SIPI_S3_ACCESS_KEY": "access"},
+                          {"SIPI_S3_SECRET_KEY": secret},
+                          {"SIPI_S3_SESSION_TOKEN": secret}):
+            result = subprocess.run([str(executable)], cwd=directory, env={**env, **variables},
+                                    capture_output=True, text=True, timeout=5)
+            assert result.returncode == 2 and "Configuration error:" in result.stderr, result
+            assert secret not in result.stdout + result.stderr, result
+        result = subprocess.run([str(executable), "--s3-access-key=cli-access", "--iiif-root=absent-root"],
+                                cwd=directory, env={**env, "SIPI_S3_ACCESS_KEY": "", "SIPI_S3_SECRET_KEY": secret},
+                                capture_output=True, text=True, timeout=5)
+        assert result.returncode == 2 and "Image repository startup error:" in result.stderr, result
+        assert secret not in result.stdout + result.stderr, result
         for action in ("--help", "--version"):
             result = subprocess.run([str(executable), action, "--iiif-root", "absent-root"],
                                     cwd=directory, env=env, capture_output=True, text=True, timeout=5)

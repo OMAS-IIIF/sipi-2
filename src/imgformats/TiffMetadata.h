@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <filesystem>
+#include "storage/ByteSource.h"
 #include <stdexcept>
 #include <variant>
 #include <vector>
@@ -37,7 +37,7 @@ struct TiffDirectory {
 /** Metadata for the first main image. levels contains only compatible, explicitly
  * marked reduced images, sorted largest first, excluding the full image.
  * ICC bytes are copied unchanged; profile interpretation belongs to color handling.
- * No pointers into libtiff or open file handles survive the read. */
+ * No pointers into libtiff or the borrowed source survive the read. */
 struct TiffMetadata {
     TiffDirectory image;
     std::vector<TiffDirectory> levels;
@@ -60,11 +60,14 @@ public:
  * strips, tiles, or scanlines. Supports consecutive reduced main IFDs and reduced
  * SubIFDs (including nested ones); stops the main chain at the next full page.
  * Ambiguous/unmarked thumbnails are not automatically treated as pyramid levels.
+ * Borrows an already opened ByteSource for this call. Independent TIFF handles
+ * have separate cursors; metadata and pixels can reuse the same source version.
+ * ByteSourceError propagates unchanged for storage failures.
  * Per-handle diagnostics and RAII permit independent concurrent reads without
  * changing libtiff's global handlers. Errors throw TiffReadError.
  * Metadata work is bounded to 256 directories, 64 MiB libtiff allocations, and
  * 16 MiB ICC data. Nonfatal libtiff warnings are suppressed in this first reader.
  */
-[[nodiscard]] TiffMetadata read_tiff_metadata(const std::filesystem::path& path);
+[[nodiscard]] TiffMetadata read_tiff_metadata(const ByteSource& source);
 
 } // namespace sipi

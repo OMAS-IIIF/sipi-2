@@ -4,7 +4,7 @@ The working implementation uses CLI11 in `src/CommandLine.cpp`.
 `load_startup_options` returns either owning `StartupOptions` or `ParseError`.
 `main` supplies argument views (excluding argv[0]) and an optional snapshot of
 `SIPI_LOG_LEVEL`, `SIPI_PORT`, `SIPI_SIZE_UPSCALING`, `SIPI_PREFLIGHT_SCRIPT`,
-`SIPI_IIIF_ROOT`, and `SIPI_PUBLIC_BASE_URL`. The loader reads an explicitly selected file, but does not log,
+`SIPI_IIIF_ROOT`, `SIPI_PUBLIC_BASE_URL`, and the three `SIPI_S3_*` credential variables. The loader reads an explicitly selected file, but does not log,
 print, exit, or change logging/environment state.
 
 ## Sources and precedence
@@ -31,6 +31,7 @@ would put the file ahead of the environment in the version we use.
 - `--iiif-root PATH`: optional repository directory, nonempty and without NUL bytes.
 - `--public-base-url URL`: public HTTP(S) origin and optional proxy mount; see below.
 - `SIPI_PUBLIC_BASE_URL` and TOML `public-base-url` supply the same setting.
+- S3 credential options are listed in the table below.
 - `--config PATH`: load one explicitly selected configuration file.
 - `SIPI_LOG_LEVEL`: the same case-sensitive level names; empty is invalid if selected.
 - `SIPI_PORT`: the same port range; empty is invalid if selected.
@@ -49,8 +50,10 @@ Duplicate scalar options/flags and conflicting help/version actions are errors.
 CLI11's standard `--` end-of-options marker is accepted; positional tokens after
 it remain errors. Flag value overrides such as `--help=false` are rejected.
 
-The supported file schema has six root keys: `log-level`, `port`, `size-upscaling`,
-`preflight-script`, `iiif-root`, and `public-base-url`. Unknown keys
+The supported file schema has fourteen root keys: `log-level`, `port`, `size-upscaling`,
+`preflight-script`, `iiif-root`, `public-base-url`, `s3-access-key`, `s3-secret-key`,
+`s3-session-token`, `iiif-storage`, `s3-bucket`, `s3-region`, `s3-endpoint`,
+and `s3-path-style`. Unknown keys
 and startup actions in the file are rejected. CLI11's built-in TOML-style reader
 is used directly; this is not a promise of full TOML grammar validation (including
 all malformed syntax or duplicate-key checks). Revisit the parser if the schema
@@ -66,7 +69,9 @@ For normal startup, an explicitly requested file must be readable even if CLI
 supplies every setting. Unknown file keys remain errors. A lower-priority setting
 value that is overridden is not semantically validated; the selected value is.
 An invalid selected value fails startup instead of silently reverting to defaults.
-Diagnostics go to stderr and main returns 2. The loader retains no input views.
+Diagnostics go to stderr and main returns 2. CLI11 parse errors expose only the
+error category, not raw values (which could contain credentials, including in
+unknown/duplicate options). File I/O errors still identify the configuration path. The loader retains no input views.
 Allocation failures may propagate as exceptions.
 
 ## Representative outcomes
@@ -152,3 +157,108 @@ If Caddy forwards `/museum/id/info.json` unchanged, configure only the origin;
 the parsed `museum` prefix is appended automatically. If it strips `/iiif` from
 `/iiif/museum/id/info.json`, configure `https://images.example.org/iiif`.
 See [information responses](iiif-info.md) for examples and development boundaries.
+
+## S3 credentials
+
+| Command line | Environment | TOML root key | Default |
+| --- | --- | --- | --- |
+| `--s3-access-key KEY` | `SIPI_S3_ACCESS_KEY` | `s3-access-key` | Absent |
+| `--s3-secret-key SECRET` | `SIPI_S3_SECRET_KEY` | `s3-secret-key` | Absent |
+| `--s3-session-token TOKEN` | `SIPI_S3_SESSION_TOKEN` | `s3-session-token` | Absent |
+
+Each parameter follows **CLI > environment > TOML > absent**, exactly like the
+other settings. Values are stored as owning strings in `ServerConfig.s3`, the
+existing `S3Config` type accepted by `S3Client`. Loading credentials does not create
+an SDK client or access the network. The HTTP worker uses this configuration for S3 sources; see repository selection below.
+
+Selected values must be nonempty and contain no ASCII control bytes (including
+NUL, CR and LF). Values are not trimmed or normalized. Empty values are errors,
+not a way to clear a lower-priority value. Overridden invalid values are ignored.
+Duplicate scalar options remain errors. After resolving all sources, access and
+secret keys must both be present or both absent; a token requires the pair.
+Fields can come from different sources, including the token: when replacing
+credentials, also update/remove any stale token in a lower-priority source.
+
+Help/version still validate supplied CLI field syntax, but skip environment,
+file loading and pair completeness checks. Thus `--help --s3-secret-key example`
+works without an access key, while an explicitly empty CLI value is rejected.
+Help and parser diagnostics do not print credential values. Avoid logging the
+resolved ServerConfig. CLI values may remain visible in shell history/process
+arguments; environment or a protected config file is preferable for real secrets.
+
+If all three SIPI settings are absent, the adapter uses the AWS SDK's normal
+credential provider chain, which can include AWS environment variables, profiles
+and roles. `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN`
+are SDK inputs, not another layer of the SIPI configuration precedence. Explicit
+SIPI credentials replace the provider chain as a complete credential set; an
+incomplete SIPI pair never borrows a missing field from AWS variables. Explicit
+temporary credentials are a startup snapshot and are not automatically refreshed.
+
+Local MinIO example (public test credentials):
+
+```sh
+SIPI_S3_ACCESS_KEY=sipi-test SIPI_S3_SECRET_KEY=sipi-local-test-password ./build/Debug/sipi-2
+```
+
+Or in an explicitly selected TOML file:
+
+```toml
+s3-access-key = "sipi-test"
+s3-secret-key = "sipi-local-test-password"
+# s3-session-token = "only-for-temporary-credentials"
+```
+
+`tests/S3ConfigurationTests.cpp` covers all source priorities, mixed-source pairs,
+empty/control values, help/version behavior and diagnostic redaction. The HTTP
+process test also checks main's actual SIPI_S3_* environment snapshot. See
+[S3 byte sources](s3-byte-source.md) for direct adapter use and MinIO tests.
+
+## Repository selection: local or S3
+
+| Command line | Environment | TOML root key | Default |
+| --- | --- | --- | --- |
+| `--iiif-storage` | `SIPI_IIIF_STORAGE` | `iiif-storage` | `local` |
+| `--s3-bucket` | `SIPI_S3_BUCKET` | `s3-bucket` | Absent |
+| `--s3-region` | `SIPI_S3_REGION` | `s3-region` | `us-east-1` |
+| `--s3-endpoint` | `SIPI_S3_ENDPOINT` | `s3-endpoint` | AWS regional endpoint |
+| `--s3-path-style` | `SIPI_S3_PATH_STYLE` | `s3-path-style` | `false` |
+
+All five fields use **CLI > environment > TOML > default**. `iiif-storage` accepts
+exactly `local` or `s3`; `s3-path-style` accepts exactly `true` or `false`.
+S3 default storage requires a bucket. Bucket input is 3–63 lowercase ASCII
+letters/digits/dots/hyphens, with alphanumeric ends and no empty labels or
+hyphens adjacent to dots; provider-specific naming rules/existence are checked by
+the service. Region input uses lowercase alphanumeric segments separated by
+hyphens. Endpoint is an HTTP(S) origin with a valid host/port, without credentials,
+path (including a trailing slash), query or fragment. Omit it for AWS. Selected
+empty values are errors, not resets. Help/version skip the cross-field bucket
+requirement but still check CLI field syntax.
+
+A configured local root is validated at startup, even with S3 as the default.
+A configured bucket enables one shared S3 client, also when the default is local
+and only Lua selects S3. Bucket existence, object access and credentials are
+checked on source access; startup does not probe objects. No S3 client is created
+without a bucket. This increment supports one configured S3 backend/bucket.
+
+**The IIIF URL prefix stays outside the default mapping. Project-specific
+translation belongs in the preflight script.** For example:
+
+| IIIF path | Local default source | S3 default source |
+| --- | --- | --- |
+| `/tiled.tif/info.json` | `<iiif-root>/tiled.tif` | `<s3-bucket>`, key `tiled.tif` |
+| `/museum/subpart/tiled.tif/info.json` | `<iiif-root>/tiled.tif` | `<s3-bucket>`, key `tiled.tif` |
+
+Prefixes still appear in public IIIF identities and in `request.prefix` for Lua;
+they are not automatically prepended to a filesystem path or object key. Keys
+and identifiers are not URL-decoded a second time. Local path containment rules
+continue to apply; S3 keys are literal object names, not normalized filesystem paths.
+See [preflight](preflight.md) for explicit prefix mapping and mixed sources.
+
+A complete local MinIO example is in `examples/minio.toml`:
+
+```sh
+./build/Debug/sipi-2 --config examples/minio.toml
+```
+
+With `sipi-test-images/tiled.tif` uploaded, both `/tiled.tif/info.json` and
+`/museum/tiled.tif/50,30,100,80/max/0/default.jpg` use that same object.

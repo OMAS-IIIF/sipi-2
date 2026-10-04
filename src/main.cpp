@@ -50,8 +50,18 @@ int main(int argc, char* argv[]) {
     if (const char* value = std::getenv("SIPI_IIIF_ROOT")) env_iiif_root = value;
     std::optional<std::string_view> env_public_base_url;
     if (const char* value = std::getenv("SIPI_PUBLIC_BASE_URL")) env_public_base_url = value;
+    sipi::S3CredentialEnvironment s3_environment;
+    if (const char* value = std::getenv("SIPI_S3_ACCESS_KEY")) s3_environment.access_key = value;
+    if (const char* value = std::getenv("SIPI_S3_SECRET_KEY")) s3_environment.secret_key = value;
+    if (const char* value = std::getenv("SIPI_S3_SESSION_TOKEN")) s3_environment.session_token = value;
+    sipi::RepositoryEnvironment repository_environment;
+    if (const char* value = std::getenv("SIPI_IIIF_STORAGE")) repository_environment.storage = value;
+    if (const char* value = std::getenv("SIPI_S3_BUCKET")) repository_environment.bucket = value;
+    if (const char* value = std::getenv("SIPI_S3_REGION")) repository_environment.region = value;
+    if (const char* value = std::getenv("SIPI_S3_ENDPOINT")) repository_environment.endpoint = value;
+    if (const char* value = std::getenv("SIPI_S3_PATH_STYLE")) repository_environment.path_style = value;
     const auto parsed = sipi::load_startup_options(arguments, env_log_level, env_port,
-        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url);
+        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&parsed)) {
         std::cerr << "Configuration error: " << error->message << '\n';
         return 2;
@@ -80,6 +90,9 @@ int main(int argc, char* argv[]) {
     }
     try {
         sipi::run_http_server(options.config, std::move(preflight));
+    } catch (const sipi::ByteSourceError&) {
+        std::cerr << "S3 startup error: invalid backend configuration\n";
+        return 2;
     } catch (const sipi::SourceError& error) {
         std::cerr << "Image repository startup error: " << error.what() << '\n';
         return 2;

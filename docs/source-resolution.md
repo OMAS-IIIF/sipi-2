@@ -11,7 +11,9 @@ is created automatically. Help/version bypass directory access.
 
 | Source decision | Resolution |
 | --- | --- |
-| No script, or allow without source | Decoded identifier relative to iiif-root |
+| No script, or allow without source; local default | Decoded identifier relative to iiif-root |
+| No script, or allow without source; S3 default | Decoded identifier as key in s3-bucket |
+| Allow with `{type="s3", key="..."}` | Literal key in configured s3-bucket |
 | Allow with relative source | Script path relative to iiif-root |
 | Allow with absolute source | Explicit trusted-script override; root not required |
 | Deny | No source access |
@@ -19,9 +21,10 @@ is created automatically. Help/version bypass directory access.
 
 The default mapping does not include IIIF prefix segments, append an extension, or
 URL-decode a second time. For example, `/museum/subpart/sample.tif/info.json`
-uses `<root>/sample.tif`. A decoded slash may name a subdirectory within the root;
+uses `<root>/sample.tif` or key `sample.tif` in the configured bucket. A decoded slash may name a subdirectory within the root;
 it cannot establish an absolute path or escape the root. Project-specific mapping
-belongs in Lua. Authorization still precedes all request-specific file access.
+belongs in Lua. **The IIIF URL prefix stays outside the default mapping;
+project-specific translation belongs in the preflight script.** Authorization still precedes all request-specific file access.
 
 **Changed behavior:** relative Lua source results previously used cwd; they now
 require iiif-root and are relative to it. The path to the Lua script itself still
@@ -30,7 +33,9 @@ uses cwd. Absolute script source results keep working without a configured root.
 ## Filesystem boundary
 
 `src/image/SourceResolver.*` is independent of HTTP, Lua, and image codecs. It
-returns a canonical absolute path to a regular file, or a typed SourceError.
+returns an owning `ImageSource` variant: `LocalSource{path}` or `S3Source{bucket,key}`,
+or throws typed SourceError. Its local-path resolver returns canonical regular
+files; S3 selection does not access the network.
 Relative/default sources reject parent traversal, rooted paths, NULs, and
 backslashes. Canonical path components must remain within the canonical root:
 symlinks inside the repository are permitted; symlinks leading outside are rejected.
@@ -41,23 +46,26 @@ repository. Scripts are trusted operator code, not arbitrary uploaded programs.
 Nonexistent/non-regular sources return 404; forbidden relative paths return 403;
 other filesystem errors return 500. Responses do not reveal local paths.
 
-Canonicalization and subsequent header reading are separate operations, not an
-atomic capability-based open. Repository directories and symlinks must not be
-mutated by untrusted writers during requests. File replacement can also change the
-source between probing, metadata reading, and future decoding; source versioning
-or handle-based access must be designed before concurrent upload/cache integration.
+Canonicalization and opening the source are separate operations, not an atomic
+capability-based open. Repository directories and symlinks must not be mutated by
+untrusted writers during requests. After opening, one `LocalFileSource` serves
+probing, metadata and pixel reads. Atomic replacement or unlinking of its path
+does not change that opened source; in-place writes remain prohibited. See
+[byte sources](byte-source.md).
 
 ## TIFF metadata and geometry
 
 `src/http/IiifWorker.*` owns the optional Lua policy, source resolver, and size
 policy, and receives the complete parsed image/info request. Its bounded worker
-performs source resolution, a four-byte format probe, TIFF metadata reading, and
+performs source resolution, opens one local or S3 byte source, then performs a four-byte
+format probe, TIFF metadata reading, and
 image-request geometry validation away from the HTTP I/O thread.
 
 The probe recognizes little/big-endian classic TIFF and BigTIFF from bytes, without
 requiring a filename extension. Other/unrecognized formats return
 501 source_format_not_supported. A recognized TIFF with unreadable/corrupt metadata
-returns 500 invalid_image_source. Information requests do not check pixel integrity; image output validates the accessed tiles.
+returns 500 invalid_image_source. Storage read failures return 500 source_error;
+a source disappearing before open returns 404 image_not_found. Information requests do not check pixel integrity; image output validates the accessed tiles.
 
 For image requests, orientation-normalized width/height are passed to the existing
 format-neutral resolve_geometry function. No TIFF-specific branching is added to
@@ -101,3 +109,5 @@ ctest --preset conan-debug --output-on-failure
 Automated checks include source priority, root startup failures, real symlinks and
 traversal, Lua-selected alternate dimensions, HEAD, clipping, orientation, BigTIFF,
 unsupported/corrupt headers, and enabled/disabled upscaling.
+
+S3 backend parameters and MinIO examples are documented in [configuration](command-line.md#repository-selection-local-or-s3). Source opening remains after preflight; one shared S3 client serves requests, while each request pins its own opened object version.

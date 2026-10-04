@@ -54,6 +54,18 @@ int main(int argc, char** argv) {
     rejects([&] { (void)SourceResolver{}.resolve("ignored", "sample.tif"); }, SourceErrorCode::configuration, "relative override needs root");
     rejects([&] { SourceResolver invalid(base / "absent"); }, SourceErrorCode::configuration, "missing root");
     rejects([&] { SourceResolver invalid(root / "sample.tif"); }, SourceErrorCode::configuration, "root must be directory");
+    const SourceResolver remote(root, sipi::StorageKind::s3, "test-bucket");
+    const auto selected = std::get<sipi::S3Source>(remote.resolve_source("folder/a%2Fb"));
+    check(selected.bucket == "test-bucket" && selected.key == "folder/a%2Fb", "literal S3 key");
+    check(std::get<sipi::LocalSource>(remote.resolve_source("ignored", sipi::SourceOverride{fs::path("sample.tif")})).path ==
+          fs::canonical(root / "sample.tif"), "string override stays local with S3 default");
+    const SourceResolver mixed(root, sipi::StorageKind::local, "test-bucket");
+    check(std::get<sipi::S3Source>(mixed.resolve_source("ignored", sipi::SourceOverride{sipi::S3Key{"project/key"}})).key ==
+          "project/key", "explicit S3 override with local default");
+    rejects([&] { (void)sources.resolve_source("ignored", sipi::SourceOverride{sipi::S3Key{"key"}}); },
+            SourceErrorCode::configuration, "S3 override requires bucket");
+    rejects([&] { SourceResolver invalid({}, sipi::StorageKind::s3); },
+            SourceErrorCode::configuration, "S3 default requires bucket");
     std::cout << checks << " checks, " << failures << " failures\n";
     return failures ? 1 : 0;
 }

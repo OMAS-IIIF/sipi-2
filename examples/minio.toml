@@ -1,0 +1,11 @@
+# Local development only: public test credentials for dev/minio/compose.yaml.
+port = 8080
+iiif-storage = "s3"
+s3-bucket = "sipi-test-images"
+s3-region = "us-east-1"
+s3-endpoint = "http://127.0.0.1:9000"
+s3-path-style = true
+s3-access-key = "sipi-test"
+s3-secret-key = "sipi-local-test-password"
+# /museum/tiled.tif/... reads key tiled.tif, NOT museum/tiled.tif.
+# Project-specific prefix translation belongs in the preflight script.

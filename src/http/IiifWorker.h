@@ -2,6 +2,7 @@
 
 #include "preflight/LuaPreflight.h"
 #include "image/SourceResolver.h"
+#include "storage/S3ByteSource.h"
 #include "iiifparser/IIIFGeometry.h"
 #include <drogon/HttpResponse.h>
 #include <condition_variable>
@@ -33,7 +34,8 @@ public:
      * public_base_url must be validated configuration without a trailing slash;
      * it supplies information-document identities, never filesystem locations. */
     IiifWorker(std::optional<preflight::LuaPreflight> policy, SourceResolver sources,
-               iiif::SizePolicy size_policy, std::string public_base_url);
+               iiif::SizePolicy size_policy, std::string public_base_url,
+               std::optional<S3Client> s3_client = std::nullopt);
     ~IiifWorker();
     IiifWorker(const IiifWorker&) = delete;
     IiifWorker& operator=(const IiifWorker&) = delete;
@@ -50,6 +52,7 @@ private:
 
     std::optional<preflight::LuaPreflight> policy_;
     SourceResolver sources_;
+    std::optional<S3Client> s3_client_;
     iiif::SizePolicy size_policy_;
     std::string public_base_url_;
     std::mutex mutex_;

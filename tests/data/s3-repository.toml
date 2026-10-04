@@ -1,0 +1,5 @@
+iiif-storage = "s3"
+s3-bucket = "file-bucket"
+s3-region = "eu-central-1"
+s3-endpoint = "http://localhost:9000"
+s3-path-style = true

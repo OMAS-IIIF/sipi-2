@@ -1,0 +1,26 @@
+# Local development only; intentionally separate from the SIPI-2 runtime.
+name: sipi-2-minio
+services:
+  minio:
+    build:
+      context: .
+    environment:
+      # Public test credentials. Never reuse these outside this loopback setup.
+      MINIO_ROOT_USER: sipi-test
+      MINIO_ROOT_PASSWORD: sipi-local-test-password
+      MINIO_REGION_NAME: us-east-1
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - data:/data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    stop_grace_period: 30s
+
+volumes:
+  data:

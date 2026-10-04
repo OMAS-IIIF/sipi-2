@@ -55,7 +55,7 @@ void request_and_decision() {
     const auto result = policy.evaluate({{{"project/part", "space here"}, "id%2Fvalue/é"},
                                          "Bearer example", "session=abc"});
     const auto* allow = std::get_if<Allow>(&result);
-    check(allow && allow->source == std::filesystem::path("/images/é example.tif"),
+    check(allow && allow->source == std::optional<sipi::SourceOverride>{std::filesystem::path("/images/é example.tif")},
           "owning source survives Lua-state destruction, without filesystem lookup");
 
     const auto no_headers = script(R"lua(
@@ -84,7 +84,7 @@ void request_and_decision() {
             return {decision = "allow", source = "relative.tif"}
         end
     )lua").evaluate({{{}, "example"}, std::nullopt, std::string("a\0b", 3)});
-    check(std::get<Allow>(binary).source == std::filesystem::path("relative.tif"),
+    check(std::get<Allow>(binary).source == std::optional<sipi::SourceOverride>{std::filesystem::path("relative.tif")},
           "length-aware input strings and unmodified relative source");
 }
 
@@ -103,6 +103,13 @@ void invalid_scripts_and_results() {
         "{decision = true}", "{decision = 1}", "{decision = 'ALLOW'}",
         "{decision = 'restrict'}", "{decision = 'allow' .. string.char(0)}",
         "{decision = 'allow', source = ''}", "{decision = 'allow', source = 123}",
+        "{decision='allow', source={type='s3', key=''}}",
+        "{decision='allow', source={type='s3', key=42}}",
+        "{decision='allow', source={type='s3', key='a', bucket='other'}}",
+        "{decision='allow', source={type='s3', key='a' .. string.char(0)}}",
+        "{decision='allow', source={type='local', key='a'}}",
+        "{decision='allow', source=setmetatable({type='s3',key='a'}, {})}",
+        "{decision='deny', source={type='s3',key='a'}}",
         "{decision = 'allow', source = false}", "{decision = 'allow', source = {}}",
         "{decision = 'allow', source = 'a' .. string.char(0) .. 'b'}",
         "{decision = 'deny', source = '/image.tif'}",
@@ -151,7 +158,7 @@ void isolation_and_snapshot() {
         }
         const auto result = policy.evaluate({{{}, "unique.tif"}, std::nullopt, std::nullopt});
         check(std::holds_alternative<Allow>(result) &&
-              std::get<Allow>(result).source == std::filesystem::path("unique.tif"),
+              std::get<Allow>(result).source == std::optional<sipi::SourceOverride>{std::filesystem::path("unique.tif")},
               "success after runtime/contract failure; isolated globals and script snapshot");
         check(std::holds_alternative<Deny>(policy.evaluate({{{}, "deny"}, {}, {}})),
               "deny never reuses a previous allow");
@@ -165,7 +172,7 @@ void isolation_and_snapshot() {
     }
     for (std::size_t i = 0; i < concurrent.size(); ++i) {
         const auto result = concurrent[i].get();
-        check(std::get<Allow>(result).source == std::filesystem::path(std::to_string(i) + ".tif"),
+        check(std::get<Allow>(result).source == std::optional<sipi::SourceOverride>{std::filesystem::path(std::to_string(i) + ".tif")},
               "concurrent calls have independent states");
     }
 }

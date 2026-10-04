@@ -9,7 +9,7 @@ server with HTML hello, JSON health, and IIIF syntax routes. Initial tiled RGB8 
 Prerequisites: a C++20 compiler, CMake 3.24 or newer, Ninja, and Conan 2.
 Python 3 is used by the HTTP integration test (no third-party Python packages).
 Direct dependencies are `spdlog/1.17.0`, `cli11/2.6.2`, `drogon/1.9.13`,
-`libtiff/4.7.2`, and `lua/5.4.8`.
+`libtiff/4.7.2`, `libjpeg/9f`, `lua/5.4.8`, and `aws-sdk-cpp/1.11.692` (S3).
 Drogon is built without Boost and ORM support. Its Conan recipe still brings
 OpenSSL transitively, even though our listener uses only plain HTTP.
 `conan.lock` records their resolved versions and recipe revisions.
@@ -231,3 +231,17 @@ is strip-based and remains unsupported for pixel delivery.
 The independent JPEG writer uses libjpeg 9f (now a direct Conan dependency),
 preserves ICC profiles, and emits synchronous byte blocks. HTTP currently buffers
 up to 64 MiB before responding. See [the supported subset, limits and tests](docs/jpeg-delivery.md).
+
+## Optional local S3 test storage
+
+See [MinIO development setup](docs/minio-development.md) for Docker Compose,
+persistent test storage and local endpoints. The [S3 byte-source adapter](docs/s3-byte-source.md)
+is integrated with HTTP and Lua source selection. Try
+`./build/Debug/sipi-2 --config examples/minio.toml` with the local test bucket.
+The IIIF URL prefix is excluded from default storage mapping; project-specific
+translation belongs in preflight. See [repository configuration](docs/command-line.md#repository-selection-local-or-s3).
+MinIO integration tests are opt-in with `-DSIPI_TEST_S3=ON`.
+
+S3 credentials support `--s3-access-key`, `--s3-secret-key` and
+`--s3-session-token`, their `SIPI_S3_*` environment equivalents and matching TOML
+keys, with the usual precedence. See [credential configuration](docs/command-line.md#s3-credentials).
