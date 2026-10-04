@@ -8,14 +8,14 @@ template<class F> void rejects(F f) {
     try { f(); } catch (const sipi::ResizeError&) { return; }
     throw std::runtime_error("Expected ResizeError");
 }
-sipi::RgbImage8 pattern(std::uint32_t w, std::uint32_t h) {
-    sipi::RgbImage8 image{w, h, std::vector<std::uint8_t>(w * h * 3), {1, 2, 3}};
+sipi::RasterImage8 pattern(std::uint32_t w, std::uint32_t h) {
+    sipi::RasterImage8 image{w, h, std::vector<std::uint8_t>(w * h * 3), {1, 2, 3}};
     for (std::size_t i = 0; i < image.pixels.size(); ++i) image.pixels[i] = (i * 73 + i / 3 * 11) % 256;
     return image;
 }
 /** Independent small-image oracle: replicate source samples onto a common
  * integer grid, then count each target cell, rather than computing overlaps. */
-std::vector<std::uint8_t> reference(const sipi::RgbImage8& in, std::uint32_t w, std::uint32_t h) {
+std::vector<std::uint8_t> reference(const sipi::RasterImage8& in, std::uint32_t w, std::uint32_t h) {
     std::vector<std::uint8_t> out(w * h * 3);
     const std::uint64_t count = in.width * in.height;
     for (std::uint32_t y = 0; y < h; ++y)

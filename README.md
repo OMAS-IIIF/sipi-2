@@ -2,7 +2,7 @@
 
 A high-performance, versatile IIIF server, developed in small, explainable steps.
 The current executable resolves startup configuration and runs a local Drogon HTTP
-server with HTML hello, JSON health, and IIIF syntax routes. Initial tiled RGB8 TIFF-to-JPEG delivery is implemented; area-weighted reduction is supported; enlargement and streaming come later.
+server with HTML hello, JSON health, and IIIF syntax routes. Tiled RGB/RGBA8 TIFF-to-JPEG/PNG delivery is implemented; area-weighted reduction is supported; enlargement and streaming come later.
 
 ## Build and run
 
@@ -153,7 +153,7 @@ in application code and prefer the rule of zero for application types.
 The standalone C++20 parser in `src/iiifparser` handles IIIF Image API 3 image
 and `info.json` paths with typed, owning results. The HTTP catch-all returns 400
 for invalid syntax; valid requests enter optional preflight and source checks,
-with supported tiled RGB8 TIFF crops delivered as JPEG. See [the parser contract](docs/iiif-parser.md) for syntax, decoding, and
+with supported tiled RGB/RGBA8 TIFF crops delivered as JPEG or PNG. See [the parser contract](docs/iiif-parser.md) for syntax, decoding, and
 the boundary between parsing and image geometry. Its regression tests run with CTest.
 
 ## TIFF metadata and geometry
@@ -174,10 +174,10 @@ See [the contract, examples, and feature roadmap](docs/tiff-metadata-and-geometr
 
 The first pixel reader is now available in `src/imgformats/TiffReader.h`:
 `read_tiff_region` reads only intersecting tiles from top-left, contiguous RGB8
-TIFFs into a format-neutral `RgbImage8`. It preserves ICC bytes and rejects other
+TIFFs into a format-neutral `RasterImage8`. It preserves ICC bytes and rejects other
 layouts explicitly. `tests/TiffRegionTests.cpp` verifies exact pixels, selective
 access, and error paths. HTTP preflight selects local or S3 sources; TIFF crop
-reading, [area-weighted reduction](docs/area-resize.md) and JPEG output are integrated.
+reading, [area-weighted reduction](docs/area-resize.md) and JPEG/PNG output are integrated.
 
 ## Lua preflight
 
@@ -190,7 +190,7 @@ not access grants. See [the contract and C++ example](docs/preflight.md) and
 key `preflight-script`. Startup validates the file and entry point before listening;
 invalid configured scripts fail startup. Relative paths use the working directory.
 No script is loaded by default. Denials return 403, script failures 500, and
-missing selected files 404; invalid geometry returns 400. Supported tiled RGB8 TIFF crops now return JPEG; unsupported layouts and
+missing selected files 404; invalid geometry returns 400. Supported tiled RGB/RGBA8 TIFF crops now return JPEG or PNG; unsupported layouts and
 transformations return 501. Information requests now
 return 200 with real dimensions and public service identity. See [HTTP behavior](docs/http-server.md).
 
@@ -250,3 +250,22 @@ keys, with the usual precedence. See [credential configuration](docs/command-lin
 A [pure TIFF read planner](docs/tiff-metadata-and-geometry.md#pure-tiff-read-planning)
 now selects suitable pyramid levels and preserves exact fractional crop edges.
 Delivery uses the selected IFD and exact fractional-window resampling, locally and over S3.
+
+
+## PNG output
+
+RGB8 PNG output now shares TIFF pyramid selection and exact crop/reduction with
+JPEG. Use `.png`, for example `/tiled.tif/50,30,100,80/37,29/0/default.png`.
+See [PNG delivery](docs/png-delivery.md) for ICC handling, limits and tests.
+Conan now includes libpng 1.6.58. Rerun the normal Conan install command and reload
+CMake in CLion after pulling. RGBA transparency is now supported; see [alpha delivery](docs/alpha-delivery.md).
+
+
+## Transparency
+
+Explicit straight and premultiplied TIFF alpha are supported for tiled RGBA8
+sources, including compatible pyramid levels. PNG retains transparency; JPEG
+composites onto white. For generated fixtures, try
+`/alpha.tif/full/max/0/default.png` and the same URL ending in `.jpg`.
+Resizing weights colors by alpha to avoid hidden-color fringes. Color management
+and arbitrary rotation remain separate steps.

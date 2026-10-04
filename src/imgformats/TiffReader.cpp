@@ -270,25 +270,29 @@ TiffMetadata read_tiff_metadata(const ByteSource& source) {
 namespace sipi {
 namespace {
 /** Check products before multiplying, with the caller's finite allocation bound. */
-std::size_t rgb_bytes(std::uint32_t width, std::uint32_t height, std::size_t limit) {
-    if (width == 0 || height == 0 || width > limit / 3 || height > limit / (static_cast<std::size_t>(width) * 3)) {
-        throw TiffReadError("RGB raster exceeds the decoded-byte limit");
+std::size_t raster_bytes(std::uint32_t width, std::uint32_t height, std::size_t channels, std::size_t limit) {
+    if (width == 0 || height == 0 || width > limit / channels || height > limit / (static_cast<std::size_t>(width) * channels)) {
+        throw TiffReadError("Raster exceeds the decoded-byte limit");
     }
-    return static_cast<std::size_t>(width) * height * 3;
+    return static_cast<std::size_t>(width) * height * channels;
 }
 } // namespace
 
 bool supports_tiff_region(const TiffDirectory& directory) {
-    return std::holds_alternative<TiffTiles>(directory.layout) &&
+    const bool rgb = directory.samples_per_pixel == 3 && directory.extra_samples.empty();
+    const bool rgba = directory.samples_per_pixel == 4 && directory.extra_samples.size() == 1 &&
+        (directory.extra_samples[0] == EXTRASAMPLE_ASSOCALPHA ||
+         directory.extra_samples[0] == EXTRASAMPLE_UNASSALPHA);
+    return (rgb || rgba) && std::holds_alternative<TiffTiles>(directory.layout) &&
         directory.orientation == TiffOrientation::top_left &&
-        directory.bits_per_sample == 8 && directory.samples_per_pixel == 3 &&
+        directory.bits_per_sample == 8 &&
         directory.sample_format == SAMPLEFORMAT_UINT && directory.photometric == PHOTOMETRIC_RGB &&
-        directory.planar_config == PLANARCONFIG_CONTIG && directory.extra_samples.empty() &&
+        directory.planar_config == PLANARCONFIG_CONTIG &&
         TIFFIsCODECConfigured(directory.compression);
 }
 
 namespace {
-RgbImage8 decode_region(const ByteSource& source, const PixelRegion& region,
+RasterImage8 decode_region(const ByteSource& source, const PixelRegion& region,
                         const TiffDirectory* selected, std::size_t max_decoded_bytes) {
     TiffInput input{source, 0, {}, {}};
     auto file = open_tiff(input);
@@ -313,21 +317,23 @@ RgbImage8 decode_region(const ByteSource& source, const PixelRegion& region,
     TIFFGetFieldDefaulted(file.get(), TIFFTAG_IMAGEDEPTH, &depth);
     TIFFGetFieldDefaulted(file.get(), TIFFTAG_TILEDEPTH, &tile_depth);
     if (!supports_tiff_region(metadata) || depth != 1 || tile_depth != 1) {
-        throw TiffUnsupportedError("Unsupported TIFF: expected tiled top-left unsigned 8-bit contiguous RGB without alpha");
+        throw TiffUnsupportedError("Unsupported TIFF: expected tiled top-left unsigned 8-bit contiguous RGB or explicitly tagged RGBA");
     }
     if (region.width == 0 || region.height == 0 || region.x >= metadata.width || region.y >= metadata.height ||
         region.width > metadata.width - region.x || region.height > metadata.height - region.y) {
         throw TiffReadError("TIFF crop must be nonempty and entirely inside the image");
     }
-    const auto output_bytes = rgb_bytes(region.width, region.height, max_decoded_bytes);
-    const auto tile_bytes = rgb_bytes(tiles->width, tiles->height, max_decoded_bytes - output_bytes);
+    const auto channels = metadata.samples_per_pixel;
+    const auto output_bytes = raster_bytes(region.width, region.height, channels, max_decoded_bytes);
+    const auto tile_bytes = raster_bytes(tiles->width, tiles->height, channels, max_decoded_bytes - output_bytes);
     if (tile_bytes > static_cast<std::size_t>(std::numeric_limits<tmsize_t>::max()) ||
         TIFFTileSize64(file.get()) != tile_bytes) {
         throw TiffReadError("Unexpected TIFF decoded tile size");
     }
     input.check_source();
     if (input.diagnostic.error[0] != '\0') { throw TiffReadError(input.diagnostic.error.data()); }
-    RgbImage8 output{region.width, region.height, std::vector<std::uint8_t>(output_bytes), std::move(profile)};
+    RasterImage8 output{region.width, region.height, std::vector<std::uint8_t>(output_bytes), std::move(profile),
+        channels == 4 ? PixelLayout::rgba : PixelLayout::rgb};
     std::vector<std::uint8_t> tile(tile_bytes);
     // Use 64-bit positions even at UINT32_MAX image edges. Tile origins supplied
     // to libtiff are still inside the image and therefore fit uint32_t.
@@ -350,25 +356,37 @@ RgbImage8 decode_region(const ByteSource& source, const PixelRegion& region,
             const auto top = std::max<std::uint64_t>(ty, region.y);
             const auto end_x = std::min(tx + tiles->width, right);
             const auto end_y = std::min(ty + tiles->height, bottom);
-            const auto row_bytes = static_cast<std::size_t>(end_x - left) * 3;
+            const auto row_bytes = static_cast<std::size_t>(end_x - left) * channels;
             for (auto y = top; y < end_y; ++y) {
-                const auto source = static_cast<std::size_t>((y - ty) * tiles->width + left - tx) * 3;
-                const auto destination = static_cast<std::size_t>((y - region.y) * region.width + left - region.x) * 3;
+                const auto source = static_cast<std::size_t>((y - ty) * tiles->width + left - tx) * channels;
+                const auto destination = static_cast<std::size_t>((y - region.y) * region.width + left - region.x) * channels;
                 std::memcpy(output.pixels.data() + destination, tile.data() + source, row_bytes);
             }
         }
     }
     input.check_source();
+    if (channels == 4 && metadata.extra_samples[0] == EXTRASAMPLE_ASSOCALPHA) {
+        // Normalize only requested pixels, not unused tile padding. Division
+        // cannot recover precision lost when 8-bit premultiplication was stored.
+        for (std::size_t i = 0; i < output.pixels.size(); i += 4) {
+            const unsigned alpha = output.pixels[i+3];
+            for (unsigned c = 0; c < 3; ++c) {
+                const unsigned value = output.pixels[i+c];
+                if (value > alpha) throw TiffReadError("Invalid associated TIFF alpha sample");
+                output.pixels[i+c] = alpha ? static_cast<std::uint8_t>((value*255 + alpha/2)/alpha) : 0;
+            }
+        }
+    }
     return output;
 }
 } // namespace
 
-RgbImage8 read_tiff_region(const ByteSource& source, const PixelRegion& region,
+RasterImage8 read_tiff_region(const ByteSource& source, const PixelRegion& region,
                            std::size_t max_decoded_bytes) {
     return decode_region(source, region, nullptr, max_decoded_bytes);
 }
 
-RgbImage8 read_tiff_region(const ByteSource& source, const TiffDirectory& directory,
+RasterImage8 read_tiff_region(const ByteSource& source, const TiffDirectory& directory,
                            const PixelRegion& region, std::size_t max_decoded_bytes) {
     return decode_region(source, region, &directory, max_decoded_bytes);
 }

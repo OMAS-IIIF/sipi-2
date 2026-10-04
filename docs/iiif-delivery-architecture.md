@@ -38,10 +38,9 @@ not a side effect of normalization.
 
 These are architectural decisions, not implemented capabilities. The current
 RGB8 TIFF crop decoder retains source ICC bytes without converting to sRGB.
-Initial tiled RGB8 TIFF-to-JPEG HTTP delivery is implemented; upload/import and
+Tiled RGB/RGBA8 TIFF-to-JPEG/PNG HTTP delivery with pyramid selection is implemented; upload/import and
 original preservation/download remain pending. See [JPEG delivery](jpeg-delivery.md).
-Keep RgbImage8 until concrete additional channel/sample requirements justify a
-broader representation.
+RasterImage8 now explicitly represents RGB8 and straight RGBA8; see [alpha delivery](alpha-delivery.md).
 
 ## Repository formats and S3-ready reading (agreed 2026-10-04)
 
@@ -372,8 +371,7 @@ first cache increment needs no generic multi-layer cache framework.
 
 - A simple RenderPlan value could carry resolved operations, keeping URL and
   preflight interpretation out of codecs. Its interface is not yet designed.
-- RasterImage is a candidate name for a future owning pixel representation.
-  Keep the existing RgbImage8 until concrete additional sample/channel needs arise.
+- RasterImage8 is the owning RGB/RGBA8 representation with an explicit PixelLayout.
 - Lua 5.4.8 now implements the initial standalone allow/deny and optional-source
   contract; see [preflight](preflight.md). Host-provided JWT verification/signing,
   HTTPS, JSON, and restriction fields are still pending.
@@ -400,3 +398,25 @@ first cache increment needs no generic multi-layer cache framework.
 - [Amazon S3 GetObject: ranges, versions and conditions](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
 - [libtiff custom I/O](https://libtiff.gitlab.io/libtiff/functions/TIFFOpen.html)
 - [Grok features and I/O](https://github.com/GrokImageCompression/grok)
+
+
+## TIFF repository profile and next codec steps (2026-10-04)
+
+Recommended import target: pyramidal tiled Classic TIFF or BigTIFF, unsigned RGB8
+or RGBA8, sRGB, top-left, contiguous channels, lossless Deflate or LZW.
+Tiled sources without pyramids remain supported; strips are a future compatibility
+step. Grayscale8 is a useful later addition. Defer direct 1-bit/16-bit/float,
+CMYK/Lab/palette, separate planes and other orientations to import conversion
+unless a concrete delivery use case justifies them. Import multi-page documents
+as separate repository images. JPEG-compressed TIFF/YCbCr needs explicit color
+interpretation support rather than a blanket compression-support claim.
+
+RGB8 PNG output and end-to-end RGBA delivery are now implemented.
+For RGBA, recognize explicitly declared straight and premultiplied alpha and
+normalize processing semantics. Filtering must account for premultiplied color
+values; choose the working color space explicitly. Separate mask IFDs and arbitrary
+extra channels belong to import initially. Plan PNG transparency and JPEG
+composition against white. Alpha filtering and white composition now use stored
+channel encoding; no implicit sRGB or linear-light conversion occurs. A future
+color-management increment must define a profile-aware working space explicitly.
+See [alpha delivery](alpha-delivery.md) for current semantics and limitations.

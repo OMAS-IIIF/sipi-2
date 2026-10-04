@@ -4,6 +4,7 @@ cli11/2.6.2
 drogon/1.9.13
 libtiff/4.7.2
 libjpeg/9f
+libpng/1.6.58
 lua/5.4.8
 aws-sdk-cpp/1.11.692
 

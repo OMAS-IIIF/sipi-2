@@ -4,12 +4,14 @@
 #include <utility>
 #include "storage/LocalFileSource.h"
 #include "image/AreaResize.h"
+#include "image/AlphaComposite.h"
 #include <array>
 #include <algorithm>
 #include "imgformats/TiffReadPlan.h"
 #include "imgformats/TiffMetadata.h"
 #include "imgformats/TiffReader.h"
 #include "imgformats/JpegWriter.h"
+#include "imgformats/PngWriter.h"
 
 namespace sipi::http {
 namespace {
@@ -130,12 +132,12 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) const {
             const auto& plan = std::get<iiif::ImageGeometry>(geometry);
             spdlog::debug("Resolved IIIF crop {},{},{},{} -> {}x{}", plan.region.x, plan.region.y,
                           plan.region.width, plan.region.height, plan.output_width, plan.output_height);
-            if (image->format != iiif::Format::jpg ||
+            if ((image->format != iiif::Format::jpg && image->format != iiif::Format::png) ||
                 (image->quality != iiif::Quality::default_quality && image->quality != iiif::Quality::color) ||
                 image->rotation.mirrored || (image->rotation.degrees != 0 && image->rotation.degrees != 360) ||
                 plan.output_width > plan.region.width || plan.output_height > plan.region.height)
                 return response(drogon::k501NotImplemented, "not_implemented",
-                    "Only unchanged or reduced RGB JPEG output without mirroring or rotation is supported");
+                    "Only unchanged or reduced RGB/RGBA JPEG/PNG output without mirroring or rotation is supported");
 
             // Preserve base-image support rules and skip levels whose layouts
             // cannot be decoded. Corrupt selected data still fails visibly.
@@ -150,16 +152,24 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) const {
             pixels = downsample_area(std::move(pixels),
                 PixelWindow{read_plan.horizontal, read_plan.vertical}, plan.output_width, plan.output_height);
             std::string encoded;
-            // Buffer until encoding succeeds: never publish partial JPEGs as 200.
+            // Buffer until encoding succeeds: never publish partial images as 200.
             // A later streaming/cache sink can use the same codec interface.
             constexpr std::size_t encoded_limit = 64 * 1024 * 1024;
-            write_jpeg(pixels, [&](std::span<const std::uint8_t> bytes) {
-                if (bytes.size() > encoded_limit - encoded.size())
+            const bool png = image->format == iiif::Format::png;
+            const auto sink = [&](std::span<const std::uint8_t> bytes) {
+                if (bytes.size() > encoded_limit - encoded.size()) {
+                    if (png) throw PngWriteError("Encoded PNG exceeds response limit");
                     throw JpegWriteError("Encoded JPEG exceeds response limit");
+                }
                 encoded.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
-            });
+            };
+            if (png) write_png(pixels, sink);
+            else {
+                pixels = composite_on_white(std::move(pixels));
+                write_jpeg(pixels, sink);
+            }
             auto result = drogon::HttpResponse::newHttpResponse();
-            result->setContentTypeCode(drogon::CT_IMAGE_JPG);
+            result->setContentTypeCode(png ? drogon::CT_IMAGE_PNG : drogon::CT_IMAGE_JPG);
             result->addHeader("Cache-Control", "no-store");
             result->setBody(std::move(encoded));
             return result;
@@ -187,8 +197,12 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) const {
         return response(drogon::k501NotImplemented, "not_implemented", "TIFF pixel layout is not supported yet");
     } catch (const TiffReadError&) {
         return response(drogon::k500InternalServerError, "invalid_image_source", "TIFF data could not be read");
+    } catch (const CompositeError&) {
+        return response(drogon::k500InternalServerError, "processing_failed", "Alpha compositing could not be completed");
     } catch (const ResizeError&) {
         return response(drogon::k500InternalServerError, "processing_failed", "Image resizing could not be completed");
+    } catch (const PngWriteError&) {
+        return response(drogon::k500InternalServerError, "encoding_failed", "PNG output could not be produced");
     } catch (const JpegWriteError&) {
         return response(drogon::k500InternalServerError, "encoding_failed", "JPEG output could not be produced");
     } catch (const std::exception&) {

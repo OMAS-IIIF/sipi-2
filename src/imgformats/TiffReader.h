@@ -2,15 +2,19 @@
 
 #include "TiffMetadata.h"
 #include "image/PixelRegion.h"
-#include "image/RgbImage.h"
+#include "image/RasterImage.h"
 
 #include <cstddef>
 
 namespace sipi {
 
 /** Decode a crop from the first TIFF image at full stored resolution.
- * Supports tiled, unsigned 8-bit, contiguous RGB with exactly three samples,
- * top-left orientation, and no extra samples. No scaling, color conversion,
+ * Supports tiled, unsigned 8-bit, contiguous RGB or RGBA with top-left orientation.
+ * RGB has no extras; RGBA requires exactly one explicitly declared associated or
+ * unassociated alpha sample. Unknown/missing extra-sample semantics are rejected.
+ * Associated samples normalize to straight alpha with half-up 8-bit rounding;
+ * color > alpha is invalid and zero alpha yields zero RGB. Existing precision
+ * loss from stored premultiplication cannot be recovered. No scaling, color conversion,
  * pyramid selection, or HTTP I/O. Unsupported layouts throw TiffUnsupportedError
  * (a TiffReadError subtype); corrupt pixel data throws TiffReadError.
  *
@@ -26,7 +30,7 @@ namespace sipi {
  * Reuse the source used for metadata planning. ByteSourceError propagates for I/O
  * failures. Local atomic replacement is safe; in-place file writes are excluded.
  */
-[[nodiscard]] RgbImage8 read_tiff_region(const ByteSource& source,
+[[nodiscard]] RasterImage8 read_tiff_region(const ByteSource& source,
                                         const PixelRegion& region,
                                         std::size_t max_decoded_bytes = 256 * 1024 * 1024);
 
@@ -42,7 +46,7 @@ namespace sipi {
  * ICC comes from the main image; conflicting level profiles are rejected.
  * Use only compatible levels returned by read_tiff_metadata. Fractional cropping
  * and scaling of the returned enclosure belong to the subsequent resampler. */
-[[nodiscard]] RgbImage8 read_tiff_region(const ByteSource& source,
+[[nodiscard]] RasterImage8 read_tiff_region(const ByteSource& source,
     const TiffDirectory& directory, const PixelRegion& region,
     std::size_t max_decoded_bytes = 256 * 1024 * 1024);
 

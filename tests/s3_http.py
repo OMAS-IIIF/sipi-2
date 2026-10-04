@@ -66,8 +66,8 @@ def server(args, variables=None):
 
 s3('PUT')
 try:
-    for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif'):
-        s3('PUT', key, fixtures / ('pyramid.tif' if key == 'pyramid.tif' else 'tiled.tif'))
+    for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif', 'alpha-pyramid.tif'):
+        s3('PUT', key, fixtures / (key if key in ('pyramid.tif','alpha-pyramid.tif') else 'tiled.tif'))
     with tempfile.TemporaryDirectory() as directory:
         policy = Path(directory, 'policy.lua')
         # Lua performs the project-specific prefix mapping explicitly.
@@ -88,6 +88,11 @@ try:
             pyramid_path = '/pyramid.tif/3,5,65,49/15,12/0/default.jpg'
             expected_pyramid = get(local, pyramid_path)
             assert expected_pyramid[0] == 200
+            expected_png = get(local, pyramid_path.replace('.jpg', '.png'))
+            assert expected_png[0] == 200
+            alpha_path = '/alpha-pyramid.tif/3,1,29,17/14,8/0/default.'
+            expected_alpha = {fmt:get(local,alpha_path+fmt) for fmt in ('png','jpg')}
+            assert all(r[0]==200 for r in expected_alpha.values())
         with server(['--preflight-script', str(policy)], {
             'SIPI_IIIF_STORAGE': 's3', 'SIPI_S3_BUCKET': bucket, 'SIPI_S3_REGION': 'us-east-1',
             'SIPI_S3_ENDPOINT': endpoint, 'SIPI_S3_PATH_STYLE': 'true',
@@ -98,6 +103,11 @@ try:
                 assert result[0] == 200 and result[2] == expected[2], (path, result[0])
             actual_pyramid = get(remote, pyramid_path)
             assert actual_pyramid[0] == 200 and actual_pyramid[2] == expected_pyramid[2]
+            actual_png = get(remote, pyramid_path.replace('.jpg', '.png'))
+            assert actual_png[0] == 200 and actual_png[2] == expected_png[2]
+            for fmt in ('png','jpg'):
+                actual = get(remote,alpha_path+fmt)
+                assert actual[0] == 200 and actual[2] == expected_alpha[fmt][2]
             status, _, data = get(remote, '/museum/tiled.tif/info.json')
             info = json.loads(data)
             assert status == 200 and info['width'] == 320 and info['height'] == 200
@@ -114,7 +124,7 @@ try:
         with server(offline + ['--iiif-storage=s3', '--preflight-script', str(policy)]) as denied:
             assert get(denied, '/deny/info.json')[0] == 403
 finally:
-    for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif'):
+    for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif', 'alpha-pyramid.tif'):
         s3('DELETE', key)
     s3('DELETE')
 print('S3 HTTP info, JPEG, HEAD, Lua overrides and prefix mapping passed')

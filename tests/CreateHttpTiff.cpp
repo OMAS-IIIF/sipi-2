@@ -1,5 +1,6 @@
 #include <tiffio.h>
 #include "TiffPyramidFixture.h"
+#include "TiffAlphaFixture.h"
 #include <algorithm>
 #include <filesystem>
 #include <memory>
@@ -64,6 +65,11 @@ int main(int argc, char** argv) {
     try {
         const std::filesystem::path directory(argv[1]);
         std::filesystem::create_directories(directory);
+        fixture::alpha_tiff(directory/"alpha.tif");
+        fixture::alpha_tiff(directory/"alpha-associated.tif", EXTRASAMPLE_ASSOCALPHA);
+        fixture::alpha_tiff(directory/"alpha-pyramid.tif", EXTRASAMPLE_UNASSALPHA, true, true);
+        fixture::alpha_tiff(directory/"alpha-unspecified.tif", EXTRASAMPLE_UNSPECIFIED);
+        fixture::alpha_tiff(directory/"alpha-invalid.tif", EXTRASAMPLE_ASSOCALPHA, false, false, true);
         fixture::pyramid(directory/"pyramid.tif", true, true);
         fixture::pyramid(directory/"pyramid-stripped.tif", false, false, true);
         {
@@ -74,6 +80,15 @@ int main(int argc, char** argv) {
         }
         write_image(directory/"tiled.tif", "w", 320, 200, ORIENTATION_TOPLEFT, true);
         write_image(directory/"broken-tile.tif", "w", 320, 200, ORIENTATION_TOPLEFT, true, true);
+        write_image(directory/"invalid-profile.tif", "w", 320, 200, ORIENTATION_TOPLEFT, true);
+        {
+            std::unique_ptr<TIFF, decltype(&TIFFClose)> invalid(
+                TIFFOpen((directory/"invalid-profile.tif").c_str(), "r+"), TIFFClose);
+            if (!invalid) throw std::runtime_error("Cannot open profile fixture");
+            const std::array<std::uint8_t, 4> profile{1,2,3,4};
+            TIFFSetField(invalid.get(), TIFFTAG_ICCPROFILE, 4u, profile.data());
+            if (!TIFFRewriteDirectory(invalid.get())) throw std::runtime_error("Cannot rewrite fixture");
+        }
         write_image(directory/"sample.tif", "w", 320, 200, ORIENTATION_TOPLEFT);
         write_image(directory/"rotated.tif", "w", 320, 200, ORIENTATION_RIGHTTOP);
         write_image(directory/"large.tif", "w8", 1000, 800, ORIENTATION_TOPLEFT);

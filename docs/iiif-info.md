@@ -34,7 +34,7 @@ or reading a TIFF pyramid does not mean the server can render its output. In
 particular, `size-upscaling=true` does not advertise `sizeUpscaling` prematurely.
 Content negotiation/JSON-LD media type, CORS and base-URI redirects are separate
 future steps. For now the response always uses application/json, as do our other
-JSON endpoints. Supported tiled RGB8 TIFF crops now return JPEG; unsupported
+JSON endpoints. Supported tiled RGB/RGBA8 TIFF crops now return JPEG or PNG; unsupported
 operations/layouts return 501. Profile publication remains pending a per-resource
 compliance review: metadata-readable sources are not all pixel-deliverable yet.
 See [JPEG delivery](jpeg-delivery.md).

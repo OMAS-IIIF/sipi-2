@@ -15,7 +15,7 @@ void require(bool condition, const char* message) {
 
 /** Independent libjpeg decompression checks output pixels and saved ICC chunks.
  * This is a test process: libjpeg's default fatal handler exits it on bad JPEGs. */
-sipi::RgbImage8 decode(const std::vector<unsigned char>& bytes) {
+sipi::RasterImage8 decode(const std::vector<unsigned char>& bytes) {
     jpeg_decompress_struct codec{};
     jpeg_error_mgr error{};
     codec.err = jpeg_std_error(&error);
@@ -29,7 +29,7 @@ sipi::RgbImage8 decode(const std::vector<unsigned char>& bytes) {
     require(jpeg_read_header(&codec, TRUE) == JPEG_HEADER_OK, "JPEG header");
     codec.out_color_space = JCS_RGB;
     jpeg_start_decompress(&codec);
-    sipi::RgbImage8 image{codec.output_width, codec.output_height, {}, {}};
+    sipi::RasterImage8 image{codec.output_width, codec.output_height, {}, {}};
     image.pixels.resize(static_cast<std::size_t>(image.width) * image.height * 3);
     unsigned sequence = 1;
     unsigned total = 0;
@@ -51,7 +51,7 @@ sipi::RgbImage8 decode(const std::vector<unsigned char>& bytes) {
 }
 
 /** Compare lossy decoded pixels to the global gradient, including crop origin. */
-void gradient(const sipi::RgbImage8& image, unsigned ox, unsigned oy, unsigned width, unsigned height) {
+void gradient(const sipi::RasterImage8& image, unsigned ox, unsigned oy, unsigned width, unsigned height) {
     require(image.width == width && image.height == height, "JPEG dimensions");
     for (unsigned y = 0; y < height; ++y) {
         for (unsigned x = 0; x < width; ++x) {
@@ -63,7 +63,7 @@ void gradient(const sipi::RgbImage8& image, unsigned ox, unsigned oy, unsigned w
     }
 }
 /** Independent common-grid averaging of the known separable TIFF gradient. */
-void resized_gradient(const sipi::RgbImage8& image, unsigned ox, unsigned oy,
+void resized_gradient(const sipi::RasterImage8& image, unsigned ox, unsigned oy,
                       unsigned sw, unsigned sh, unsigned w, unsigned h) {
     require(image.width == w && image.height == h, "Resized JPEG dimensions");
     for (unsigned y = 0; y < h; ++y)
@@ -84,6 +84,18 @@ void resized_gradient(const sipi::RgbImage8& image, unsigned ox, unsigned oy,
  * decode an HTTP response and validate the known TIFF fixture's actual pixels. */
 int main(int argc, char** argv) {
     try {
+        if (argc == 6 && std::string(argv[1]) == "--rgb") {
+            std::ifstream input(argv[2], std::ios::binary), reference(argv[3], std::ios::binary);
+            require(bool(input) && bool(reference), "Cannot open JPEG reference files");
+            const std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(input), {}};
+            const std::vector<unsigned char> expected{std::istreambuf_iterator<char>(reference), {}};
+            const auto image = decode(bytes);
+            require(image.width == std::stoul(argv[4]) && image.height == std::stoul(argv[5]) &&
+                    image.pixels.size() == expected.size(), "JPEG reference dimensions");
+            for (std::size_t i=0; i<expected.size(); ++i)
+                require(std::abs(int(image.pixels[i])-int(expected[i])) <= 35, "JPEG composited pixel");
+            return 0;
+        }
         if (argc == 6 || argc == 8) {
             std::ifstream input(argv[1], std::ios::binary);
             require(bool(input), "cannot open HTTP JPEG");
@@ -97,7 +109,7 @@ int main(int argc, char** argv) {
             return 0;
         }
         require(argc == 1, "unexpected arguments");
-        sipi::RgbImage8 image{320, 200, {}, {}};
+        sipi::RasterImage8 image{320, 200, {}, {}};
         for (unsigned y = 0; y < image.height; ++y) {
             for (unsigned x = 0; x < image.width; ++x) {
                 image.pixels.push_back(static_cast<unsigned char>(255*x/319));
@@ -125,8 +137,8 @@ int main(int argc, char** argv) {
             try { sipi::write_jpeg(image, collect, quality); } catch (const sipi::JpegWriteError&) { failed = true; }
             require(failed, "invalid quality rejected");
         }
-        for (const auto& bad : {sipi::RgbImage8{0, 1, {}, {}}, sipi::RgbImage8{65501, 1, {}, {}},
-                               sipi::RgbImage8{1, 1, {0, 0}, {}}}) {
+        for (const auto& bad : {sipi::RasterImage8{0, 1, {}, {}}, sipi::RasterImage8{65501, 1, {}, {}},
+                               sipi::RasterImage8{1, 1, {0, 0}, {}}}) {
             bool failed = false;
             try { sipi::write_jpeg(bad, collect); } catch (const sipi::JpegWriteError&) { failed = true; }
             require(failed, "invalid raster rejected");

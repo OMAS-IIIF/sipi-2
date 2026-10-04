@@ -69,8 +69,8 @@ void finish_destination(j_compress_ptr codec) noexcept {
 }
 } // namespace
 
-void write_jpeg(const RgbImage8& image, const JpegSink& sink, int quality) {
-    if (!sink || quality < 1 || quality > 100 || image.width == 0 || image.height == 0 ||
+void write_jpeg(const RasterImage8& image, const JpegSink& sink, int quality) {
+    if (image.layout != PixelLayout::rgb || !sink || quality < 1 || quality > 100 || image.width == 0 || image.height == 0 ||
         image.width > JPEG_MAX_DIMENSION || image.height > JPEG_MAX_DIMENSION ||
         static_cast<std::uint64_t>(image.width) * image.height * 3 != image.pixels.size())
         throw JpegWriteError("Invalid JPEG raster, quality or sink");

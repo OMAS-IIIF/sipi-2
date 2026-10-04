@@ -6,8 +6,9 @@ codec increment, not a general image transformation engine.
 
 ## Supported requests
 
-Source: tiled TIFF/BigTIFF, top-left orientation, unsigned 8-bit contiguous RGB,
-exactly three samples, no extra samples/alpha, no volume depth. The existing TIFF
+Source: tiled TIFF/BigTIFF, top-left orientation, unsigned 8-bit contiguous RGB
+or explicitly declared RGBA, no volume depth. RGBA is composited onto white
+before JPEG encoding; see [alpha delivery](alpha-delivery.md). The existing TIFF
 reader selects only tiles intersecting the crop in a suitable pyramid level
 (main-chain reduced IFDs or SubIFDs). It skips levels with unsupported layouts or
 unavailable compression codecs and falls back to the base if necessary. Corrupt
@@ -19,7 +20,7 @@ geometry resolver, including clipping at image edges. The resolved output size
 may equal or reduce the crop dimensions on each axis. Reductions use
 [area-weighted stored-channel averaging](area-resize.md); enlargement is not implemented. Rotation 0 or 360 is
 accepted as identity; mirroring and other rotations return 501. JPEG with default
-or color quality is supported; gray/bitonal and other output formats return 501.
+or color quality is supported; PNG now uses the same pipeline (see [PNG delivery](png-delivery.md)). Gray/bitonal and other output formats return 501.
 Invalid geometry retains its previous 400/501 error mapping before rendering.
 
 After building and running CTest, from the repository root:
@@ -42,7 +43,7 @@ supported subset does not make every metadata-readable TIFF deliverable.
 ## Encoder boundary and ownership
 
 `src/imgformats/JpegWriter.h` exposes `write_jpeg(image, sink, quality=90)`.
-The encoder depends on the format-neutral owning `RgbImage8`, not TIFF, Drogon,
+The encoder depends on the format-neutral owning `RasterImage8`, not TIFF, Drogon,
 files or a cache. libjpeg 9f is now an explicit Conan dependency and is linked
 privately by the `jpegwriter` CMake target; the locked version was already used
 transitively by libtiff.

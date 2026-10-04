@@ -1,4 +1,4 @@
-# Area-weighted RGB8 reduction
+# Area-weighted RGB/RGBA8 reduction
 
 `image/AreaResize.h` provides `downsample_area` in the independent
 `imageprocessing` target. It knows neither IIIF nor TIFF, S3, HTTP or JPEG.
@@ -27,11 +27,11 @@ It averages **stored RGB channel values**, not linear light. ICC bytes remain
 unchanged and untagged input remains untagged; no sRGB transfer function is assumed.
 For example, averaging channel values 0 and 255 yields 128. Profile-aware
 linear-light processing is a separate color-management decision; it must not be
-silently inferred from the presence of three channels. Alpha is not supported.
+silently inferred from the presence of three channels. RGBA uses alpha-weighted colors; see [alpha delivery](alpha-delivery.md).
 
 ## Ownership and memory
 
-The function takes an owning `RgbImage8` by value. Pass `std::move(image)` to
+The function takes an owning `RasterImage8` by value. Pass `std::move(image)` to
 transfer ownership without copying the input. An identity resize returns the same
 pixel allocation. A reduction allocates only its output raster; ICC storage moves
 unchanged. There is no expanded raster, intermediate image or weight table.
@@ -48,7 +48,7 @@ allocation failures may propagate. Ownership is consumed even on failure.
 ## Delivery pipeline and examples
 
 The HTTP worker resolves geometry, reads the crop, reduces it if needed, then
-encodes JPEG. The same processing works with local and S3 ByteSources:
+encodes JPEG or PNG. The same processing works with local and S3 ByteSources:
 
 ```text
 /tiled.tif/full/160,/0/default.jpg

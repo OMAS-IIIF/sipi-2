@@ -1,5 +1,6 @@
 #pragma once
 #include <tiffio.h>
+#include "IccFixture.h"
 #include <array>
 #include <filesystem>
 #include <memory>
@@ -28,8 +29,8 @@ inline void pyramid_directory(TIFF* file, std::uint32_t width, std::uint32_t hei
     TIFFSetField(file, TIFFTAG_ORIENTATION, ORIENTATION_TOPLEFT);
     TIFFSetField(file, TIFFTAG_SUBFILETYPE, level ? FILETYPE_REDUCEDIMAGE : 0);
     if (profile) {
-        const std::array<std::uint8_t, 4> bytes{1, 2, 3, 4};
-        TIFFSetField(file, TIFFTAG_ICCPROFILE, 4u, bytes.data());
+        const auto bytes = icc_header();
+        TIFFSetField(file, TIFFTAG_ICCPROFILE, static_cast<std::uint32_t>(bytes.size()), bytes.data());
     }
     if (stripped) {
         TIFFSetField(file, TIFFTAG_ROWSPERSTRIP, 16);

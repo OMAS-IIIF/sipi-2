@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
             const auto plan = sipi::plan_tiff_read(metadata, {{3, 5, 65, 49}, 15, 12});
             check(plan.directory.width == 26, "Selected wrong level");
             auto image = sipi::read_tiff_region(source, plan.directory, plan.read_region);
-            check(image.icc_profile == metadata.icc_profile && image.icc_profile.size() == 4,
+            check(image.icc_profile == metadata.icc_profile && image.icc_profile == fixture::icc_header(),
                   "Main ICC must survive reduced IFD without profile");
             for (std::uint32_t y = 0; y < image.height; ++y)
                 for (std::uint32_t x = 0; x < image.width; ++x) {

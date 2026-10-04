@@ -7,26 +7,57 @@
 
 namespace sipi {
 namespace {
-std::size_t pixel_bytes(std::uint32_t width, std::uint32_t height) {
-    if (!width || !height || static_cast<std::uint64_t>(width) * height >
-        std::numeric_limits<std::size_t>::max() / 3)
-        throw ResizeError("Invalid RGB dimensions");
-    return static_cast<std::size_t>(width) * height * 3;
-}
+std::size_t pixel_bytes(std::uint32_t width, std::uint32_t height, std::size_t channels) {
+    if (!channels || !width || !height || static_cast<std::uint64_t>(width) * height >
+        std::numeric_limits<std::size_t>::max() / channels)
+        throw ResizeError("Invalid raster dimensions/layout");
+    return static_cast<std::size_t>(width) * height * channels;
 }
 
-RgbImage8 downsample_area(RgbImage8 image, std::uint32_t width, std::uint32_t height,
+std::uint8_t quantize(double value) {
+    return static_cast<std::uint8_t>(std::clamp(std::floor(value + 0.5), 0.0, 255.0));
+}
+
+/** Accumulate premultiplied contributions in double without quantizing an
+ * intermediate RGBA raster. Divide by total alpha to return straight RGB. */
+struct WeightedPixel {
+    std::array<double, 3> colors{};
+    double alpha = 0;
+
+    void add(const std::uint8_t* pixel, double weight, std::size_t channels) {
+        if (channels == 4) {
+            weight *= pixel[3];
+            alpha += weight;
+        }
+        for (std::size_t c = 0; c < 3; ++c) colors[c] += pixel[c] * weight;
+    }
+    void store(std::uint8_t* pixel, double area, std::size_t channels) const {
+        if (channels == 4) {
+            pixel[3] = quantize(alpha / area);
+            // Fully transparent output has deterministic black hidden color.
+            for (std::size_t c = 0; c < 3; ++c)
+                pixel[c] = pixel[3] ? quantize(colors[c] / alpha) : 0;
+        } else {
+            for (std::size_t c = 0; c < 3; ++c) pixel[c] = quantize(colors[c] / area);
+        }
+    }
+};
+
+}
+
+RasterImage8 downsample_area(RasterImage8 image, std::uint32_t width, std::uint32_t height,
                           std::size_t max_working_bytes) {
-    const auto input_bytes = pixel_bytes(image.width, image.height);
-    const auto output_bytes = pixel_bytes(width, height);
+    const auto channels = image.channel_count();
+    const auto input_bytes = pixel_bytes(image.width, image.height, channels);
+    const auto output_bytes = pixel_bytes(width, height, channels);
     if (image.pixels.size() != input_bytes || width > image.width || height > image.height)
-        throw ResizeError("Invalid RGB raster or enlargement requested");
+        throw ResizeError("Invalid raster or enlargement requested");
     const bool identity = width == image.width && height == image.height;
     if (input_bytes > max_working_bytes || image.icc_profile.size() > max_working_bytes - input_bytes ||
         (!identity && output_bytes > max_working_bytes - input_bytes - image.icc_profile.size()))
         throw ResizeError("Resize working memory exceeds limit");
     if (identity) return image;
-    RgbImage8 output{width, height, std::vector<std::uint8_t>(output_bytes), std::move(image.icc_profile)};
+    RasterImage8 output{width, height, std::vector<std::uint8_t>(output_bytes), std::move(image.icc_profile), image.layout};
     // Use integer coordinates in units of 1/target_dimension source pixels.
     // Source pixel boundaries are multiples of target_dimension; target pixel
     // boundaries are multiples of source_dimension. Thus fractional overlaps
@@ -38,20 +69,18 @@ RgbImage8 downsample_area(RgbImage8 image, std::uint32_t width, std::uint32_t he
         for (std::uint32_t x = 0; x < width; ++x) {
             const auto left = static_cast<std::uint64_t>(x) * image.width;
             const auto right = (static_cast<std::uint64_t>(x) + 1) * image.width;
-            std::array<double, 3> sums{};
+            WeightedPixel sum;
             for (auto sy = top / height; sy <= (bottom - 1) / height; ++sy) {
                 const auto wy = std::min(bottom, (sy + 1) * height) - std::max(top, sy * height);
                 for (auto sx = left / width; sx <= (right - 1) / width; ++sx) {
                     const auto wx = std::min(right, (sx + 1) * width) - std::max(left, sx * width);
                     const double weight = static_cast<double>(wx) * static_cast<double>(wy);
-                    const auto index = static_cast<std::size_t>(sy * image.width + sx) * 3;
-                    for (std::size_t c = 0; c < 3; ++c) sums[c] += image.pixels[index + c] * weight;
+                    const auto index = static_cast<std::size_t>(sy * image.width + sx) * channels;
+                    sum.add(image.pixels.data() + index, weight, channels);
                 }
             }
-            const auto index = (static_cast<std::size_t>(y) * width + x) * 3;
-            for (std::size_t c = 0; c < 3; ++c)
-                output.pixels[index + c] = static_cast<std::uint8_t>(
-                    std::clamp(std::floor(sums[c] / area + 0.5), 0.0, 255.0));
+            const auto index = (static_cast<std::size_t>(y) * width + x) * channels;
+            sum.store(output.pixels.data() + index, area, channels);
         }
     }
     return output;
@@ -92,12 +121,13 @@ double overlap(std::uint64_t pixel, const Boundary& left, const Boundary& right)
 }
 } // namespace
 
-RgbImage8 downsample_area(RgbImage8 image, const PixelWindow& window,
+RasterImage8 downsample_area(RasterImage8 image, const PixelWindow& window,
                           std::uint32_t width, std::uint32_t height,
                           std::size_t max_working_bytes) {
-    const auto input_bytes = pixel_bytes(image.width, image.height);
-    const auto output_bytes = pixel_bytes(width, height);
-    if (image.pixels.size() != input_bytes) throw ResizeError("Invalid RGB raster");
+    const auto channels = image.channel_count();
+    const auto input_bytes = pixel_bytes(image.width, image.height, channels);
+    const auto output_bytes = pixel_bytes(width, height, channels);
+    if (image.pixels.size() != input_bytes) throw ResizeError("Invalid raster");
     validate_interval(window.horizontal, image.width, width);
     validate_interval(window.vertical, image.height, height);
     const auto full_axis = [](const PixelInterval& axis, std::uint32_t dimension) {
@@ -109,28 +139,26 @@ RgbImage8 downsample_area(RgbImage8 image, const PixelWindow& window,
     if (input_bytes > max_working_bytes || image.icc_profile.size() > max_working_bytes - input_bytes ||
         output_bytes > max_working_bytes - input_bytes - image.icc_profile.size())
         throw ResizeError("Resize working memory exceeds limit");
-    RgbImage8 output{width, height, std::vector<std::uint8_t>(output_bytes), std::move(image.icc_profile)};
+    RasterImage8 output{width, height, std::vector<std::uint8_t>(output_bytes), std::move(image.icc_profile), image.layout};
     for (std::uint32_t y = 0; y < height; ++y) {
         const auto top = boundary(window.vertical, y, height);
         const auto bottom = boundary(window.vertical, y + 1, height);
         for (std::uint32_t x = 0; x < width; ++x) {
             const auto left = boundary(window.horizontal, x, width);
             const auto right = boundary(window.horizontal, x + 1, width);
-            std::array<double, 3> sums{};
+            WeightedPixel sum;
             double area = 0;
             for (auto sy = top.pixel; sy < bottom.ceiling(); ++sy) {
                 const auto wy = overlap(sy, top, bottom);
                 for (auto sx = left.pixel; sx < right.ceiling(); ++sx) {
                     const double weight = wy * overlap(sx, left, right);
-                    const auto index = static_cast<std::size_t>(sy * image.width + sx) * 3;
+                    const auto index = static_cast<std::size_t>(sy * image.width + sx) * channels;
                     area += weight;
-                    for (std::size_t c = 0; c < 3; ++c) sums[c] += image.pixels[index + c] * weight;
+                    sum.add(image.pixels.data() + index, weight, channels);
                 }
             }
-            const auto index = (static_cast<std::size_t>(y) * width + x) * 3;
-            for (std::size_t c = 0; c < 3; ++c)
-                output.pixels[index + c] = static_cast<std::uint8_t>(
-                    std::clamp(std::floor(sums[c] / area + 0.5), 0.0, 255.0));
+            const auto index = (static_cast<std::size_t>(y) * width + x) * channels;
+            sum.store(output.pixels.data() + index, area, channels);
         }
     }
     return output;

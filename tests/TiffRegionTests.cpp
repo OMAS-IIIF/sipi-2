@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
         const auto short_tile = make("short-last.tif", {.corrupt_last_tile = true});
         rejects([&] { (void)sipi::read_tiff_region(sipi::LocalFileSource{short_tile}, {48, 32, 5, 9}); }, "Cannot decode complete TIFF tile");
         const std::vector<Fixture> unsupported{
-            {.tiled = false}, {.bits = 16}, {.samples = 4}, {.planar = PLANARCONFIG_SEPARATE},
+            {.tiled = false}, {.bits = 16}, {.samples = 5}, {.planar = PLANARCONFIG_SEPARATE},
             {.orientation = ORIENTATION_RIGHTTOP}, {.samples = 1, .photometric = PHOTOMETRIC_MINISBLACK},
             {.sample_format = SAMPLEFORMAT_INT}};
         for (std::size_t i = 0; i < unsupported.size(); ++i) {

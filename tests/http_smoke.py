@@ -4,6 +4,7 @@ Uses only Python's standard library. Starts the executable in an isolated
 working directory on a free loopback port and always reaps the child process.
 """
 
+from png_check import decode_png
 import concurrent.futures
 import html
 import http.client
@@ -19,6 +20,38 @@ import tempfile
 import time
 
 
+def alpha_pixel(x, y, associated=False):
+    p = ((0,0,255,0), (255,0,0,255), (90,180,30,85), (255,0,255,1), (64,128,192,128))[(x+y)%5]
+    if associated:
+        a = p[3]
+        return tuple((((c*a+127)//255)*255+a//2)//a if a else 0 for c in p[:3]) + (a,)
+    return p
+
+
+def alpha_reference(region, output, level=(35,19), associated=False):
+    """Exact rational box integration in original full-image coordinates."""
+    from fractions import Fraction as F
+    from math import floor, ceil
+    rx,ry,rw,rh = region
+    ow,oh = output
+    dx,dy = F(rw*level[0],35*ow), F(rh*level[1],19*oh)
+    result = bytearray()
+    for y in range(oh):
+        top = F(ry*level[1],19)+y*dy
+        for x in range(ow):
+            left = F(rx*level[0],35)+x*dx
+            colors, alpha = [F(0)]*3, F(0)
+            for sy in range(floor(top),ceil(top+dy)):
+                for sx in range(floor(left),ceil(left+dx)):
+                    weight = (min(top+dy,sy+1)-max(top,sy))*(min(left+dx,sx+1)-max(left,sx))
+                    pixel = alpha_pixel(sx,sy,associated)
+                    alpha += weight*pixel[3]
+                    for c in range(3): colors[c] += weight*pixel[c]*pixel[3]
+            a = floor(alpha/(dx*dy)+F(1,2))
+            result.extend([floor(c/alpha+F(1,2)) if a else 0 for c in colors]+[a])
+    return bytes(result)
+
+
 def run(executable: Path, fixtures: Path, verifier: Path, configured: bool = False, upscaling: bool = False) -> None:
     """Run HTTP assertions; raise on failure and clean up the server in all cases."""
     with socket.socket() as probe:
@@ -29,7 +62,7 @@ def run(executable: Path, fixtures: Path, verifier: Path, configured: bool = Fal
     with tempfile.TemporaryDirectory(prefix="sipi-http-") as directory:
         root = Path(directory, "images")
         root.mkdir()
-        for name in ("sample.tif", "rotated.tif", "large.tif", "tiled.tif", "broken-tile.tif", "pyramid.tif", "pyramid-level.tif", "pyramid-stripped.tif"):
+        for name in ("sample.tif", "rotated.tif", "large.tif", "tiled.tif", "broken-tile.tif", "pyramid.tif", "pyramid-level.tif", "pyramid-stripped.tif", "invalid-profile.tif", "alpha.tif", "alpha-associated.tif", "alpha-pyramid.tif", "alpha-unspecified.tif", "alpha-invalid.tif"):
             shutil.copyfile(fixtures / name, root / name)
         for name in ("id", "hello-world", "a/b", "a%2Fb", "a+b", "café.tif", "source with spaces.tif"):
             target = root / name
@@ -52,7 +85,7 @@ def run(executable: Path, fixtures: Path, verifier: Path, configured: bool = Fal
 function preflight(request)
     local id = request.identifier
     if id == 'jpeg-alias' then return {decision='allow', source='tiled.tif'} end
-    if id == 'tiled.tif' or id == 'broken-tile.tif' or id:match('^pyramid') then return {decision='allow', source=id} end
+    if id == 'tiled.tif' or id == 'broken-tile.tif' or id == 'invalid-profile.tif' or id:match('^pyramid') or id:match('^alpha') then return {decision='allow', source=id} end
     if id == 'denied' then return {decision='deny'} end
     if id == 'script-error' then error('secret-token /private/source.tif') end
     if id == 'invalid-result' then return {decision='allow', restrictions={}} end
@@ -208,6 +241,21 @@ end
                     assert head_status == 200 and not head_body
                     for field in ("content-type", "content-length", "cache-control"):
                         assert head_headers.get(field) == headers.get(field)
+                    # PNG must preserve the processed samples exactly. Reference
+                    # each separable gradient axis by counting common-grid cells.
+                    status, png_headers, png_body = request(path.replace('.jpg', '.png'))
+                    assert status == 200 and png_headers['content-type'].startswith('image/png')
+                    pw, ph, rgb, icc, chunks = decode_png(png_body)
+                    rx, ry, rw, rh = crop[:4]
+                    ow, oh = crop[4:] if len(crop) == 6 else (rw, rh)
+                    assert (pw, ph) == (ow, oh) and icc is None
+                    reds = [(2*sum(255*(rx+(x*rw+k)//ow)//319 for k in range(rw))+rw)//(2*rw) for x in range(ow)]
+                    greens = [(2*sum(255*(ry+(y*rh+k)//oh)//199 for k in range(rh))+rh)//(2*rh) for y in range(oh)]
+                    assert rgb == bytes(v for y in range(oh) for x in range(ow) for v in (reds[x],greens[y],128))
+                    assert not {b'sRGB', b'gAMA', b'cHRM'}.intersection(chunks)
+                    ps, hh, hb = request(path.replace('.jpg', '.png'), 'HEAD')
+                    assert ps == 200 and not hb and hh['content-length'] == str(len(png_body))
+                    assert png_headers['cache-control'] == 'no-store'
                 # The base contains a corrupt tile. Success plus identical JPEG
                 # bytes proves that the reduced SubIFD and inherited ICC are used.
                 status, headers, body = request("/pyramid.tif/full/26,20/0/default.jpg")
@@ -219,9 +267,51 @@ end
                 status, head_headers, head_body = request("/pyramid.tif/full/26,20/0/default.jpg", "HEAD")
                 assert status == 200 and not head_body
                 assert head_headers["content-length"] == str(len(body))
+                _, error = json_request("/invalid-profile.tif/full/max/0/default.png", 500)
+                assert error['error'] == 'encoding_failed'
+                assert request("/invalid-profile.tif/full/max/0/default.png", 'HEAD')[0] == 500
+                status, headers, body = request("/pyramid.tif/full/26,20/0/default.png")
+                assert status == 200 and body == request("/pyramid-level.tif/full/max/0/default.png")[2]
+                pw, ph, rgb, icc, _ = decode_png(body)
+                assert (pw, ph) == (26,20) and icc is not None and len(icc) == 132
+                assert rgb == bytes(v for y in range(20) for x in range(26) for v in (x*3+40,y*4+60,100))
+                assert request("/pyramid.tif/full/max/0/default.png")[0] == 500
+                status, _, body = request("/pyramid.tif/3,5,65,49/15,12/0/default.png")
+                assert status == 200 and decode_png(body)[:2] == (15,12)
+                for name, region, output, level, associated in (
+                    ('alpha.tif',(0,0,35,19),(35,19),(35,19),False),
+                    ('alpha-associated.tif',(0,0,35,19),(35,19),(35,19),True),
+                    ('alpha.tif',(3,1,29,17),(14,8),(35,19),False),
+                    ('alpha-pyramid.tif',(3,1,29,17),(14,8),(18,10),False),
+                ):
+                    suffix = ','.join(map(str,region))+'/'+','.join(map(str,output))+'/0/default.'
+                    path = '/'+name+'/'+suffix
+                    status, headers, body = request(path+'png')
+                    assert status == 200 and headers['content-type'].startswith('image/png')
+                    w,h,rgba,icc,_ = decode_png(body)
+                    assert (w,h) == output and icc is not None and len(rgba)==w*h*4
+                    if output == region[2:]:
+                        expected = bytes(v for y in range(h) for x in range(w) for v in alpha_pixel(x,y,associated))
+                        assert rgba == expected
+                    else:
+                        expected = alpha_reference(region,output,level,associated)
+                        assert all(abs(a-b)<=1 for a,b in zip(rgba,expected))
+                    status, jpeg_headers, jpeg = request(path+'jpg')
+                    assert status == 200 and jpeg_headers['content-type'].startswith('image/jpeg')
+                    jpg_file = Path(directory,'alpha.jpg'); jpg_file.write_bytes(jpeg)
+                    rgb_file = Path(directory,'alpha.rgb')
+                    rgb_file.write_bytes(bytes((rgba[i+c]*rgba[i+3]+255*(255-rgba[i+3])+127)//255
+                                               for i in range(0,len(rgba),4) for c in range(3)))
+                    subprocess.run([str(verifier),'--rgb',str(jpg_file),str(rgb_file),str(w),str(h)], check=True,timeout=5)
+                    for extension, content in (('png',body),('jpg',jpeg)):
+                        hs,hh,hb = request(path+extension,'HEAD')
+                        assert hs == 200 and not hb and hh['content-length']==str(len(content))
+                assert request('/alpha-pyramid.tif/full/max/0/default.png')[0] == 500
+                assert request('/alpha-unspecified.tif/full/max/0/default.png')[0] == 501
+                assert request('/alpha-invalid.tif/full/max/0/default.png')[0] == 500
                 for suffix in ("full/max/90/default.jpg",
                                "full/max/!0/default.jpg", "full/max/0/gray.jpg",
-                               "full/max/0/bitonal.jpg", "full/max/0/default.png"):
+                               "full/max/0/bitonal.jpg", "full/max/0/default.tif"):
                     _, body = json_request("/tiled.tif/" + suffix, 501)
                     assert body["error"] == "not_implemented", body
                 _, body = json_request("/broken-tile.tif/full/max/0/default.jpg", 500)

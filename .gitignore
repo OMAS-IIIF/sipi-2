@@ -9,3 +9,6 @@
 # Drogon default runtime upload directory.
 /uploads/
 /.DS_Store
+
+# Python test module bytecode
+__pycache__/

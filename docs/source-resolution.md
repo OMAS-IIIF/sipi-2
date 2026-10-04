@@ -76,7 +76,7 @@ valid. `^max` without a finite configured size limit returns 400; deployment siz
 limit configuration remains open. Invalid internal dimensions/policies return 500.
 
 Successful geometry is concrete before rotation and can be inspected with debug
-logging. Supported tiled RGB8 TIFF crops, optionally reduced by area averaging, produce JPEG; enlargement, rotation
+logging. Supported tiled RGB/RGBA8 TIFF crops, optionally reduced by area averaging, produce JPEG or PNG; enlargement, rotation
 and unsupported layouts return 501 not_implemented. See [JPEG delivery](jpeg-delivery.md). An info request returns the
 orientation-normalized dimensions and public identity as JSON with status 200;
 it has no region/size to validate. See [info.json](iiif-info.md). All worker responses use Cache-Control: no-store.

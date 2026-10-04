@@ -102,7 +102,7 @@ The previous hand-written parser was reviewed successfully before replacement.
 Future configuration fields belong in `ServerConfig` and must have explicit
 validation and precedence tests. No generic configuration registry is needed.
 
-Size upscaling is consumed by the geometry API. HTTP JPEG delivery supports
+Size upscaling is consumed by the geometry API. HTTP JPEG/PNG delivery supports
 unchanged dimensions and area-weighted reductions; enlargement rendering remains
 unimplemented even when permitted by policy. See
 [TIFF metadata and geometry](tiff-metadata-and-geometry.md).

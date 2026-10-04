@@ -13,7 +13,7 @@ are later steps. No TLS listener or certificates are configured in SIPI-2.
 | GET `/hello/id` | HTML containing the reconstructed request URL |
 | GET `/hello/path1/path2/id?a=1&b=2` | Same, including path and query |
 | GET `/health` | JSON: `{"status":"ok","message":"I'm alive","version":"0.1.0"}` |
-| GET `/id/full/max/0/default.jpg` | 200 JPEG for supported tiled RGB8 TIFF; otherwise explicit error |
+| GET `/id/full/max/0/default.jpg` | 200 JPEG for supported tiled RGB/RGBA8 TIFF; otherwise explicit error |
 | GET `/project/id/info.json` | 200 JSON: authorized TIFF dimensions and public service identity |
 | GET an invalid IIIF path, including `/` | 400 JSON with error, component, and message |
 | HEAD any of the above | Same status/headers, no response body |
@@ -45,7 +45,7 @@ syntax returns, for example:
 ```
 
 The actual message explains the rejected syntax. Valid image and `info.json`
-requests proceed to optional preflight. Without a script, they use the configured iiif-root mapping. Supported tiled RGB8 TIFF crops return 200 image/jpeg after metadata
+requests proceed to optional preflight. Without a script, they use the configured iiif-root mapping. Supported tiled RGB/RGBA8 TIFF crops return JPEG or PNG after metadata
 and geometry checks. Unsupported layouts/operations return `not_implemented`
 with status 501; corrupt pixel reads return 500. See [JPEG delivery](jpeg-delivery.md). Information requests return actual metadata; see
 [info.json](iiif-info.md) for the explicitly incomplete compliance declaration.
@@ -124,10 +124,10 @@ semantics; raw header ordering/duplicates cannot be recovered by this adapter.
 | Invalid region/size for the image | 400 / invalid_iiif_geometry |
 | Actual upscaling disabled | 501 / upscaling_disabled |
 | TIFF metadata validated for info.json | 200 / information document |
-| Supported TIFF crop and JPEG output | 200 / image/jpeg |
+| Supported TIFF crop and JPEG/PNG output | 200 / image/jpeg or image/png |
 | Unsupported TIFF pixel layout or transformation/output format | 501 / not_implemented |
 | Corrupt TIFF pixels / decoder limit failure | 500 / invalid_image_source |
-| JPEG codec or encoded-response limit failure | 500 / encoding_failed |
+| JPEG/PNG codec or encoded-response limit failure | 500 / encoding_failed |
 | Worker queue full or stopping | 503 / iiif_busy, Retry-After: 1 |
 
 All preflight-dependent responses carry Cache-Control: no-store. Lua diagnostics,
@@ -156,3 +156,5 @@ project mapping belongs in preflight. See [configuration](command-line.md#reposi
 and [Lua source selection](preflight.md).
 
 JPEG delivery now supports area-weighted reductions after crop reading, on both local and S3 sources. See [area resizing](area-resize.md) for channel semantics and memory limits. Delivery selects a suitable supported TIFF pyramid level and resamples the exact fractional crop within its integer read rectangle.
+
+RGB8 PNG shares the processing path; see [PNG delivery](png-delivery.md) for the encoder and profile/error contract.

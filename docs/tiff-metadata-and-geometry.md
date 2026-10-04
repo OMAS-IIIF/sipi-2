@@ -4,7 +4,7 @@ The metadata and geometry APIs read TIFF delivery metadata and resolve parsed
 region/size values without decoding pixels. A separate region reader now decodes
 the supported RGB subset described below. The HTTP worker resolves the authorized
 source via SourceResolver, returns info.json metadata, and validates image geometry.
-Supported tiled RGB8 TIFF crops now return JPEG; other pixel operations return 501.
+Supported tiled RGB/RGBA8 TIFF crops now return JPEG or PNG; other pixel operations return 501.
 See [JPEG delivery](jpeg-delivery.md).
 
 ## TIFF reader
@@ -138,7 +138,7 @@ This table is a roadmap, not an `info.json` capability advertisement.
 
 | Features | Current state / next integration |
 | --- | --- |
-| `regionByPct`, `regionByPx`, `regionSquare` | Implemented for supported tiled RGB8 TIFF crops; no capability advertisement yet |
+| `regionByPct`, `regionByPx`, `regionSquare` | Implemented for supported tiled RGB/RGBA8 TIFF crops; no capability advertisement yet |
 | `sizeByConfinedWh`, `sizeByH`, `sizeByPct`, `sizeByW`, `sizeByWh` | Syntax and geometry implemented; rendering pending |
 | `sizeUpscaling` | Startup option and geometry policy implemented; rendering and finite `^max` deployment limits pending |
 | `mirroring`, `rotationArbitrary`, `rotationBy90s` | Syntax implemented; pixel transformations pending |
@@ -165,13 +165,13 @@ and geometry without inventing a URL-to-filesystem mapping.
 
 `read_tiff_region(source, region, max_decoded_bytes)` in `TiffReader.h` decodes the
 first image directory at its full stored resolution. Supported inputs are classic
-TIFF or BigTIFF with tiles, unsigned 8-bit RGB, three contiguous samples, no extra
-samples, and top-left orientation. Other layouts raise `TiffReadError` explicitly.
-No silent conversion of alpha, bit depth, color model, or orientation is performed.
+TIFF or BigTIFF with tiles, unsigned 8-bit RGB or explicitly declared RGBA,
+contiguous samples, and top-left orientation. Other layouts raise `TiffReadError` explicitly.
+Associated alpha is explicitly normalized to straight RGBA. No silent conversion of bit depth, color model, or orientation is performed.
 
 `PixelRegion` now lives in `src/image/PixelRegion.h`; the IIIF namespace retains an
 alias for source compatibility. The decoder includes no IIIF parser header.
-`RgbImage8` owns a tightly packed row-major RGB vector and the source ICC bytes.
+`RasterImage8` owns a tightly packed row-major RGB vector and the source ICC bytes.
 RGB samples are not implicitly sRGB. Profile validation and conversion are later
 work. Both types are usable by another format reader without TIFF or IIIF types.
 
@@ -260,7 +260,7 @@ reader can decode them. The worker checks base support and removes unsupported
 levels before planning. `read_tiff_region(source, directory, region, budget)`
 selects the planned IFD by offset, rechecks actual tags and validates planned
 dimensions/orientation. It retains the main ICC profile when reduced IFDs omit it.
-Top-left RGB8 remains the supported pixel subset, so no orientation translation
+Top-left RGB/RGBA8 remains the supported pixel subset, so no orientation translation
 is needed yet. The fractional-window overload of `downsample_area` then resamples
 the **exact fractional window** using the format-neutral `PixelWindow` type.
 Scaling the whole enclosing rectangle would shift/expand the requested view.
@@ -278,3 +278,5 @@ unsupported layouts, selected-directory validation, tile isolation and memory
 limits. A deliberately damaged base tile proves reduced delivery does not decode
 the main image. HTTP tests compare reduced-IFD output with a flat reference and
 check GET/HEAD; MinIO tests compare fractional pyramid delivery with local output.
+
+Alpha metadata, normalization and output behavior are specified in [alpha delivery](alpha-delivery.md).

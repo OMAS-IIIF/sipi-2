@@ -10,7 +10,7 @@ echoes the backend URL with HTML escaping. Port defaults to 8080 and is configur
 through --port, SIPI_PORT, or TOML. The listener binds only to 127.0.0.1. The initial executable ran successfully in CLion
 according to the owner. A standalone IIIF Image API 3 syntax parser now produces
 owning typed image/info requests. The HTTP catch-all maps invalid syntax to 400 JSON and applies configured
-preflight to valid requests, returning information JSON or JPEG for supported tiled RGB8 TIFF crops; exact /health returns liveness/version JSON. Area-weighted reduction is integrated; rotation
+preflight to valid requests, returning information JSON or JPEG/PNG for supported tiled RGB/RGBA8 TIFF crops; exact /health returns liveness/version JSON. Area-weighted reduction is integrated; rotation
 and socket streaming are not integrated yet. A standalone TIFF metadata reader
 and pure IIIF region/size resolver are implemented and tested together. The HTTP
 worker now resolves sources, reads TIFF headers, and validates geometry.
@@ -56,8 +56,8 @@ ExternalProject build wholesale; adopt libraries and source modules incrementall
 - `src/preflight/LuaPreflight.h`, `.cpp`: isolated Lua evaluation and typed policy contract.
 - `docs/preflight.md`, `examples/preflight.lua`, `tests/preflight/LuaPreflightTests.cpp`: contract, sample, and regression tests.
 - `CMakeLists.txt`: C++20 executable `sipi-2`, standalone `iiifparser` library, and CTest targets.
-- `src/imgformats/TiffMetadata.h`, `TiffReader.h`, `TiffReader.cpp`: shared RAII TIFF metadata and tiled RGB8 crop reading.
-- `src/image/PixelRegion.h`, `RgbImage.h`: format-neutral pixel rectangle and owning RGB8 raster.
+- `src/imgformats/TiffMetadata.h`, `TiffReader.h`, `TiffReader.cpp`: shared RAII TIFF metadata and tiled RGB/RGBA8 crop reading.
+- `src/image/PixelRegion.h`, `RasterImage.h`: format-neutral pixel rectangle and owning RGB/RGBA8 raster.
 - `src/iiifparser/IIIFGeometry.h`, `.cpp`: pure region/size resolution with explicit policy.
 - `docs/tiff-metadata-and-geometry.md`: reader limits, rounding rules, composition, feature roadmap.
 - `src/iiifparser/IIIFParser.h`, `.cpp`: pure IIIF 3 path parser and owning value types.
@@ -119,7 +119,7 @@ routes are case-insensitive, while IIIF parameter parsing remains case-sensitive
 Health reports liveness, not readiness. IIIF preflight selects/checks a source,
 and info generation returns metadata; supported TIFF crops produce JPEG. Debug logs record parsed values.
 
-Next: measure remote request counts and add bounded range buffering as justified. The first tiled RGB8 TIFF crop decoder is
+Next: measure remote request counts and add bounded range buffering as justified. The first tiled RGB/RGBA8 TIFF crop decoder is
 implemented; Grok remains the next format to evaluate. Evaluate streaming/cancellation
 separately. Tests cover configuration, the HTTP route, and IIIF syntax. The owner already knows C++; focus on design choices and unfamiliar
 modern features. Logging remains synchronous console output; Drogon now provides the initial HTTP layer; codec integration remains open.
@@ -241,9 +241,9 @@ and geometry. Default mapping uses only identifier, never prefix segments.
 ## First TIFF crop decoder (2026-10-03)
 
 `read_tiff_region` decodes only intersecting tiles from the first image or an
-explicitly selected compatible pyramid directory: top-left unsigned RGB8, contiguous three-channel layout without alpha.
+explicitly selected compatible pyramid directory: top-left unsigned RGB/RGBA8, contiguous samples and explicitly declared alpha.
 Unsupported variants fail explicitly. The format-neutral PixelRegion is shared
-with geometry via an IIIF namespace alias; RgbImage8 owns RGB pixels and source
+with geometry via an IIIF namespace alias; RasterImage8 owns RGB pixels and source
 ICC bytes. No implicit sRGB conversion. CMake target tiffreader replaces
 tiffmetadata; TiffReadError replaces TiffMetadataError for file/codec failures.
 The two entry points share per-handle opening/diagnostics and tag/profile reading
@@ -275,7 +275,7 @@ Parse before dispatch; authorize image/info GET and HEAD alike. Deny returns 403
 Lua/contract/quota failures 500. Resolve and probe the definitive source, read TIFF
 metadata, and pass orientation-normalized dimensions to the pure geometry resolver.
 Invalid region/size is 400; disabled actual upscaling is 501 upscaling_disabled.
-Supported tiled RGB8 TIFF crops return JPEG. Unsupported operations/layouts
+Supported tiled RGB/RGBA8 TIFF crops return JPEG or PNG. Unsupported operations/layouts
 remain 501 not_implemented.
 Information requests return 200 JSON with oriented dimensions and public identity.
 
@@ -327,7 +327,7 @@ IiifWorker resolves geometry, rejects unsupported transforms/formats, decodes on
 intersecting TIFF tiles and collects JPEG blocks into a <=64 MiB string. Publish
 200 image/jpeg/no-store only after success. TIFF raster + tile limit remains
 256 MiB. JPEG dimensions are limited to 65500; codec/response-limit errors are 500.
-Top-left, unsigned RGB8, contiguous, three channels, tiled TIFF only; no alpha.
+Top-left, unsigned RGB/RGBA8, contiguous tiled TIFF; explicit alpha only.
 Any region syntax works; resolved output dimensions may stay unchanged or shrink independently.
 Reduction uses the format-independent AreaResize module in stored channel values.
 Rotation 0/360, no mirroring, default/color JPG only. Other requests return 501;
@@ -491,7 +491,41 @@ Main-image ICC is inherited; selected corrupt data fails without silent fallback
 PixelWindow/PixelInterval in src/image/PixelWindow.h represent the rational crop
 independently of TIFF. AreaResize accepts that window, preserving exact pixel
 boundary selection and weighting partial edges in stored channel values.
-Only top-left tiled RGB8 delivery remains supported. Remote range buffering,
+Only top-left tiled RGB/RGBA8 delivery remains supported. Remote range buffering,
 additional pixel layouts and color conversion remain next steps.
 All 19 suites pass, including real main-chain/SubIFD, HTTP and MinIO pyramid tests.
 See `docs/tiff-metadata-and-geometry.md` for the contract and examples.
+
+
+## RGB8 PNG output (2026-10-04)
+
+`src/imgformats/PngWriter.h/.cpp` adds an independent synchronous block encoder
+(libpng 1.6.58, private PNG::PNG dependency). Worker selects JPEG or PNG after the
+same TIFF read plan and fractional resampling. PNG preserves RGB8 samples and ICC,
+without color conversion or synthesized sRGB/gamma tags. Basic ICC RGB header
+checks plus libpng checks reject problematic profiles; no full ICC validation.
+Input cap 256 MiB, ICC 16 MiB, axis cap 1,000,000; HTTP encoded cap remains 64 MiB.
+Failure discards output and returns encoding_failed; HEAD follows GET processing.
+Independent standard-library Python decoding verifies pixels, ICC and PNG CRCs.
+See docs/png-delivery.md. Refresh Conan and reload CMake in CLion for the new codec.
+RGBA/alpha-aware filtering and PNG transparency/JPEG compositing are implemented below;
+repository TIFF target decisions are in docs/iiif-delivery-architecture.md.
+
+
+## RGBA transparency (2026-10-04)
+
+RasterImage8 in src/image/RasterImage.h replaces the RGB-only type with explicit
+PixelLayout::rgb/rgba; rgba always means straight alpha. TIFF accepts exactly one
+associated/unassociated alpha sample, normalizes associated values to straight
+8-bit RGB and rejects requested associated pixels with color > alpha. Unknown
+extra channels are not guessed. Pyramids retain existing compatibility checks.
+AreaResize accumulates colors weighted by alpha in double and returns straight
+RGBA; zero-alpha reduced output has black hidden RGB. Identity preserves bytes.
+AlphaComposite::composite_on_white compacts RGBA to RGB in place before JPEG;
+write_jpeg rejects RGBA itself. PNG encodes RGBA directly. Both processing stages
+use stored channel encoding, not linear light; ICC remains unchanged.
+Memory bounds count 4 channels for RGBA. Tests cover both source alpha modes,
+transparent hidden colors, partial/zero coverage, fractional windows, corrupt
+pixels outside/inside crops, inherited ICC and local/S3 PNG/JPEG/HEAD delivery.
+See docs/alpha-delivery.md. Next work includes color management, other TIFF layouts,
+rotation/mirroring, range buffering and cache; alpha does not imply those features.
