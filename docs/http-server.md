@@ -13,7 +13,7 @@ are later steps. No TLS listener or certificates are configured in SIPI-2.
 | GET `/hello/id` | HTML containing the reconstructed request URL |
 | GET `/hello/path1/path2/id?a=1&b=2` | Same, including path and query |
 | GET `/health` | JSON: `{"status":"ok","message":"I'm alive","version":"0.1.0"}` |
-| GET `/id/full/max/0/default.jpg` | 200 JPEG for supported tiled RGB/RGBA8 TIFF; otherwise explicit error |
+| GET `/id/full/max/0/default.jpg` | 200 JPEG for supported tiled or strip-based gray/RGB/RGBA8 TIFF; otherwise explicit error |
 | GET `/project/id/info.json` | 200 JSON: authorized TIFF dimensions and public service identity |
 | GET an invalid IIIF path, including `/` | 400 JSON with error, component, and message |
 | HEAD any of the above | Same status/headers, no response body |
@@ -45,7 +45,7 @@ syntax returns, for example:
 ```
 
 The actual message explains the rejected syntax. Valid image and `info.json`
-requests proceed to optional preflight. Without a script, they use the configured iiif-root mapping. Supported tiled RGB/RGBA8 TIFF crops return JPEG or PNG after metadata
+requests proceed to optional preflight. Without a script, they use the configured iiif-root mapping. Supported tiled or strip-based gray/RGB/RGBA8 TIFF crops return JPEG or PNG after metadata
 and geometry checks. Unsupported layouts/operations return `not_implemented`
 with status 501; corrupt pixel reads return 500. See [JPEG delivery](jpeg-delivery.md). Information requests return actual metadata; see
 [info.json](iiif-info.md) for the explicitly incomplete compliance declaration.
@@ -104,7 +104,7 @@ remain untested and are separate increments.
 For both image and info requests, including HEAD: parse syntax, run the configured
 preflight if present, resolve and open one byte source, read TIFF metadata, and validate geometry.
 Format probing and pixel decoding reuse that source (see [byte sources](byte-source.md)). Health/hello and rejected methods
-never enter preflight. Authorization is evaluated on each request, without a cache.
+never enter preflight. Authorization is evaluated on each request, including encoded-result cache hits.
 The Authorization header is copied without validation by the HTTP layer. Drogon
 parses Cookie separately and does not retain its raw header: use request.cookies
 in Lua, e.g. request.cookies.session. Repeated cookie names follow Drogon's map
@@ -158,3 +158,20 @@ and [Lua source selection](preflight.md).
 JPEG delivery now supports area-weighted reductions after crop reading, on both local and S3 sources. See [area resizing](area-resize.md) for channel semantics and memory limits. Delivery selects a suitable supported TIFF pyramid level and resamples the exact fractional crop within its integer read rectangle.
 
 RGB8 PNG shares the processing path; see [PNG delivery](png-delivery.md) for the encoder and profile/error contract.
+
+
+## Encoded-result cache
+
+With `cache-dir` configured, the worker shares ownership of the persistent store.
+Preflight and definitive source/version opening, metadata, geometry and source/layout
+capability checks precede lookup on every request. A hit reads complete encoded
+bytes and skips decoding/resizing/encoding. A miss publishes only successful output.
+Lookup/read failures render normally; publication/admission failures still deliver
+the completed encoding. Both paths retain the 64 MiB response bound and identical
+content type and `Cache-Control: no-store`. No cache identifiers are exposed in
+headers. GET/HEAD share entries; Drogon suppresses HEAD bodies as before.
+
+Information documents, errors and authorization decisions are not cached. Header
+reads still occur, and the single bounded worker still serializes image processing.
+See [persistent cache](persistent-cache.md#http-integration) for failure boundaries,
+lifecycle, tests and deferred streaming/metadata work.

@@ -60,8 +60,12 @@ int main(int argc, char* argv[]) {
     if (const char* value = std::getenv("SIPI_S3_REGION")) repository_environment.region = value;
     if (const char* value = std::getenv("SIPI_S3_ENDPOINT")) repository_environment.endpoint = value;
     if (const char* value = std::getenv("SIPI_S3_PATH_STYLE")) repository_environment.path_style = value;
+    sipi::CacheEnvironment cache_environment;
+    if (const char* value = std::getenv("SIPI_CACHE_DIR")) cache_environment.directory = value;
+    if (const char* value = std::getenv("SIPI_CACHE_MAX_BYTES")) cache_environment.max_bytes = value;
+    if (const char* value = std::getenv("SIPI_CACHE_TARGET_PERCENT")) cache_environment.target_percent = value;
     const auto parsed = sipi::load_startup_options(arguments, env_log_level, env_port,
-        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment);
+        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&parsed)) {
         std::cerr << "Configuration error: " << error->message << '\n';
         return 2;
@@ -88,8 +92,20 @@ int main(int argc, char* argv[]) {
         }
         spdlog::info("Preflight script validated");
     }
+    // Prepare/recover persistent storage and retain its exclusive directory lock.
+    std::shared_ptr<sipi::cache::ResultCache> cache;
+    if (options.config.cache_dir) {
+        try {
+            cache = std::make_shared<sipi::cache::ResultCache>(*options.config.cache_dir, options.config.cache_limits);
+            spdlog::info("Persistent cache initialized");
+        } catch (const sipi::cache::CacheError&) {
+            spdlog::warn("Persistent cache unavailable; continuing without cache");
+        } catch (const std::filesystem::filesystem_error&) {
+            spdlog::warn("Persistent cache filesystem unavailable; continuing without cache");
+        }
+    }
     try {
-        sipi::run_http_server(options.config, std::move(preflight));
+        sipi::run_http_server(options.config, std::move(preflight), std::move(cache));
     } catch (const sipi::ByteSourceError&) {
         std::cerr << "S3 startup error: invalid backend configuration\n";
         return 2;

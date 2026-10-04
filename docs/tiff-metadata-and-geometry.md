@@ -4,7 +4,7 @@ The metadata and geometry APIs read TIFF delivery metadata and resolve parsed
 region/size values without decoding pixels. A separate region reader now decodes
 the supported RGB subset described below. The HTTP worker resolves the authorized
 source via SourceResolver, returns info.json metadata, and validates image geometry.
-Supported tiled RGB/RGBA8 TIFF crops now return JPEG or PNG; other pixel operations return 501.
+Supported tiled or strip-based gray/RGB/RGBA8 TIFF crops now return JPEG or PNG; other pixel operations return 501.
 See [JPEG delivery](jpeg-delivery.md).
 
 ## TIFF reader
@@ -138,7 +138,7 @@ This table is a roadmap, not an `info.json` capability advertisement.
 
 | Features | Current state / next integration |
 | --- | --- |
-| `regionByPct`, `regionByPx`, `regionSquare` | Implemented for supported tiled RGB/RGBA8 TIFF crops; no capability advertisement yet |
+| `regionByPct`, `regionByPx`, `regionSquare` | Implemented for supported tiled or strip-based gray/RGB/RGBA8 TIFF crops; no capability advertisement yet |
 | `sizeByConfinedWh`, `sizeByH`, `sizeByPct`, `sizeByW`, `sizeByWh` | Syntax and geometry implemented; rendering pending |
 | `sizeUpscaling` | Startup option and geometry policy implemented; rendering and finite `^max` deployment limits pending |
 | `mirroring`, `rotationArbitrary`, `rotationBy90s` | Syntax implemented; pixel transformations pending |
@@ -161,17 +161,17 @@ pixels. Header failures and independent concurrent reads are also exercised.
 A composition test combines startup configuration, a real TIFF header, parsing,
 and geometry without inventing a URL-to-filesystem mapping.
 
-## First pixel reader: tiled RGB8
+## Pixel reader: tiles, strips and 8-bit gray/RGB/RGBA
 
 `read_tiff_region(source, region, max_decoded_bytes)` in `TiffReader.h` decodes the
 first image directory at its full stored resolution. Supported inputs are classic
-TIFF or BigTIFF with tiles, unsigned 8-bit RGB or explicitly declared RGBA,
+TIFF or BigTIFF with tiles or strips, unsigned 8-bit gray/RGB or explicitly declared RGBA,
 contiguous samples, and top-left orientation. Other layouts raise `TiffReadError` explicitly.
 Associated alpha is explicitly normalized to straight RGBA. No silent conversion of bit depth, color model, or orientation is performed.
 
 `PixelRegion` now lives in `src/image/PixelRegion.h`; the IIIF namespace retains an
 alias for source compatibility. The decoder includes no IIIF parser header.
-`RasterImage8` owns a tightly packed row-major RGB vector and the source ICC bytes.
+`RasterImage8` owns a tightly packed row-major gray/RGB/RGBA vector and the source ICC bytes.
 RGB samples are not implicitly sRGB. Profile validation and conversion are later
 work. Both types are usable by another format reader without TIFF or IIIF types.
 
@@ -190,14 +190,14 @@ if (const auto* geometry = std::get_if<sipi::iiif::ImageGeometry>(&resolved)) {
 
 The rectangle must be nonempty and entirely inside the current image. Geometry
 resolution performs clipping; the decoder rejects invalid bounds rather than
-clipping a second time. Only intersecting tiles are decoded, into one reusable
-buffer. Each tile intersection is computed in full-image coordinates and then
-translated separately into tile and output-buffer coordinates. Padding outside
+clipping a second time. Only intersecting tiles or strips are decoded, into one reusable
+buffer. Each block intersection is computed in full-image coordinates and then
+translated separately into block and output-buffer coordinates. Padding outside
 edge tiles never becomes part of the returned raster.
 
-The combined output-plus-tile allocation is bounded by the supplied byte limit
+The combined output-plus-block allocation is bounded by the supplied byte limit
 (default 256 MiB). Products are checked before multiplication/allocation. libtiff
-and metadata limits are separate. Tile errors or short reads throw before any
+and metadata limits are separate. Block errors or short reads throw before any
 partial image is returned. Reuse the same open source for metadata
 planning and decoding. Local atomic replacement preserves this opened file;
 in-place writes remain prohibited.
@@ -260,7 +260,7 @@ reader can decode them. The worker checks base support and removes unsupported
 levels before planning. `read_tiff_region(source, directory, region, budget)`
 selects the planned IFD by offset, rechecks actual tags and validates planned
 dimensions/orientation. It retains the main ICC profile when reduced IFDs omit it.
-Top-left RGB/RGBA8 remains the supported pixel subset, so no orientation translation
+Top-left gray/RGB/RGBA8 remains the supported pixel subset, so no orientation translation
 is needed yet. The fractional-window overload of `downsample_area` then resamples
 the **exact fractional window** using the format-neutral `PixelWindow` type.
 Scaling the whole enclosing rectangle would shift/expand the requested view.

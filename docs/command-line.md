@@ -4,7 +4,7 @@ The working implementation uses CLI11 in `src/CommandLine.cpp`.
 `load_startup_options` returns either owning `StartupOptions` or `ParseError`.
 `main` supplies argument views (excluding argv[0]) and an optional snapshot of
 `SIPI_LOG_LEVEL`, `SIPI_PORT`, `SIPI_SIZE_UPSCALING`, `SIPI_PREFLIGHT_SCRIPT`,
-`SIPI_IIIF_ROOT`, `SIPI_PUBLIC_BASE_URL`, and the three `SIPI_S3_*` credential variables. The loader reads an explicitly selected file, but does not log,
+`SIPI_IIIF_ROOT`, `SIPI_PUBLIC_BASE_URL`, the three `SIPI_CACHE_*` settings, and the three `SIPI_S3_*` credential variables. The loader reads an explicitly selected file, but does not log,
 print, exit, or change logging/environment state.
 
 ## Sources and precedence
@@ -29,6 +29,9 @@ would put the file ahead of the environment in the version we use.
 - `--size-upscaling BOOL`: permit IIIF enlargement; exactly `true` or `false`.
 - `--preflight-script PATH`: optional Lua script, nonempty and without NUL bytes.
 - `--iiif-root PATH`: optional repository directory, nonempty and without NUL bytes.
+- `--cache-dir PATH`: optional persistent cache directory; see the cache section below.
+- `--cache-max-bytes BYTES`: encoded file limit, default `1073741824` (1 GiB).
+- `--cache-target-percent PERCENT`: cleanup target from 1 to 99, default `90`.
 - `--public-base-url URL`: public HTTP(S) origin and optional proxy mount; see below.
 - `SIPI_PUBLIC_BASE_URL` and TOML `public-base-url` supply the same setting.
 - S3 credential options are listed in the table below.
@@ -50,10 +53,10 @@ Duplicate scalar options/flags and conflicting help/version actions are errors.
 CLI11's standard `--` end-of-options marker is accepted; positional tokens after
 it remain errors. Flag value overrides such as `--help=false` are rejected.
 
-The supported file schema has fourteen root keys: `log-level`, `port`, `size-upscaling`,
+The supported file schema has seventeen root keys: `log-level`, `port`, `size-upscaling`,
 `preflight-script`, `iiif-root`, `public-base-url`, `s3-access-key`, `s3-secret-key`,
 `s3-session-token`, `iiif-storage`, `s3-bucket`, `s3-region`, `s3-endpoint`,
-and `s3-path-style`. Unknown keys
+`s3-path-style`, `cache-dir`, `cache-max-bytes`, and `cache-target-percent`. Unknown keys
 and startup actions in the file are rejected. CLI11's built-in TOML-style reader
 is used directly; this is not a promise of full TOML grammar validation (including
 all malformed syntax or duplicate-key checks). Revisit the parser if the schema
@@ -263,3 +266,35 @@ A complete local MinIO example is in `examples/minio.toml`:
 
 With `sipi-test-images/tiled.tif` uploaded, both `/tiled.tif/info.json` and
 `/museum/tiled.tif/50,30,100,80/max/0/default.jpg` use that same object.
+
+## Persistent result cache
+
+| CLI / TOML key | Environment | Default |
+| --- | --- | --- |
+| `cache-dir` | `SIPI_CACHE_DIR` | absent (disabled) |
+| `cache-max-bytes` | `SIPI_CACHE_MAX_BYTES` | `1073741824` (1 GiB) |
+| `cache-target-percent` | `SIPI_CACHE_TARGET_PERCENT` | `90` |
+
+`cache-dir` must be nonempty and contain no NUL; relative paths resolve against
+**the process working directory**, not the TOML file location. The server creates
+it if necessary. Use a dedicated private local directory separate from iiif-root.
+The database filename is fixed: `<cache-dir>/cache.sqlite3`. The store is retained
+across restart; bind a persistent volume when running in a container.
+
+Capacity values use decimal integers (no units/signs/fractions). The byte range is
+1..4611686018427387903; percent is 1..99. The byte budget counts encoded bodies and
+the single in-progress body, excluding database/journal/filesystem overhead.
+Admission additionally leaves at least 64 MiB of available filesystem space at
+its check; this is headroom, not an exclusive disk reservation. See
+[persistent cache](persistent-cache.md) for exact eviction and failure behavior.
+
+Source precedence is per field, including limits when cache-dir is absent.
+Help/version validate CLI syntax but neither initialize the cache nor read its
+environment settings. Invalid selected settings fail startup; runtime storage
+initialization failure logs a warning and allows uncached operation.
+
+Startup initializes, recovers and locks the store. JPEG/PNG image GET/HEAD requests
+now reuse complete encoded results after current preflight, source/version, header,
+geometry and capability checks. Hits skip pixel decoding/processing/encoding;
+header reads are not cached yet. Storage failures fall back to uncached delivery.
+See [HTTP cache integration](persistent-cache.md#http-integration).

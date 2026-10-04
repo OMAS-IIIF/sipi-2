@@ -8,7 +8,7 @@ namespace sipi {
 /** Invalid raster/dimensions or exceeded resize working-memory budget. */
 class ResizeError : public std::runtime_error { public: using std::runtime_error::runtime_error; };
 
-/** Downsample RGB/RGBA8 by exact pixel-area overlap in stored channel values.
+/** Downsample gray/RGB/RGBA8 by exact pixel-area overlap in stored channel values.
  * Both target axes must be positive and no larger than the source. Each output
  * pixel averages its entire source footprint; quantization rounds once, half up.
  * RGBA colors accumulate with alpha weights, then divide by accumulated alpha

@@ -15,7 +15,7 @@ void require(bool condition, const char* message) {
 
 /** Independent libjpeg decompression checks output pixels and saved ICC chunks.
  * This is a test process: libjpeg's default fatal handler exits it on bad JPEGs. */
-sipi::RasterImage8 decode(const std::vector<unsigned char>& bytes) {
+sipi::RasterImage8 decode(const std::vector<unsigned char>& bytes, bool require_gray = false) {
     jpeg_decompress_struct codec{};
     jpeg_error_mgr error{};
     codec.err = jpeg_std_error(&error);
@@ -27,6 +27,7 @@ sipi::RasterImage8 decode(const std::vector<unsigned char>& bytes) {
     jpeg_mem_src(&codec, bytes.data(), bytes.size());
     jpeg_save_markers(&codec, JPEG_APP0 + 2, 65535);
     require(jpeg_read_header(&codec, TRUE) == JPEG_HEADER_OK, "JPEG header");
+    if (require_gray) require(codec.num_components == 1 && codec.jpeg_color_space == JCS_GRAYSCALE, "Native grayscale JPEG");
     codec.out_color_space = JCS_RGB;
     jpeg_start_decompress(&codec);
     sipi::RasterImage8 image{codec.output_width, codec.output_height, {}, {}};
@@ -84,14 +85,16 @@ void resized_gradient(const sipi::RasterImage8& image, unsigned ox, unsigned oy,
  * decode an HTTP response and validate the known TIFF fixture's actual pixels. */
 int main(int argc, char** argv) {
     try {
-        if (argc == 6 && std::string(argv[1]) == "--rgb") {
+        if (argc == 6 && (std::string(argv[1]) == "--rgb" || std::string(argv[1]) == "--gray")) {
             std::ifstream input(argv[2], std::ios::binary), reference(argv[3], std::ios::binary);
             require(bool(input) && bool(reference), "Cannot open JPEG reference files");
             const std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(input), {}};
             const std::vector<unsigned char> expected{std::istreambuf_iterator<char>(reference), {}};
-            const auto image = decode(bytes);
+            const auto image = decode(bytes, std::string(argv[1]) == "--gray");
             require(image.width == std::stoul(argv[4]) && image.height == std::stoul(argv[5]) &&
                     image.pixels.size() == expected.size(), "JPEG reference dimensions");
+            if (std::string(argv[1]) == "--gray")
+                require(image.icc_profile.size() >= 132 && std::string(image.icc_profile.begin()+16,image.icc_profile.begin()+20)=="GRAY", "Gray ICC in JPEG");
             for (std::size_t i=0; i<expected.size(); ++i)
                 require(std::abs(int(image.pixels[i])-int(expected[i])) <= 35, "JPEG composited pixel");
             return 0;

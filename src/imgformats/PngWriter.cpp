@@ -51,12 +51,12 @@ void write_png(const RasterImage8& image, const PngSink& sink) {
     if (image.icc_profile.size() > 16 * 1024 * 1024)
         throw PngWriteError("ICC profile exceeds PNG writer limit");
 
-    // PNG RGB images require an RGB profile. Recent libpng writers check size
+    // PNG gray/RGB images require a matching GRAY/RGB profile. Recent libpng writers check size
     // but do not fully validate ICC semantics; do not imply color validation.
     if (!image.icc_profile.empty() && (image.icc_profile.size() < 132 ||
         std::memcmp(image.icc_profile.data() + 36, "acsp", 4) != 0 ||
-        std::memcmp(image.icc_profile.data() + 16, "RGB ", 4) != 0))
-        throw PngWriteError("PNG requires an RGB ICC profile header");
+        std::memcmp(image.icc_profile.data() + 16, channels == 1 ? "GRAY" : "RGB ", 4) != 0))
+        throw PngWriteError("PNG requires an ICC header matching its color model");
 
     const auto state = std::make_unique<Encoder>(sink);
     // Treat warnings as failures too: an invalid profile must not disappear.
@@ -71,7 +71,7 @@ void write_png(const RasterImage8& image, const PngSink& sink) {
     png_set_write_fn(state->codec, state.get(), emit, flush);
     png_set_compression_level(state->codec, 6);
     png_set_IHDR(state->codec, state->info, image.width, image.height, 8,
-                 channels == 4 ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+                 channels == 1 ? PNG_COLOR_TYPE_GRAY : (channels == 4 ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_RGB), PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
     if (!image.icc_profile.empty()) {
         png_set_iCCP(state->codec, state->info, "Source ICC", PNG_COMPRESSION_TYPE_BASE,
                      image.icc_profile.data(), static_cast<png_uint_32>(image.icc_profile.size()));

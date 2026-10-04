@@ -1,6 +1,7 @@
 #include <tiffio.h>
 #include "TiffPyramidFixture.h"
 #include "TiffAlphaFixture.h"
+#include "TiffStripGrayFixture.h"
 #include <algorithm>
 #include <filesystem>
 #include <memory>
@@ -65,6 +66,11 @@ int main(int argc, char** argv) {
     try {
         const std::filesystem::path directory(argv[1]);
         std::filesystem::create_directories(directory);
+        fixture::strip_gray_tiff(directory/"gray.tif");
+        fixture::strip_gray_tiff(directory/"gray-white.tif", {.white_zero=true});
+        fixture::strip_gray_tiff(directory/"gray-tiled.tif", {.tiled=true});
+        fixture::strip_gray_tiff(directory/"gray-pyramid.tif", {.broken_last=true}, true);
+        fixture::strip_gray_tiff(directory/"strip-rgba.tif", {.gray=false,.alpha=true});
         fixture::alpha_tiff(directory/"alpha.tif");
         fixture::alpha_tiff(directory/"alpha-associated.tif", EXTRASAMPLE_ASSOCALPHA);
         fixture::alpha_tiff(directory/"alpha-pyramid.tif", EXTRASAMPLE_UNASSALPHA, true, true);

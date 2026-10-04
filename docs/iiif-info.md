@@ -1,7 +1,7 @@
 # Image information
 
 GET `/{prefix...}/{identifier}/info.json` authorizes the request, resolves the
-definitive source, reads its TIFF metadata, and returns status 200 with an
+definitive source, reads its TIFF or JPEG 2000 metadata, and returns status 200 with an
 `application/json` document. HEAD performs the same policy and metadata checks,
 returning the same headers without the body. All worker responses, including
 successful information documents, carry `Cache-Control: no-store`.
@@ -28,13 +28,14 @@ the [Image API](https://iiif.io/api/image/3.0/#52-technical-properties) requires
 output. Add the appropriate profile when its actual requirements are implemented
 and tested, rather than declaring the eventual target now.
 
-No `sizes`, `tiles`, `preferredFormats`, `extraFormats`, `extraQualities`, or
-`extraFeatures` are emitted yet. Parsing a parameter, recognizing an input codec,
+No `sizes`, `tiles`, `preferredFormats`, `extraFormats`, or
+`extraFeatures` are emitted yet. Readable native grayscale sources advertise
+`extraQualities: ["gray"]`; RGB-to-gray conversion is not implemented. Parsing a parameter, recognizing an input codec,
 or reading a TIFF pyramid does not mean the server can render its output. In
 particular, `size-upscaling=true` does not advertise `sizeUpscaling` prematurely.
 Content negotiation/JSON-LD media type, CORS and base-URI redirects are separate
 future steps. For now the response always uses application/json, as do our other
-JSON endpoints. Supported tiled RGB/RGBA8 TIFF crops now return JPEG or PNG; unsupported
+JSON endpoints. Supported tiled or strip-based gray/RGB/RGBA8 TIFF crops now return JPEG or PNG; unsupported
 operations/layouts return 501. Profile publication remains pending a per-resource
 compliance review: metadata-readable sources are not all pixel-deliverable yet.
 See [JPEG delivery](jpeg-delivery.md).
@@ -83,3 +84,7 @@ dimensions, BigTIFF, Lua source overrides, prefixes, escaping, hostile Host/prox
 headers, configured and default origins, GET/HEAD parity, no-store, and unchanged
 deny/missing/corrupt-source handling. Configuration tests cover precedence,
 trailing-slash normalization, IPv6, malformed URLs and help/version boundaries.
+
+JPEG 2000 JP2/raw J2K also supplies information, geometry checks and supported
+8-bit gray/RGB region/resolution pixel delivery through the same local/S3 source;
+see [JPEG 2000 input](jpeg2000-input.md).

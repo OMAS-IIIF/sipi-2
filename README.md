@@ -2,14 +2,15 @@
 
 A high-performance, versatile IIIF server, developed in small, explainable steps.
 The current executable resolves startup configuration and runs a local Drogon HTTP
-server with HTML hello, JSON health, and IIIF syntax routes. Tiled RGB/RGBA8 TIFF-to-JPEG/PNG delivery is implemented; area-weighted reduction is supported; enlargement and streaming come later.
+server with HTML hello, JSON health, and IIIF syntax routes. Tiled or strip-based gray/RGB/RGBA8 TIFF-to-JPEG/PNG delivery is implemented; area-weighted reduction is supported; enlargement and streaming come later.
 
 ## Build and run
 
-Prerequisites: a C++20 compiler, CMake 3.24 or newer, Ninja, and Conan 2.
+Prerequisites: a compiler supporting C++20 for SIPI and C++23 for Grok, CMake 3.24 or newer, Ninja, and Conan 2.
 Python 3 is used by the HTTP integration test (no third-party Python packages).
 Direct dependencies are `spdlog/1.17.0`, `cli11/2.6.2`, `drogon/1.9.13`,
-`libtiff/4.7.2`, `libjpeg/9f`, `lua/5.4.8`, and `aws-sdk-cpp/1.11.692` (S3).
+`libtiff/4.7.2`, `libjpeg/9f`, `libpng/1.6.58`, `grok/20.4.15`, `lua/5.4.8`,
+`aws-sdk-cpp/1.11.692` (S3), `openssl/3.6.5` (cache-key SHA-256), and `sqlite3/3.53.4` (result index).
 Drogon is built without Boost and ORM support. Its Conan recipe still brings
 OpenSSL transitively, even though our listener uses only plain HTTP.
 `conan.lock` records their resolved versions and recipe revisions.
@@ -27,6 +28,7 @@ cache, not in Git; each machine needs its own matching compiler settings.
 From the repository root:
 
 ```sh
+conan export conan/recipes/grok
 conan install . -pr:h profiles/macos-debug -pr:b sipi-2-local --build=missing
 cmake --preset conan-debug
 cmake --build --preset conan-debug
@@ -153,7 +155,7 @@ in application code and prefer the rule of zero for application types.
 The standalone C++20 parser in `src/iiifparser` handles IIIF Image API 3 image
 and `info.json` paths with typed, owning results. The HTTP catch-all returns 400
 for invalid syntax; valid requests enter optional preflight and source checks,
-with supported tiled RGB/RGBA8 TIFF crops delivered as JPEG or PNG. See [the parser contract](docs/iiif-parser.md) for syntax, decoding, and
+with supported tiled or strip-based gray/RGB/RGBA8 TIFF crops delivered as JPEG or PNG. See [the parser contract](docs/iiif-parser.md) for syntax, decoding, and
 the boundary between parsing and image geometry. Its regression tests run with CTest.
 
 ## TIFF metadata and geometry
@@ -173,7 +175,7 @@ See [source resolution and manual test images](docs/source-resolution.md).
 See [the contract, examples, and feature roadmap](docs/tiff-metadata-and-geometry.md).
 
 The first pixel reader is now available in `src/imgformats/TiffReader.h`:
-`read_tiff_region` reads only intersecting tiles from top-left, contiguous RGB8
+`read_tiff_region` reads only intersecting tiles or strips from top-left, contiguous gray/RGB/RGBA8
 TIFFs into a format-neutral `RasterImage8`. It preserves ICC bytes and rejects other
 layouts explicitly. `tests/TiffRegionTests.cpp` verifies exact pixels, selective
 access, and error paths. HTTP preflight selects local or S3 sources; TIFF crop
@@ -190,7 +192,7 @@ not access grants. See [the contract and C++ example](docs/preflight.md) and
 key `preflight-script`. Startup validates the file and entry point before listening;
 invalid configured scripts fail startup. Relative paths use the working directory.
 No script is loaded by default. Denials return 403, script failures 500, and
-missing selected files 404; invalid geometry returns 400. Supported tiled RGB/RGBA8 TIFF crops now return JPEG or PNG; unsupported layouts and
+missing selected files 404; invalid geometry returns 400. Supported tiled or strip-based gray/RGB/RGBA8 TIFF crops now return JPEG or PNG; unsupported layouts and
 transformations return 501. Information requests now
 return 200 with real dimensions and public service identity. See [HTTP behavior](docs/http-server.md).
 
@@ -226,7 +228,7 @@ The generated `tiled.tif` fixture supports real image output:
 
 Open `/tiled.tif/full/max/0/default.jpg` for the full image or
 `/tiled.tif/50,30,100,80/max/0/default.jpg` for a crop. The earlier `sample.tif`
-is strip-based and remains unsupported for pixel delivery.
+is strip-based and also supports pixel delivery.
 
 The independent JPEG writer uses libjpeg 9f (now a direct Conan dependency),
 preserves ICC profiles, and emits synchronous byte blocks. HTTP currently buffers
@@ -263,9 +265,33 @@ CMake in CLion after pulling. RGBA transparency is now supported; see [alpha del
 
 ## Transparency
 
-Explicit straight and premultiplied TIFF alpha are supported for tiled RGBA8
+Explicit straight and premultiplied TIFF alpha are supported for tiled or strip-based RGBA8
 sources, including compatible pyramid levels. PNG retains transparency; JPEG
 composites onto white. For generated fixtures, try
 `/alpha.tif/full/max/0/default.png` and the same URL ending in `.jpg`.
 Resizing weights colors by alpha to avoid hidden-color fringes. Color management
 and arbitrary rotation remain separate steps.
+
+Strip-based TIFF and native 8-bit grayscale now share the delivery pipeline,
+including MINISBLACK/MINISWHITE normalization, pyramid selection and local/S3
+access. PNG and JPEG retain a single gray channel and its ICC profile. See
+[strips and grayscale](docs/tiff-strips-and-gray.md) for examples and limits.
+
+JPEG 2000 input via Grok now supports headers and region/resolution pixel decoding locally and over S3. See
+[JPEG 2000 input](docs/jpeg2000-input.md) for the local Conan recipe, CLion setup,
+supported pixel layouts, read planning and resource limits.
+
+The first cache increment defines stable encoded-result identities and SHA-256
+keys, tested independently of HTTP. Persistent storage is now implemented below;
+see [cache identity](docs/cache-key.md) for normalization and policy boundaries.
+
+
+Persistent encoded-result storage now uses files and a fixed `cache.sqlite3`
+index. Configure `cache-dir` / `SIPI_CACHE_DIR` / `--cache-dir`; precedence remains
+CLI > environment > TOML > defaults. Without a directory it stays disabled.
+The default encoded-file limit is 1 GiB, with LRU cleanup to 90%; both are
+configurable. Startup recovery and exclusive directory locking are implemented.
+JPEG/PNG image responses now use authorized cache lookup/fill, including local and
+S3 sources. Hits skip pixel decoding, processing and encoding; header reads still
+run. Cache failures fall back to uncached delivery. See [persistent cache](docs/persistent-cache.md) and
+[startup configuration](docs/command-line.md).

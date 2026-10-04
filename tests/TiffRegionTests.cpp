@@ -52,6 +52,10 @@ void write_fixture(const std::filesystem::path& path, const Fixture& spec) {
     TIFFSetField(file.get(), TIFFTAG_SAMPLEFORMAT, spec.sample_format);
     TIFFSetField(file.get(), TIFFTAG_PLANARCONFIG, spec.planar);
     TIFFSetField(file.get(), TIFFTAG_PHOTOMETRIC, spec.photometric);
+    if (spec.photometric == PHOTOMETRIC_PALETTE) {
+        std::array<std::uint16_t,256> map{};
+        TIFFSetField(file.get(), TIFFTAG_COLORMAP, map.data(), map.data(), map.data());
+    }
     TIFFSetField(file.get(), TIFFTAG_ORIENTATION, spec.orientation);
     TIFFSetField(file.get(), TIFFTAG_COMPRESSION, spec.compression);
     TIFFSetField(file.get(), TIFFTAG_ICCPROFILE, static_cast<std::uint32_t>(profile.size()), profile.data());
@@ -154,12 +158,14 @@ int main(int argc, char** argv) {
         const auto short_tile = make("short-last.tif", {.corrupt_last_tile = true});
         rejects([&] { (void)sipi::read_tiff_region(sipi::LocalFileSource{short_tile}, {48, 32, 5, 9}); }, "Cannot decode complete TIFF tile");
         const std::vector<Fixture> unsupported{
-            {.tiled = false}, {.bits = 16}, {.samples = 5}, {.planar = PLANARCONFIG_SEPARATE},
-            {.orientation = ORIENTATION_RIGHTTOP}, {.samples = 1, .photometric = PHOTOMETRIC_MINISBLACK},
+            {.bits = 16}, {.samples = 5}, {.planar = PLANARCONFIG_SEPARATE},
+            {.orientation = ORIENTATION_RIGHTTOP}, {.samples = 1, .photometric = PHOTOMETRIC_PALETTE},
             {.sample_format = SAMPLEFORMAT_INT}};
         for (std::size_t i = 0; i < unsupported.size(); ++i) {
             const auto path = make("unsupported-" + std::to_string(i) + ".tif", unsupported[i]);
+            const auto before = failures;
             rejects([&] { (void)sipi::read_tiff_region(sipi::LocalFileSource{path}, {0, 0, 1, 1}); }, "Unsupported TIFF");
+            if (failures != before) std::cerr << "Fixture: " << path.filename() << '\n';
         }
         for (const sipi::PixelRegion region : {sipi::PixelRegion{0, 0, 0, 1}, {0, 0, 1, 0},
              {53, 0, 1, 1}, {0, 41, 1, 1}, {52, 40, 2, 1}, {0, 0, std::numeric_limits<std::uint32_t>::max(), 1}}) {

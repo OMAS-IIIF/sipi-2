@@ -27,6 +27,10 @@ struct Case {
     std::optional<std::filesystem::path> iiif_root = std::nullopt;
     std::optional<std::string> url_environment = std::nullopt;
     std::optional<std::string> public_base_url = std::nullopt;
+    sipi::CacheEnvironment cache_environment = {};
+    std::optional<std::filesystem::path> cache_dir = std::nullopt;
+    std::uint64_t cache_max_bytes = 1073741824;
+    unsigned cache_target_percent = 90;
 };
 
 /** Check either a complete typed result or a nonempty diagnostic. */
@@ -49,7 +53,7 @@ bool check(const Case& test) {
     std::optional<std::string_view> url_environment;
     if (test.url_environment) url_environment = *test.url_environment;
     const auto result = sipi::load_startup_options(arguments, environment, port_environment,
-        upscale_environment, preflight_environment, root_environment, url_environment);
+        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&result)) {
         if (test.error && !error->message.empty()) {
             return true;
@@ -64,6 +68,9 @@ bool check(const Case& test) {
                          options.config.preflight_script == test.preflight_script &&
                          options.config.iiif_root == test.iiif_root &&
                          options.config.public_base_url == test.public_base_url &&
+                         options.config.cache_dir == test.cache_dir &&
+                         options.config.cache_limits.max_bytes == test.cache_max_bytes &&
+                         options.config.cache_limits.target_percent == test.cache_target_percent &&
                          (options.command != sipi::Command::help ||
                           options.help_text.find("--log-level") != std::string::npos);
     if (!matches) {
@@ -275,6 +282,36 @@ int main(int argc, char* argv[]) {
         url_case("invalid URL CLI", {"--public-base-url", value}, {}, {}, true);
         url_case("invalid URL env", {}, value, {}, true);
     }
+    const auto cache_case = [&](std::string name, std::vector<std::string> args,
+                                sipi::CacheEnvironment env,
+                                std::optional<std::filesystem::path> directory,
+                                std::uint64_t limit = 1073741824, unsigned target = 90,
+                                bool error = false, Command command = Command::run) {
+        Case test;
+        test.name = std::move(name); test.arguments = std::move(args);
+        test.cache_environment = env; test.cache_dir = std::move(directory);
+        test.cache_max_bytes = limit; test.cache_target_percent = target;
+        test.error = error; test.command = command;
+        cases.push_back(std::move(test));
+    };
+    cache_case("cache file", {"--config",file("cache.toml")}, {}, "cache with spaces", 1000,80);
+    cache_case("cache env over file", {"--config",file("cache.toml")}, {"env","2000","85"}, "env",2000,85);
+    cache_case("cache CLI over env/file", {"--config",file("cache.toml"),"--cache-dir=cli","--cache-max-bytes=3000","--cache-target-percent=75"},
+        {"env","2000","85"}, "cli",3000,75);
+    cache_case("cache mixed priority", {"--config",file("cache.toml"),"--cache-dir=cli"}, {{},"2000",{}}, "cli",2000,80);
+    cache_case("cache CLI ignores invalid env", {"--cache-dir=cli","--cache-max-bytes=3000","--cache-target-percent=75"},
+        {"","bad","0"}, "cli",3000,75);
+    cache_case("cache help skips env", {"--help"}, {"","bad","0"}, {},1073741824,90,false,Command::help);
+    for (const auto& args : std::vector<std::vector<std::string>>{
+        {"--cache-dir",""},{"--cache-dir"},{"--cache-dir=a","--cache-dir=b"},
+        {"--cache-dir",std::string("a\0b",3)},{"--cache-max-bytes=0"},
+        {"--cache-max-bytes=-1"},{"--cache-max-bytes=1.5"},{"--cache-max-bytes=4611686018427387904"},
+        {"--cache-max-bytes=18446744073709551616"},{"--cache-target-percent=0"},
+        {"--cache-target-percent=100"},{"--cache-target-percent=bad"},
+        {"--help","--cache-max-bytes=0"},{"--config",file("invalid-cache.toml")}})
+        cache_case("invalid cache CLI/file",args,{}, {},1073741824,90,true);
+    for (const auto& env : std::vector<sipi::CacheEnvironment>{{"",{},{}},{{},"0",{}},{{},{},"100"}})
+        cache_case("invalid cache environment",{},env,{},1073741824,90,true);
     int failures = 0;
     for (const auto& test : cases) {
         failures += !check(test);

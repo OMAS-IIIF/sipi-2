@@ -17,14 +17,15 @@ public:
  * consume it immediately. Throw to abort. No HTTP/file/cache ownership is implied. */
 using JpegSink = std::function<void(std::span<const std::uint8_t>)>;
 
-/** Encode an owning RGB8 raster as baseline JPEG, emitting bounded byte blocks.
+/** Encode an owning gray8 or RGB8 raster as baseline JPEG, emitting bounded byte blocks.
  * Input and sink must live for this call; independent calls share no codec state.
- * Only PixelLayout::rgb is accepted; RGBA must be composited explicitly first.
- * quality is 1..100 (default 90), with 4:4:4 sampling to retain chroma detail.
+ * PixelLayout::gray and rgb are accepted; RGBA must be composited explicitly first.
+ * quality is 1..100 (default 90), with RGB 4:4:4 sampling to retain chroma detail.
  * Embedded ICC bytes are preserved in APP2 markers; no color conversion occurs.
+ * Gray profiles undergo basic GRAY header checks, not full ICC validation.
  * Untagged RGB stays untagged. EXIF/IPTC and other source metadata are not copied.
  *
- * Dimensions must fit libjpeg (1..65500) and pixels must contain exactly w*h*3
+ * Dimensions must fit libjpeg (1..65500) and pixels must contain exactly w*h*channel_count()
  * bytes. ICC data must fit at most 255 JPEG ICC chunks. Failures can follow partial
  * output: the caller must discard/abort that output, never publish it as complete.
  * The encoder buffers blocks, not the complete JPEG. Sink/storage limits belong

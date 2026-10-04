@@ -10,7 +10,7 @@ echoes the backend URL with HTML escaping. Port defaults to 8080 and is configur
 through --port, SIPI_PORT, or TOML. The listener binds only to 127.0.0.1. The initial executable ran successfully in CLion
 according to the owner. A standalone IIIF Image API 3 syntax parser now produces
 owning typed image/info requests. The HTTP catch-all maps invalid syntax to 400 JSON and applies configured
-preflight to valid requests, returning information JSON or JPEG/PNG for supported tiled RGB/RGBA8 TIFF crops; exact /health returns liveness/version JSON. Area-weighted reduction is integrated; rotation
+preflight to valid requests, returning information JSON or JPEG/PNG for supported tiled or strip-based gray/RGB/RGBA8 TIFF crops; exact /health returns liveness/version JSON. Area-weighted reduction is integrated; rotation
 and socket streaming are not integrated yet. A standalone TIFF metadata reader
 and pure IIIF region/size resolver are implemented and tested together. The HTTP
 worker now resolves sources, reads TIFF headers, and validates geometry.
@@ -41,7 +41,7 @@ before listening and evaluated on a bounded worker for IIIF GET/HEAD.
 The existing cserve context records Grok as the intended Kakadu replacement and
 Docker as the primary deployment target, with native development and debugging.
 Drogon is integrated for basic HTTP; its suitability for codec streaming still
-requires evaluation. Grok and Docker have not been integrated in this repository. Do not copy cserve's legacy
+requires evaluation. Grok header reading and the local MinIO Docker setup are now integrated. Do not copy cserve's legacy
 ExternalProject build wholesale; adopt libraries and source modules incrementally.
 
 ## Key files and next steps
@@ -56,7 +56,7 @@ ExternalProject build wholesale; adopt libraries and source modules incrementall
 - `src/preflight/LuaPreflight.h`, `.cpp`: isolated Lua evaluation and typed policy contract.
 - `docs/preflight.md`, `examples/preflight.lua`, `tests/preflight/LuaPreflightTests.cpp`: contract, sample, and regression tests.
 - `CMakeLists.txt`: C++20 executable `sipi-2`, standalone `iiifparser` library, and CTest targets.
-- `src/imgformats/TiffMetadata.h`, `TiffReader.h`, `TiffReader.cpp`: shared RAII TIFF metadata and tiled RGB/RGBA8 crop reading.
+- `src/imgformats/TiffMetadata.h`, `TiffReader.h`, `TiffReader.cpp`: shared RAII TIFF metadata and tiled/strip gray/RGB/RGBA8 crop reading.
 - `src/image/PixelRegion.h`, `RasterImage.h`: format-neutral pixel rectangle and owning RGB/RGBA8 raster.
 - `src/iiifparser/IIIFGeometry.h`, `.cpp`: pure region/size resolution with explicit policy.
 - `docs/tiff-metadata-and-geometry.md`: reader limits, rounding rules, composition, feature roadmap.
@@ -159,7 +159,7 @@ neither complete pipeline is implemented yet.
   defaults, and metadata/orientation handling require explicit later decisions.
 
 TIFF reading and pure IIIF geometry are separate libraries. The first pixel reader
-handles tiled RGB8 crops; upload integration remains deferred. Do not introduce a generic codec framework
+handles tiled or strip-based gray/RGB/RGBA8 crops; upload integration remains deferred. Do not introduce a generic codec framework
 before concrete shared requirements emerge.
 
 ### Original preservation and presentation scope (agreed 2026-10-04)
@@ -275,7 +275,7 @@ Parse before dispatch; authorize image/info GET and HEAD alike. Deny returns 403
 Lua/contract/quota failures 500. Resolve and probe the definitive source, read TIFF
 metadata, and pass orientation-normalized dimensions to the pure geometry resolver.
 Invalid region/size is 400; disabled actual upscaling is 501 upscaling_disabled.
-Supported tiled RGB/RGBA8 TIFF crops return JPEG or PNG. Unsupported operations/layouts
+Supported tiled or strip-based gray/RGB/RGBA8 TIFF crops return JPEG or PNG. Unsupported operations/layouts
 remain 501 not_implemented.
 Information requests return 200 JSON with oriented dimensions and public identity.
 
@@ -342,7 +342,7 @@ src/imgformats/JpegWriter.h, tests/JpegWriterTests.cpp and docs/jpeg-delivery.md
 info.json still omits profile pending per-resource conformance review; do not infer
 output support for every metadata-readable source from this first decoder subset.
 
-## Persistent cache design (agreed 2026-10-04; not implemented)
+## Persistent cache design (agreed 2026-10-04; identity, storage and HTTP integration implemented)
 
 See docs/iiif-delivery-architecture.md#cache-architecture-agreed-2026-10-04 for the
 agreed contract. Start with one local cache per server instance, persistent image
@@ -366,9 +366,9 @@ use file identity/size/high-resolution timestamps as a practical fingerprint, no
 content proof; later prefer import-assigned source versions. Planning/decoding
 now share one open local descriptor, supporting atomic replacement while reads
 are in flight; in-place writes remain prohibited. Preserve the option of versioned public identities for
-citations/annotations. Implementation details (schema, configuration defaults,
-reservations, durability, handle/retry strategy) remain open. No distributed cache,
-backend abstraction, changed browser cache policy or cache implementation added.
+citations/annotations. Storage implementation/defaults are described in the
+2026-10-05 storage section below. Source metadata caching and coalesced generation for multiple workers remain
+open. No distributed cache, backend abstraction or browser cache policy change.
 
 ## S3-ready repository reading (agreed 2026-10-04)
 
@@ -491,7 +491,7 @@ Main-image ICC is inherited; selected corrupt data fails without silent fallback
 PixelWindow/PixelInterval in src/image/PixelWindow.h represent the rational crop
 independently of TIFF. AreaResize accepts that window, preserving exact pixel
 boundary selection and weighting partial edges in stored channel values.
-Only top-left tiled RGB/RGBA8 delivery remains supported. Remote range buffering,
+Top-left tiled or strip-based gray/RGB/RGBA8 delivery is supported. Remote range buffering,
 additional pixel layouts and color conversion remain next steps.
 All 19 suites pass, including real main-chain/SubIFD, HTTP and MinIO pyramid tests.
 See `docs/tiff-metadata-and-geometry.md` for the contract and examples.
@@ -529,3 +529,137 @@ transparent hidden colors, partial/zero coverage, fractional windows, corrupt
 pixels outside/inside crops, inherited ICC and local/S3 PNG/JPEG/HEAD delivery.
 See docs/alpha-delivery.md. Next work includes color management, other TIFF layouts,
 rotation/mirroring, range buffering and cache; alpha does not imply those features.
+
+## Strip TIFF and native grayscale (2026-10-04)
+
+TiffReader now decodes intersecting strips as well as tiles, sharing block-copy
+logic and bounding output plus one decoded block. Full-width strips can be costly
+for narrow crops; pyramidal tiled TIFF remains recommended for local/S3 serving.
+PixelLayout::gray adds native single-channel 8-bit grayscale throughout decoding,
+area reduction, PNG and JPEG. MINISWHITE is inverted to black-zero internally;
+ICC remains in its original GRAY model, with basic encoder header checks.
+Native gray supports default/color/gray qualities and advertises extraQualities
+["gray"]. RGB-to-gray conversion, gray+alpha, other bit depths/orientations and
+color management remain separate increments. See docs/tiff-strips-and-gray.md.
+
+## JPEG 2000 header input (2026-10-04)
+
+Grok 20.4.15 uses a pinned local Conan recipe in conan/recipes/grok because there
+is no ConanCenter package. Export it before conan install on fresh machines.
+SIPI stays C++20; Grok builds internally as C++23 and ships as a shared CPU core.
+No GPU/Rust/bindings/network clients. Include the Grok shared library in deployment.
+J2kReader owns codec/cursor per call, borrows the existing local/S3 ByteSource,
+contains callback exceptions and copies owning metadata/ICC. One process runtime
+uses one worker; all calls finish before static teardown. Input budget is 16 MiB
+with 64 KiB buffering, not a codec-allocation cap. Nonzero reference-grid origins
+are subtracted when exposing dimensions. HTTP recognizes JP2/J2K bytes and uses
+the existing info/geometry functions; valid pixel requests remain explicitly 501.
+Next: optimized region/resolution pixel decode into RasterImage8, then cache.
+See docs/jpeg2000-input.md for build instructions, tests and limitations.
+
+TIFF repository policy remains top-left unsigned 8-bit gray/RGB/RGBA, contiguous
+channels. Import normalizes other orientations and YCbCr/CMYK into supported
+repository representations; delivery does not silently add these conversions.
+
+## JPEG 2000 pixel delivery (2026-10-05)
+
+J2kReadPlan selects the coarsest sufficient wavelet resolution in both axes,
+using actual reduced grid extents and exact fractional crop windows. J2kReader
+requests only the enclosing region through the same ByteSource, checks supported
+8-bit co-sited gray/RGB, decodes synchronously and packs RasterImage8 with ICC.
+TIFF/J2K then share area resampling and JPEG/PNG output. Raw single-component
+streams mean grayscale; ambiguous multicomponent streams need JP2 color metadata.
+No palette/channel mappings, alpha, signed/other bit depths, YCbCr or CMYK.
+Unknown output format prevents implicit codec color conversion.
+
+One codec-local executor per call keeps I/O and diagnostic callbacks synchronous.
+Global handlers are installed once and route warnings/errors to a thread-local
+scope. Treat data warnings as fatal (except pinned unknown JP2 box-skipping
+diagnostics): Grok may otherwise return success for partial
+tile output. Budget packed output plus logical int32 tile samples to 256 MiB;
+codec padding/scratch and metadata are extra. Pixel input reads capped at 256 MiB.
+Exact pixels, reduced crop/full-resolution-level consistency, corruption isolation,
+ICC, limits, unsupported layouts, concurrency and local/S3 output are tested.
+See docs/jpeg2000-input.md. Result cache remains the next architectural milestone.
+
+External balloon.jp2/colortable.jp2 testing exposed benign optional uinf metadata
+warnings. The pinned unknown-box-skipping warning is allowed; all other warnings
+and errors remain fatal. Generated UUID-info regression fixtures avoid depending
+on downloaded assets. Revisit diagnostic text classification on Grok upgrades.
+
+## Encoded-result cache identity (2026-10-05)
+
+src/cache/CacheKey.h/.cpp and the independent cachekey target implement step 1:
+required opened SourceInfo + effective variant, resolved geometry, normalized
+rotation/quality, typed JPEG/PNG encoding, optional versioned watermark and
+rendering recipe. No URL/HTTP/auth input; storage and delivery integration stay separate.
+Default/color share for RGB; native gray default/color/gray share. 360 and signed
+zero normalize to zero; other angle doubles retain exact binary64 identity.
+Length-framed named fields, locale-independent integers and SHA-256 (OpenSSL EVP)
+make a stable owning key with immutable accessors. Schema v1 golden-vector tests
+protect serialization. OpenSSL 3.6.5 is explicitly required (already transitive).
+The persistent index keeps serialized identity beside digest for collision checks.
+
+current_render_recipe in CacheKey.h versions all fixed pixel/color/encoder
+semantics; bump for output-affecting algorithm/codec changes. JPEG quality is
+explicit, with no independent cache default. Future configurable color/encoder
+settings need actual fields. Effective variant MUST reflect actual restrictions;
+watermark placement/opacity belongs there while watermark source/version is
+separate. Restrictions are not implemented by this module. Authorization,
+geometry and capability checks still precede EVERY lookup. Storage and HTTP
+integration are now implemented below. See docs/cache-key.md.
+
+
+## Persistent encoded-result storage (2026-10-05)
+
+src/cache/ResultCache.h/.cpp provides the resultcache target: one exclusively
+locked local directory, fixed cache.sqlite3 (SQLite 3.53.4 via Conan), sharded
+hash-named bodies, full serialized-key collision checks and output metadata.
+get returns a shared immutable ByteSource handle; put accepts a complete encoding.
+A mutex serializes index/file operations without holding a transaction during
+encoding or file writing. Active handles pin entries; reads use independent pread.
+
+Writes use same-directory temporary files, fsync/close/rename/directory fsync,
+then a FULL-synchronous SQLite commit. Restart removes temporary/orphan bodies and
+missing/wrong-size index rows. Foreign/newer database schemas fail without reset.
+A failed put disables further admissions until reopen to preserve accounting.
+Cache contents are disposable; source repository data is never cache data.
+
+Config: cache-dir / SIPI_CACHE_DIR / --cache-dir, absent disables; relative to cwd.
+cache-max-bytes defaults to 1 GiB, cache-target-percent to 90, same normal priority.
+Budget includes encoded bodies plus the serialized in-progress write; SQLite and
+filesystem overhead are additional. A 64 MiB free-space headroom check supplements
+this, not a hard volume quota. Eviction skips pinned bodies, may decline admission;
+single bodies above the lower target may occupy the cache alone up to the maximum.
+LRU touches batch every 64 hits, before eviction, and best-effort on destruction.
+
+main initializes/reconciles and holds the configured store, warns/falls back if
+unavailable. HTTP lookup/fill is now implemented below. Next: source metadata
+caching and coalesced generation when a worker pool is introduced. No browser cache policy
+change, streaming/socket tee, distributed cache or generic database abstraction.
+See docs/persistent-cache.md and docs/command-line.md. Tests cover real startup,
+configuration precedence, restart/abrupt exit, injected publication failures,
+recovery, collisions, LRU/hysteresis/pinning, schema rejection and concurrency.
+
+
+## Authorized HTTP cache integration (2026-10-05)
+
+main -> run_http_server -> IiifWorker share ownership of the configured ResultCache.
+Every image request still runs preflight, opens the definitive version-bound source,
+reads its header, resolves geometry and checks current source/operation support.
+Then the worker builds the original-variant identity using actual source layout,
+JPEG quality 90 (also explicitly passed to the writer) or fixed PNG parameters.
+Hit metadata must match the output plan; complete bounded reads precede 200. A hit
+skips decoding/resizing/encoding. Missing entries render and publish only complete
+successful output. Separate cache exception boundaries allow uncached delivery;
+source/policy/codec failures retain normal error mapping. No cached info/errors.
+
+GET/HEAD share results; HEAD retains Drogon's body suppression and may fill/read
+cache. Responses remain buffered up to 64 MiB with unchanged no-store headers.
+Debug logs report cache outcomes without key/source/auth values. The single worker
+serializes current requests; no new thread pool/single-flight machinery added.
+Header caching and true streaming remain open. Native gray, RGBA, TIFF and J2K
+reuse the same result path. Tests cover actual hit logs, alias equivalence, denial,
+source override/version changes and deletion, local/S3 replacement, restart, HEAD,
+failed encodings, missing/truncated cached files, DB fault injection and disabled/
+undersized caches. See docs/persistent-cache.md#http-integration.

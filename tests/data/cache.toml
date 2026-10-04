@@ -1,0 +1,3 @@
+cache-dir = "cache with spaces"
+cache-max-bytes = 1000
+cache-target-percent = 80

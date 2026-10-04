@@ -72,13 +72,15 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                                 std::optional<std::string_view> env_iiif_root,
                                 std::optional<std::string_view> env_public_base_url,
                                 S3CredentialEnvironment s3_environment,
-                                RepositoryEnvironment repository_environment) {
+                                RepositoryEnvironment repository_environment,
+                                CacheEnvironment cache_environment) {
     StartupOptions result;
     bool help = false;
     bool version = false;
     std::string config_path;
     std::string preflight_script;
     std::string iiif_root;
+    std::string cache_dir;
     std::string public_base_url;
     std::string storage = "local", bucket, path_style = "false";
     std::string log_level = "info";
@@ -119,6 +121,19 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     auto* root_option = app.add_option("--iiif-root", iiif_root,
         "Image repository root (SIPI_IIIF_ROOT; default: not configured)")
         ->check(path_validator)->type_name("PATH");
+    auto* cache_dir_option = app.add_option("--cache-dir", cache_dir,
+        "Persistent result cache directory (SIPI_CACHE_DIR; default: disabled)")
+        ->check(path_validator)->type_name("PATH");
+    const auto unsigned_decimal = CLI::Validator([](const std::string& value) {
+        return value.empty() || value.find_first_not_of("0123456789") != std::string::npos
+            ? std::string{"Expected unsigned decimal integer"} : std::string{};
+    }, "INTEGER");
+    auto* cache_max_option = app.add_option("--cache-max-bytes", result.config.cache_limits.max_bytes,
+        "Encoded cache byte limit (SIPI_CACHE_MAX_BYTES; default: 1073741824)")
+        ->check(unsigned_decimal)->check(CLI::Range(std::uint64_t{1}, std::uint64_t{INT64_MAX}/2));
+    auto* cache_target_option = app.add_option("--cache-target-percent", result.config.cache_limits.target_percent,
+        "Cleanup target percent (SIPI_CACHE_TARGET_PERCENT; default: 90)")
+        ->check(unsigned_decimal)->check(CLI::Range(1,99));
     auto* public_url_option = app.add_option("--public-base-url", public_base_url,
         "Public origin and proxy mount (SIPI_PUBLIC_BASE_URL; default: local listener)")
         ->check(CLI::Validator(validate_public_base_url, "URL"))->type_name("URL");
@@ -187,6 +202,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
             result.config.size_upscaling = size_upscaling == "true";
             if (!preflight_option->empty()) result.config.preflight_script = preflight_script;
             if (!root_option->empty()) result.config.iiif_root = iiif_root;
+            if (!cache_dir_option->empty()) result.config.cache_dir = cache_dir;
             save_public_url();
             save_repository();
             result.command = help ? Command::help : Command::version;
@@ -244,6 +260,9 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                 option->run_callback();
             }
         };
+        load_setting(cache_dir_option, cache_environment.directory);
+        load_setting(cache_max_option, cache_environment.max_bytes);
+        load_setting(cache_target_option, cache_environment.target_percent);
         load_setting(storage_option, repository_environment.storage);
         load_setting(bucket_option, repository_environment.bucket);
         load_setting(region_option, repository_environment.region);
@@ -279,6 +298,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
         return ParseError{"S3 session token requires an access key and secret key"};
     if (!preflight_option->empty()) result.config.preflight_script = preflight_script;
     if (!root_option->empty()) result.config.iiif_root = iiif_root;
+    if (!cache_dir_option->empty()) result.config.cache_dir = cache_dir;
     save_public_url();
     result.config.log_level = levels.at(log_level);
     result.config.size_upscaling = size_upscaling == "true";

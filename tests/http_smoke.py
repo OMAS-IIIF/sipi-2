@@ -62,12 +62,13 @@ def run(executable: Path, fixtures: Path, verifier: Path, configured: bool = Fal
     with tempfile.TemporaryDirectory(prefix="sipi-http-") as directory:
         root = Path(directory, "images")
         root.mkdir()
-        for name in ("sample.tif", "rotated.tif", "large.tif", "tiled.tif", "broken-tile.tif", "pyramid.tif", "pyramid-level.tif", "pyramid-stripped.tif", "invalid-profile.tif", "alpha.tif", "alpha-associated.tif", "alpha-pyramid.tif", "alpha-unspecified.tif", "alpha-invalid.tif"):
+        for name in ("source.jp2", "source.j2k", "offset.jp2", "metadata-box.jp2", "corrupt-tile.jp2", "sixteen.jp2", "rgb-unknown.j2k", "sample.tif", "rotated.tif", "large.tif", "tiled.tif", "broken-tile.tif", "pyramid.tif", "pyramid-level.tif", "pyramid-stripped.tif", "invalid-profile.tif", "alpha.tif", "alpha-associated.tif", "alpha-pyramid.tif", "alpha-unspecified.tif", "alpha-invalid.tif", "gray.tif", "gray-white.tif", "gray-tiled.tif", "gray-pyramid.tif", "strip-rgba.tif"):
             shutil.copyfile(fixtures / name, root / name)
         for name in ("id", "hello-world", "a/b", "a%2Fb", "a+b", "café.tif", "source with spaces.tif"):
             target = root / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(fixtures / "sample.tif", target)
+        (root / "broken.jp2").write_bytes((fixtures / "source.jp2").read_bytes()[:32])
         (root / "broken.tif").write_bytes(b"II*\x00broken")
         (root / "other.png").write_bytes(b"\x89PNG\r\n\x1a\n")
         (root / "config").mkdir()
@@ -85,7 +86,7 @@ def run(executable: Path, fixtures: Path, verifier: Path, configured: bool = Fal
 function preflight(request)
     local id = request.identifier
     if id == 'jpeg-alias' then return {decision='allow', source='tiled.tif'} end
-    if id == 'tiled.tif' or id == 'broken-tile.tif' or id == 'invalid-profile.tif' or id:match('^pyramid') or id:match('^alpha') then return {decision='allow', source=id} end
+    if id == 'metadata-box.jp2' or id == 'corrupt-tile.jp2' or id == 'sixteen.jp2' or id == 'rgb-unknown.j2k' or id == 'source.jp2' or id == 'source.j2k' or id == 'offset.jp2' or id == 'broken.jp2' or id == 'tiled.tif' or id == 'broken-tile.tif' or id == 'invalid-profile.tif' or id:match('^pyramid') or id:match('^alpha') or id:match('^gray') or id == 'strip-rgba.tif' then return {decision='allow', source=id} end
     if id == 'denied' then return {decision='deny'} end
     if id == 'script-error' then error('secret-token /private/source.tif') end
     if id == 'invalid-result' then return {decision='allow', restrictions={}} end
@@ -178,9 +179,44 @@ end
                 for path in ("/id/full/max/0/default.jpg", "/myproj/subpart/id/full/max/0/default.jpg",
                              "/hello-world/full/max/0/default.jpg", "/a%2Fb/full/max/0/default.jpg",
                              "/a%252Fb/full/max/0/default.jpg", "/a+b/full/max/0/default.jpg",
-                             "/id/%66ull/max/%210/default%2Ejpg", "/id/full/max/0/default.jpg?size=bad"):
-                    _, body = json_request(path, 501)
-                    assert body["error"] == "not_implemented" and body["message"], body
+                             "/id/full/max/0/default.jpg?size=bad"):
+                    assert request(path)[0] == 200
+                assert request('/id/%66ull/max/%210/default%2Ejpg')[0] == 501
+
+                for name in ('source.jp2', 'source.j2k', 'offset.jp2', 'metadata-box.jp2'):
+                    _, info = json_request('/museum/'+name+'/info.json', 200)
+                    assert (info['width'], info['height']) == (37, 23)
+                    assert info['id'].endswith('/museum/'+name)
+                    assert 'profile' not in info
+                    assert info.get('extraQualities', []) == (['gray'] if name == 'source.j2k' else [])
+                    status, _, data = request('/'+name+'/info.json', method='HEAD')
+                    assert status == 200 and not data
+                    assert request('/'+name+'/full/max/0/default.jpg')[0] == 200
+                    path = '/'+name+'/3,4,19,8/max/0/default.'
+                    status, _, body = request(path+'png')
+                    assert status == 200
+                    w,h,pixels,icc,_ = decode_png(body)
+                    channels = 1 if name == 'source.j2k' else 3
+                    expected = bytes(((x+3)*7+(y+4)*11+c*31)%256
+                                     for y in range(8) for x in range(19) for c in range(channels))
+                    assert (w,h,pixels,icc) == (19,8,expected,None)
+                    status,_,jpg = request(path+'jpg')
+                    assert status == 200
+                    jp = Path(directory,'j2k-response.jpg'); jp.write_bytes(jpg)
+                    rp = Path(directory,'j2k-reference.rgb')
+                    rp.write_bytes(pixels if channels == 3 else bytes(v for v in pixels for _ in range(3)))
+                    subprocess.run([str(verifier),'--rgb',str(jp),str(rp),'19','8'],check=True,timeout=5)
+                    status,headers,empty = request(path+'png','HEAD')
+                    assert status == 200 and not empty and int(headers['content-length']) == len(body)
+                    status,_,reduced = request('/'+name+'/1,1,35,21/7,4/0/default.png')
+                    assert status == 200 and decode_png(reduced)[:2] == (7,4)
+                    assert request('/'+name+'/100,0,1,1/max/0/default.jpg')[0] == 400
+                assert request('/broken.jp2/info.json')[0] == 500
+                assert request('/corrupt-tile.jp2/0,0,5,5/max/0/default.png')[0] == 200
+                assert request('/corrupt-tile.jp2/full/max/0/default.png')[0] == 500
+                for name in ('sixteen.jp2','rgb-unknown.j2k'):
+                    assert request('/'+name+'/info.json')[0] == 200
+                    assert request('/'+name+'/full/max/0/default.png')[0] == 501
 
                 # Public identity is independent of filesystem selection, Host and proxy headers.
                 for path, service_path, dimensions in (
@@ -309,6 +345,53 @@ end
                 assert request('/alpha-pyramid.tif/full/max/0/default.png')[0] == 500
                 assert request('/alpha-unspecified.tif/full/max/0/default.png')[0] == 501
                 assert request('/alpha-invalid.tif/full/max/0/default.png')[0] == 500
+                # Strip RGB follows exactly the same crop/resize path as tiled RGB.
+                for suffix in ('full/max/0/default.png','50,30,100,80/37,29/0/default.png',
+                               '310,190,50,50/max/0/default.png'):
+                    assert request('/sample.tif/'+suffix)[2] == request('/tiled.tif/'+suffix)[2]
+                assert request('/sample.tif/full/^160,/0/default.jpg')[0] == 200
+                assert request('/large.tif/full/900,/0/default.jpg')[0] == 200
+                gray_bodies = []
+                for name in ('gray.tif','gray-white.tif','gray-tiled.tif'):
+                    path = '/'+name+'/3,4,19,8/max/0/default.'
+                    status,headers,body = request(path+'png')
+                    assert status == 200
+                    w,h,pixels,icc,_ = decode_png(body)
+                    expected = bytes(((x+3)*7+(y+4)*11)%256 for y in range(8) for x in range(19))
+                    assert (w,h,pixels)==(19,8,expected) and icc[16:20]==b'GRAY'
+                    gray_bodies.append(body)
+                    assert request(path.replace('default.','gray.')+'png')[2] == body
+                    assert request(path.replace('default.','color.')+'png')[2] == body
+                    status,jh,jpeg = request(path+'jpg')
+                    assert status == 200
+                    jpg_file=Path(directory,'gray.jpg'); jpg_file.write_bytes(jpeg)
+                    rgb_file=Path(directory,'gray.rgb'); rgb_file.write_bytes(bytes(v for v in pixels for _ in range(3)))
+                    subprocess.run([str(verifier),'--gray',str(jpg_file),str(rgb_file),'19','8'],check=True,timeout=5)
+                    hs,hh,hb=request(path+'png','HEAD')
+                    assert hs==200 and not hb and hh['content-length']==str(len(body))
+                    _,document=json_request('/'+name+'/info.json',200)
+                    assert document['extraQualities']==['gray'] and (document['width'],document['height'])==(37,23)
+                assert gray_bodies[0]==gray_bodies[1]==gray_bodies[2]
+                from fractions import Fraction as F
+                from math import floor,ceil
+                status,_,body=request('/gray-pyramid.tif/3,1,31,21/15,10/0/gray.png')
+                assert status==200
+                w,h,pixels,icc,_=decode_png(body)
+                assert (w,h)==(15,10) and icc[16:20]==b'GRAY'
+                for y in range(h):
+                    top,dy=F(12,23)+y*F(21*12,23*h),F(21*12,23*h)
+                    for x in range(w):
+                        left,dx=F(3*19,37)+x*F(31*19,37*w),F(31*19,37*w)
+                        total=sum((min(top+dy,sy+1)-max(top,sy))*(min(left+dx,sx+1)-max(left,sx))*((sx*7+sy*11)%256)
+                                  for sy in range(floor(top),ceil(top+dy)) for sx in range(floor(left),ceil(left+dx)))
+                        assert abs(pixels[y*w+x]-floor(total/(dx*dy)+F(1,2)))<=1
+                assert request('/gray-pyramid.tif/full/max/0/default.png')[0]==500
+                status,_,body=request('/strip-rgba.tif/3,4,19,8/max/0/default.png')
+                assert status==200
+                w,h,pixels,_,_=decode_png(body)
+                expected=bytes(v for y in range(4,12) for x in range(3,22)
+                               for v in (*[((x*7+y*11)%256+c*31)%256 for c in range(3)],((x+y)%3)*127))
+                assert (w,h,pixels)==(19,8,expected)
                 for suffix in ("full/max/90/default.jpg",
                                "full/max/!0/default.jpg", "full/max/0/gray.jpg",
                                "full/max/0/bitonal.jpg", "full/max/0/default.tif"):
@@ -349,21 +432,18 @@ end
                         assert headers.get("allow") == "GET, HEAD", headers
                         assert body["error"] == "method_not_allowed", body
                 for path, expected_status in (("/hello", 200), ("/health", 200),
-                                               ("/id/full/max/0/default.jpg", 501),
+                                               ("/id/full/max/0/default.jpg", 200),
                                                ("/id/info.json", 200), ("/invalid", 400)):
                     status, _, body = request(path, "HEAD")
-                    assert status == expected_status and body == "", (path, status, body)
+                    assert status == expected_status and not body, (path, status, body)
                 # Both default mapping and Lua-selected paths feed actual header dimensions.
                 for path, status, code in (
                     ("/sample.tif/320,0,1,1/max/0/default.jpg", 400, "invalid_iiif_geometry"),
                     ("/sample.tif/full/321,/0/default.jpg", 400, "invalid_iiif_geometry"),
                     ("/sample.tif/full/^640,/0/default.jpg", 501, "not_implemented" if upscaling else "upscaling_disabled"),
-                    ("/sample.tif/full/^160,/0/default.jpg", 501, "not_implemented"),
-                    ("/sample.tif/310,190,50,50/max/0/default.jpg", 501, "not_implemented"),
                     ("/sample.tif/pct:100,0,10,10/max/0/default.jpg", 400, "invalid_iiif_geometry"),
                     ("/rotated.tif/210,0,1,1/max/0/default.jpg", 400, "invalid_iiif_geometry"),
                     ("/rotated.tif/0,210,1,1/max/0/default.jpg", 501, "not_implemented"),
-                    ("/large.tif/full/900,/0/default.jpg", 501, "not_implemented"),
                     ("/sample.tif/full/900,/0/default.jpg", 400, "invalid_iiif_geometry"),
                     ("/broken.tif/info.json", 500, "invalid_image_source"),
                     ("/other.png/info.json", 501, "source_format_not_supported"),
@@ -394,7 +474,7 @@ end
                             assert "secret-token" not in str(body) and "/private/" not in str(body), body
                             head_status, _, head_body = request(path, "HEAD")
                             assert head_status == status and not head_body
-                    assert request("/use-large/full/900,/0/default.jpg")[0] == 501
+                    assert request("/use-large/full/900,/0/default.jpg")[0] == 200
                     # A trusted script may deliberately select outside the repository.
                     outside = Path(directory, "outside.tif")
                     shutil.copyfile(fixtures / "sample.tif", outside)

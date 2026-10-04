@@ -1,6 +1,7 @@
 #pragma once
 
 #include "storage/S3ByteSource.h"
+#include "cache/ResultCache.h"
 #include "image/ImageSource.h"
 
 #include <cstdint>
@@ -26,6 +27,9 @@ struct ServerConfig {
     S3Config s3;
     StorageKind iiif_storage = StorageKind::local;
     std::optional<std::string> s3_bucket;
+    // Absent disables the persistent cache. Relative paths use the working directory.
+    std::optional<std::filesystem::path> cache_dir;
+    cache::CacheLimits cache_limits;
     LogLevel log_level = LogLevel::info;
     std::uint16_t port = 8080;
     bool size_upscaling = false;
@@ -68,6 +72,11 @@ struct RepositoryEnvironment {
     std::optional<std::string_view> storage, bucket, region, endpoint, path_style;
 };
 
+/** Caller-supplied SIPI_CACHE_{DIR,MAX_BYTES,TARGET_PERCENT} snapshots. */
+struct CacheEnvironment {
+    std::optional<std::string_view> directory, max_bytes, target_percent;
+};
+
 /**
  * Resolve startup options in CLI > environment > TOML file > default order.
  *
@@ -84,6 +93,8 @@ struct RepositoryEnvironment {
  * SIPI_S3_SESSION_TOKEN. Resolve each field independently, then require the
  * access/secret pair; a session token requires that pair. Help/version validate
  * supplied CLI field syntax but skip pair checks and environment/file loading.
+ * cache_environment supplies the optional cache directory and capacity settings.
+ * Parsing validates syntax only; persistent cache initialization belongs to startup.
  * Input views need only live for this call. The returned result owns its data.
  * Reads only an explicitly requested --config file; does not print, log, mutate
  * the environment, or set logging levels. CLI errors are checked even for help
@@ -101,6 +112,7 @@ struct RepositoryEnvironment {
     std::optional<std::string_view> env_iiif_root = std::nullopt,
     std::optional<std::string_view> env_public_base_url = std::nullopt,
     S3CredentialEnvironment s3_environment = {},
-    RepositoryEnvironment repository_environment = {});
+    RepositoryEnvironment repository_environment = {},
+    CacheEnvironment cache_environment = {});
 
 } // namespace sipi

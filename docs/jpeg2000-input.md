@@ -1,0 +1,164 @@
+# JPEG 2000 input through Grok
+
+JP2 containers and raw J2K codestreams are read through Grok 20.4.15 over the
+existing local/S3 ByteSource. Information requests, geometry validation and
+selective region/resolution decoding feed the common RasterImage8 -> area resize
+-> JPEG/PNG pipeline. JPEG 2000 output remains outside this implementation.
+
+Pixel delivery accepts unsigned 8-bit, equally sampled grayscale or RGB. JP2
+must declare a supported color model or carry a matching RGB/GRAY ICC header.
+An untagged single-component codestream means grayscale by repository convention.
+An untagged multicomponent codestream is ambiguous and is rejected: use a JP2
+container declaring its color space. Palette/channel-definition mappings,
+alpha, YCbCr, CMYK, signed and other precision/subsampling layouts remain
+unsupported. Metadata readability alone does not imply pixel support.
+
+## Dependency and build
+
+Grok is not currently available from ConanCenter. The project owns a small recipe
+in `conan/recipes/grok`, with release and submodule archives pinned by SHA256.
+Export it before the normal dependency installation, also on a fresh machine:
+
+```sh
+conan export conan/recipes/grok
+conan install . -pr:h profiles/macos-debug -pr:b sipi-2-local --build=missing
+cmake --preset conan-debug
+cmake --build --preset conan-debug
+```
+
+Reload CMake in CLion afterwards. SIPI code remains C++20; Grok internally requires
+C++23. This integration was tested with the project's macOS/Apple Clang profile.
+Grok is packaged as a shared CPU-only core library (`grok::grok`); deployment must
+include that library, rather than copying only the server executable. The local
+Conan build supplies its runtime search path. Grok's GPU plugin, codec programs,
+Python bindings, optional Rust acceleration and network clients are disabled.
+Its bundled LittleCMS/Highway and pinned internal logging dependencies remain
+implementation details; the adapter does not request color conversion. Grok is
+licensed AGPL-3.0; upstream sources and license are included in the package.
+
+## Ownership, storage and limits
+
+`src/imgformats/J2kReader.h` exposes owning metadata values without Grok types.
+Every read owns a codec and callback cursor; the borrowed ByteSource outlives both.
+The source is never reopened by name. Local files and S3 therefore use identical
+codec callbacks and retain the existing source-version consistency contract.
+Callback exceptions are captured and rethrown on return to C++, including storage
+and source-change errors. Source errors remain distinct from malformed headers.
+
+Grok's process runtime initializes once with one worker and is released at static
+teardown. All outstanding reads must finish before shutdown. Each codec is local
+to its call; tests exercise simultaneous readers of the same source.
+
+The callback buffer is 64 KiB. Header reads may prefetch compressed bytes but never
+invoke pixel decompression or stage the complete object intentionally. Cumulative
+callback input is limited to 16 MiB, including rereads. This is **not** a bound on
+Grok's internal allocations; ICC copying has its own 16 MiB limit. A synthetic
+1 GiB source test verifies that header access consumes at most 128 KiB of input.
+Large metadata exceeding these limits is explicitly rejected.
+
+Metadata includes reference-grid width/height, grid origin, tile dimensions,
+main-header resolution count, per-component size/precision/signedness/sampling,
+and copied ICC bytes. Extents are `x1-x0` and `y1-y0`, so nonzero origins do not
+inflate IIIF dimensions. Tile/component coding overrides and header readability
+do not imply support by the future pixel decoder. Multicomponent raw codestreams are not assumed to be RGB.
+
+## HTTP and tests
+
+Format detection uses bytes, not the filename extension. Authorization still
+precedes source access. TIFF and J2K feed the same width/height arguments into
+`resolve_geometry` and `make_info_document`; no JPEG-2000-specific geometry rules
+are added. Readable grayscale sources advertise gray quality; a compliance profile remains omitted.
+Malformed headers, codec data warnings and incomplete pixel reads return 500 `invalid_image_source`; underlying I/O
+failures return the existing source error response.
+
+CTest generates tiny tiled, lossless RGB JP2 and grayscale J2K files, including
+nonzero origins. They can be served from `build/Debug/http-test-data`:
+
+- `/source.jp2/info.json`: 37 x 23 RGB source metadata.
+- `/source.j2k/info.json`: 37 x 23 grayscale source metadata.
+- `/offset.jp2/info.json`: the same extents despite a (3,5) grid origin.
+
+Tests cover metadata, truncated input, read budgets, callback failures, concurrent
+cursors, GET/HEAD, prefix identity, invalid geometry and real MinIO range reads.
+The test fixture encoder is not a public J2K output implementation.
+
+## Resolution, regions and processing
+
+`J2kReadPlan` is pure geometry. It chooses the coarsest main-header resolution
+sufficient in both axes. Reduced image extents are
+`ceil(grid_end / 2^reduction) - ceil(grid_origin / 2^reduction)`. As for TIFF
+pyramids, each resolution represents the complete image: map the requested
+full-image field of view proportionally into that raster. Rational window edges
+preserve the exact crop when the shared resampler reduces the integer enclosure.
+This matters at odd image dimensions and nonzero grid origins. Reduced wavelet
+samples can differ from averaging full-resolution pixels; this is expected.
+
+The decoder passes the enclosure back as full-resolution, image-relative
+coordinates to Grok. A top-left 1x1 window may be enlarged before exact cropping
+because Grok interprets windows with all coordinates <=1 as fractions. Whole
+images use its explicit default window. No pixel resizing is done by our codec
+adapter. Grok performs the inverse wavelet/component transform needed to recover
+the source samples; no ICC or output color conversion is requested.
+
+Each decode uses a synchronous codec-local executor (`num_threads=1`). Process
+message handlers are installed once and dispatch warnings/errors to a thread-local
+request scope. These are fatal except the pinned diagnostic for deliberately
+skipping an unknown JP2 box (for example optional `uinf` UUID metadata): Grok can report successful decompression while
+warning that some tiles are missing. No partial image is published. Callers must
+not replace Grok's global handlers or runtime independently. Concurrent tests
+verify that one failing request does not poison another.
+
+Before decoding, the adapter bounds packed output plus a conservative logical
+int32 sample estimate for all intersecting reduced tiles to 256 MiB. Codec row
+padding, wavelet scratch, compressed buffers, metadata/ICC and allocator overhead
+are additional; this is not a process-wide memory cap. Pixel input is limited to
+256 MiB cumulative callback reads. Metadata is rechecked before pixel decoding,
+and component dimensions/strides/sample range are checked before interleaving.
+A reduced-resolution request unsupported by a tile override fails explicitly.
+
+Only requested regions are reconstructed. Actual S3 range traffic also depends on
+codestream organization and Grok buffering; we do not claim one range per tile
+or zero unrelated byte reads. No independent Grok S3 client or full-object staging
+is used. Pinned source identity remains common to headers and pixels.
+
+Examples using the generated fixtures:
+
+- `/source.jp2/3,4,19,8/max/0/default.png`: exact lossless RGB crop.
+- `/source.jp2/1,1,35,21/7,4/0/default.jpg`: reduced wavelet resolution and final resize.
+- `/source.j2k/full/max/0/gray.png`: native single-channel grayscale.
+
+Tests verify exact full-resolution pixels, reduced crops against a complete
+reconstruction at the same resolution, fractional windows, origin offsets,
+ICC retention, unsupported layouts and memory limits. A corrupt unrequested tile
+is skipped, while requesting it fails. HTTP tests decode actual PNG/JPEG pixels;
+MinIO tests compare local and remote reduced output byte for byte.
+
+Next: evaluate JPEG 2000 repository encoding recommendations and remote access
+costs; the persistent result cache is the next architectural milestone.
+
+Upstream: [Grok 20.4.15 API](https://github.com/GrokImageCompression/grok/blob/v20.4.15/src/lib/core/grok.h).
+
+## External sample validation (2026-10-05)
+
+The user's downloaded `balloon.jp2` and `colortable.jp2` were tested locally without
+changing the originals or adding them to Git. Both are 8-bit, equally sampled RGB,
+RPCL progression, six quality layers and no embedded ICC profile (enumerated sRGB).
+Balloon is 2717 x 3701, with 1024 x 1024 tiles, six resolutions, 64 x 64 codeblocks
+and irreversible 9/7 wavelets. Colortable is 1000 x 1000, one tile, five resolutions,
+32 x 32 codeblocks and reversible 5/3 wavelets. A reversible transform alone does
+not establish that all coding passes were retained or that compression was lossless.
+
+Balloon exposed an overly strict warning policy: Grok intentionally skips its
+optional `uinf` box while successfully reading the image. Permit only the pinned
+`Ignoring unknown box of type ` warning category; other warnings and every error
+still fail. A generated UUID-info-box fixture covers metadata, pixel and HTTP
+regression paths; corrupt-tile tests continue to enforce failure on partial output.
+This classification depends on Grok's versioned diagnostic text and must be
+reviewed when upgrading the codec. No external assets are required by CTest.
+
+Manual requests covered information, full images, full-resolution crops, confined
+thumbnails, reduced crops and a corner pixel, with JPEG/PNG and HEAD. Outputs and
+inspection scripts are in the ignored build/manual-j2k directory. Full-resolution
+PNG crops match the corresponding pixels of the full PNG exactly for both files. These checks
+establish compatibility with these files, not certification against an archival
+encoding recommendation or a production performance benchmark.

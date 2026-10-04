@@ -8,7 +8,7 @@ RasterImage8 composite_on_white(RasterImage8 image, std::size_t max_working_byte
         count * channels != image.pixels.size() ||
         image.icc_profile.size() > max_working_bytes - image.pixels.size())
         throw CompositeError("Invalid raster or compositing memory limit exceeded");
-    if (image.layout == PixelLayout::rgb) return image;
+    if (image.layout != PixelLayout::rgba) return image;
     for (std::size_t i = 0; i < count; ++i) {
         const unsigned alpha = image.pixels[4*i+3];
         for (unsigned c = 0; c < 3; ++c) {

@@ -1,4 +1,4 @@
-# Area-weighted RGB/RGBA8 reduction
+# Area-weighted gray/RGB/RGBA8 reduction
 
 `image/AreaResize.h` provides `downsample_area` in the independent
 `imageprocessing` target. It knows neither IIIF nor TIFF, S3, HTTP or JPEG.
@@ -23,7 +23,7 @@ and clamp defensively to 0..255. Single-pixel axes need no special interpolation
 formula and never divide by target dimension minus one.
 
 This is a box/area filter, not a claim of optimal reconstruction for every image.
-It averages **stored RGB channel values**, not linear light. ICC bytes remain
+It averages **stored gray/RGB channel values**, not linear light. ICC bytes remain
 unchanged and untagged input remains untagged; no sRGB transfer function is assumed.
 For example, averaging channel values 0 and 255 yields 128. Profile-aware
 linear-light processing is a separate color-management decision; it must not be
@@ -37,7 +37,7 @@ pixel allocation. A reduction allocates only its output raster; ICC storage move
 unchanged. There is no expanded raster, intermediate image or weight table.
 Concurrent independent calls have no shared state.
 
-Validate positive dimensions, exact RGB byte count and size arithmetic before
+Validate positive dimensions, exact layout-dependent byte count and size arithmetic before
 processing. The default 256 MiB working budget includes input plus output pixel
 bytes and one ICC profile; identity needs input plus profile only. Counts exclude
 vector capacity, allocator overhead and objects owned by the caller. TIFF decoding

@@ -29,7 +29,7 @@ struct WeightedPixel {
             weight *= pixel[3];
             alpha += weight;
         }
-        for (std::size_t c = 0; c < 3; ++c) colors[c] += pixel[c] * weight;
+        for (std::size_t c = 0; c < std::min<std::size_t>(channels, 3); ++c) colors[c] += pixel[c] * weight;
     }
     void store(std::uint8_t* pixel, double area, std::size_t channels) const {
         if (channels == 4) {
@@ -38,7 +38,7 @@ struct WeightedPixel {
             for (std::size_t c = 0; c < 3; ++c)
                 pixel[c] = pixel[3] ? quantize(colors[c] / alpha) : 0;
         } else {
-            for (std::size_t c = 0; c < 3; ++c) pixel[c] = quantize(colors[c] / area);
+            for (std::size_t c = 0; c < channels; ++c) pixel[c] = quantize(colors[c] / area);
         }
     }
 };

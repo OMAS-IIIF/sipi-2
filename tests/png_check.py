@@ -15,8 +15,8 @@ def decode_png(data):
         chunks.append(kind)
         if kind == b'IHDR':
             width, height, depth, color, compression, filtering, interlace = struct.unpack('>IIBBBBB', payload)
-            assert (depth, compression, filtering, interlace) == (8, 0, 0, 0) and color in (2,6)
-            channels = 4 if color == 6 else 3
+            assert (depth, compression, filtering, interlace) == (8, 0, 0, 0) and color in (0,2,6)
+            channels = {0:1,2:3,6:4}[color]
         elif kind == b'IDAT':
             compressed.extend(payload)
         elif kind == b'iCCP':
@@ -71,6 +71,8 @@ if __name__ == '__main__':
                     struct.pack_into('>I', header, offset, value)
                 assert profile == header
         assert decode_png((root/'rgba.png').read_bytes())[:3] == (2,1,bytes([255,0,0,128,0,0,255,0]))
+        assert decode_png((root/'gray.png').read_bytes())[:3] == (3,1,bytes([0,127,255]))
+        assert decode_png((root/'gray.png').read_bytes())[3][16:20] == b'GRAY'
         assert decode_png((root/'one.png').read_bytes())[:3] == (1,1,bytes([0,127,255]))
         assert decode_png((root/'column.png').read_bytes())[:3] == (1,3,bytes(range(1,10)))
         assert decode_png((root/'row.png').read_bytes())[:3] == (3,1,bytes(range(1,10)))

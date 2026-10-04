@@ -29,6 +29,10 @@ struct TiffDirectory {
     std::vector<std::uint16_t> extra_samples;
     std::variant<TiffStrips, TiffTiles> layout;
 
+    /** Single grayscale sample (MINISBLACK or MINISWHITE), without extra channels.
+     * Describes the color model, not bit-depth/layout decoder support. */
+    [[nodiscard]] bool is_grayscale() const noexcept;
+
     /** Dimensions exposed to IIIF after normalizing TIFF orientation. */
     [[nodiscard]] std::uint32_t display_width() const noexcept;
     [[nodiscard]] std::uint32_t display_height() const noexcept;

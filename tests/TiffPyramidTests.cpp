@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
             auto metadata = sipi::read_tiff_metadata(source);
             std::erase_if(metadata.levels, [](const auto& level) { return !sipi::supports_tiff_region(level); });
             const auto plan = sipi::plan_tiff_read(metadata, {{0,0,101,77}, 26,20});
-            check(plan.directory.width == 51, "Skip unsupported smaller layout");
+            check(plan.directory.width == 26, "Strip pyramid level is now supported");
             (void)sipi::read_tiff_region(source, plan.directory, plan.read_region);
         }
         fixture::pyramid(path, true, false, false, true);

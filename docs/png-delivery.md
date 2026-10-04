@@ -1,10 +1,10 @@
-# RGB/RGBA8 PNG delivery
+# Gray/RGB/RGBA8 PNG delivery
 
 The existing TIFF pipeline now accepts `.png` as well as `.jpg`. It performs the
 same authorization, source selection, geometry validation, pyramid/tile selection
 and fractional-window reduction before choosing the encoder. Supported qualities
-are `default` and `color`; source support remains top-left tiled RGB/RGBA8 TIFF/BigTIFF.
-PNG output preserves straight RGBA transparency. It does not yet add PNG input, gray/bitonal output, enlargement,
+are `default` and `color`, plus `gray` for native grayscale sources; source support remains top-left tiled or strip-based gray/RGB/RGBA8 TIFF/BigTIFF.
+PNG output preserves straight RGBA transparency. It does not yet add PNG input, RGB-to-gray conversion or bitonal output, enlargement,
 mirroring or rotation. `info.json` conformance declarations remain unchanged.
 
 After building and running the tests:
@@ -23,15 +23,15 @@ The same URI shape works with S3-backed sources and preflight overrides.
 After pulling this change, run the normal Conan install command and reload CMake
 in CLion. Existing locked dependencies retain their versions/revisions.
 
-The encoder borrows the owning `RasterImage8` and writes noninterlaced 8-bit RGB or straight RGBA rows
+The encoder borrows the owning `RasterImage8` and writes noninterlaced 8-bit gray, RGB or straight RGBA rows
 with compression level 6. It emits borrowed blocks of at most 16 KiB to a
 synchronous sink, without creating another raster or a complete PNG buffer.
 Input samples are preserved losslessly; prior resampling remains a separate step.
 There is no gamma/color conversion, implicit sRGB declaration or synthetic gAMA/
 cHRM chunk. ICC bytes are compressed into iCCP and preserved unchanged.
 
-Nonempty ICC data must have a basic RGB ICC header (minimum length, signature,
-RGB color-space field) and pass libpng's write checks. Warnings and failures abort
+Nonempty ICC data must have a basic matching ICC header (minimum length, signature,
+GRAY or RGB color-space field) and pass libpng's write checks. Warnings and failures abort
 encoding rather than silently losing the profile. This is not complete ICC
 validation: valid color transforms and missing/invalid-profile import policy
 remain future color-management work. Test ICC headers deliberately contain no

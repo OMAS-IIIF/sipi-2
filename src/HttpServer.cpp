@@ -166,14 +166,15 @@ void hello(const drogon::HttpRequestPtr& request,
 
 } // namespace
 
-void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPreflight> policy) {
+void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPreflight> policy,
+                     std::shared_ptr<cache::ResultCache> result_cache) {
     SourceResolver sources(config.iiif_root, config.iiif_storage, config.s3_bucket); // Validate configured root before listening.
     iiif::SizePolicy size_policy;
     size_policy.allow_upscaling = config.size_upscaling;
     const auto public_base_url = config.public_base_url.value_or("http://127.0.0.1:" + std::to_string(config.port));
     std::optional<S3Client> s3_client;
     if (config.s3_bucket) s3_client.emplace(config.s3);
-    auto worker = std::make_shared<http::IiifWorker>(std::move(policy), std::move(sources), size_policy, public_base_url, std::move(s3_client));
+    auto worker = std::make_shared<http::IiifWorker>(std::move(policy), std::move(sources), size_policy, public_base_url, std::move(s3_client), std::move(result_cache));
     const auto port = config.port;
     auto& app = drogon::app();
     app.addListener("127.0.0.1", port);

@@ -1,6 +1,6 @@
 # RGBA transparency
 
-Delivery accepts tiled top-left unsigned RGB8 and RGBA8 TIFF/BigTIFF, including
+Delivery accepts tiled or strip-based top-left unsigned RGB8 and RGBA8 TIFF/BigTIFF, including
 compatible pyramid levels, from local or S3 storage. An RGBA directory must have
 four contiguous samples and exactly one `ExtraSamples` entry declaring straight
 (unassociated) or premultiplied (associated) alpha. Unspecified extra samples,
@@ -54,7 +54,7 @@ pipeline change; this implementation does not claim physically linear mixing.
 
 PNG writes straight RGBA as color type 6, preserving the processed samples and
 accepted ICC bytes. JPEG cannot carry alpha, so the worker explicitly invokes
-`composite_on_white` before the RGB-only JPEG encoder:
+`composite_on_white` before the gray/RGB JPEG encoder:
 
 ```text
 C_rgb = round_half_up((C * A + 255 * (255 - A)) / 255)
@@ -62,11 +62,11 @@ C_rgb = round_half_up((C * A + 255 * (255 - A)) / 255)
 
 White means encoded RGB `(255,255,255)` in the retained source color space. It is
 currently fixed, with no new configuration option or nonstandard IIIF parameter.
-The operation consumes the raster and compacts storage in place; RGB input passes
+The operation consumes the raster and compacts storage in place; RGB and gray input pass
 through. Source ICC remains unchanged. Background/color management can evolve
 separately; this is not an implicit conversion to sRGB.
 
-The 256 MiB TIFF decode budget counts the RGBA output plus one four-channel tile.
+The 256 MiB TIFF decode budget counts the RGBA output plus one four-channel tile or full-width strip.
 Resize counts input + output pixels + ICC; composition counts input pixels + ICC.
 Vector capacity, codec allocations and caller-owned data are not a process-wide
 cap. PNG and JPEG retain the 64 MiB HTTP response cap. Generic errors, authorization,

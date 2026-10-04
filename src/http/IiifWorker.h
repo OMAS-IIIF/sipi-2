@@ -1,6 +1,7 @@
 #pragma once
 
 #include "preflight/LuaPreflight.h"
+#include "cache/ResultCache.h"
 #include "image/SourceResolver.h"
 #include "storage/S3ByteSource.h"
 #include "iiifparser/IIIFGeometry.h"
@@ -13,11 +14,12 @@
 
 namespace sipi::http {
 
-/** One bounded worker for IIIF policy, source resolution, metadata, geometry and JPEG delivery.
+/** One bounded worker for IIIF policy, source resolution, metadata, geometry and JPEG/PNG delivery.
  * Owns the script snapshot; jobs own all request values and their completion.
  * Completion runs on the worker, using Drogon's thread-safe response callback.
  * stop() rejects new work, discards queued jobs and joins the current job. Call
  * it after app.run returns, before server resources disappear. No detached work.
+ * Holds shared ownership of the optional result cache until worker destruction.
  */
 class IiifWorker {
 public:
@@ -35,7 +37,8 @@ public:
      * it supplies information-document identities, never filesystem locations. */
     IiifWorker(std::optional<preflight::LuaPreflight> policy, SourceResolver sources,
                iiif::SizePolicy size_policy, std::string public_base_url,
-               std::optional<S3Client> s3_client = std::nullopt);
+               std::optional<S3Client> s3_client = std::nullopt,
+               std::shared_ptr<cache::ResultCache> result_cache = nullptr);
     ~IiifWorker();
     IiifWorker(const IiifWorker&) = delete;
     IiifWorker& operator=(const IiifWorker&) = delete;
@@ -55,6 +58,7 @@ private:
     std::optional<S3Client> s3_client_;
     iiif::SizePolicy size_policy_;
     std::string public_base_url_;
+    std::shared_ptr<cache::ResultCache> result_cache_;
     std::mutex mutex_;
     std::condition_variable ready_;
     std::deque<Job> jobs_;

@@ -34,8 +34,13 @@ int main(int argc, char** argv) {
         save(root / "column.png", {1, 3, {1,2,3,4,5,6,7,8,9}, {}});
         save(root / "row.png", {3, 1, {1,2,3,4,5,6,7,8,9}, {}});
         save(root / "rgba.png", {2,1,{255,0,0,128,0,0,255,0},fixture::icc_header(),sipi::PixelLayout::rgba});
+        auto gray_profile = fixture::icc_header();
+        std::copy_n("GRAY",4,gray_profile.begin()+16);
+        save(root / "gray.png", {3,1,{0,127,255},gray_profile,sipi::PixelLayout::gray});
         const sipi::PngSink discard = [](auto) {};
         rejects([&] { sipi::write_png(image, {}); });
+        rejects([&] { sipi::write_png({1,1,{0},fixture::icc_header(),sipi::PixelLayout::gray}, discard); });
+        rejects([&] { sipi::write_png({1,1,{0,0,0},gray_profile}, discard); });
         rejects([&] { sipi::write_png({1,1,{1,2,3},{},sipi::PixelLayout::rgba}, discard); });
         rejects([&] { sipi::write_png({1,1,{1,2,3},{},static_cast<sipi::PixelLayout>(99)}, discard); });
         rejects([&] { sipi::write_png({0,1,{},{}}, discard); });

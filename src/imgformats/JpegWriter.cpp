@@ -70,12 +70,18 @@ void finish_destination(j_compress_ptr codec) noexcept {
 } // namespace
 
 void write_jpeg(const RasterImage8& image, const JpegSink& sink, int quality) {
-    if (image.layout != PixelLayout::rgb || !sink || quality < 1 || quality > 100 || image.width == 0 || image.height == 0 ||
+    const auto channels = image.channel_count();
+    if ((image.layout != PixelLayout::rgb && image.layout != PixelLayout::gray) || !sink || quality < 1 || quality > 100 || image.width == 0 || image.height == 0 ||
         image.width > JPEG_MAX_DIMENSION || image.height > JPEG_MAX_DIMENSION ||
-        static_cast<std::uint64_t>(image.width) * image.height * 3 != image.pixels.size())
+        static_cast<std::uint64_t>(image.width) * image.height * channels != image.pixels.size())
         throw JpegWriteError("Invalid JPEG raster, quality or sink");
     if (image.icc_profile.size() > 255 * icc_chunk_bytes)
         throw JpegWriteError("ICC profile exceeds JPEG marker capacity");
+
+    if (image.layout == PixelLayout::gray && !image.icc_profile.empty() &&
+        (image.icc_profile.size() < 132 || std::memcmp(image.icc_profile.data()+36, "acsp", 4) != 0 ||
+         std::memcmp(image.icc_profile.data()+16, "GRAY", 4) != 0))
+        throw JpegWriteError("Grayscale JPEG requires a gray ICC profile header");
 
     const auto state = std::make_unique<Encoder>(sink);
     state->codec.err = jpeg_std_error(&state->error.manager);
@@ -93,11 +99,11 @@ void write_jpeg(const RasterImage8& image, const JpegSink& sink, int quality) {
     state->codec.dest = &state->destination;
     state->codec.image_width = image.width;
     state->codec.image_height = image.height;
-    state->codec.input_components = 3;
-    state->codec.in_color_space = JCS_RGB;
+    state->codec.input_components = static_cast<int>(channels);
+    state->codec.in_color_space = channels == 1 ? JCS_GRAYSCALE : JCS_RGB;
     jpeg_set_defaults(&state->codec);
     jpeg_set_quality(&state->codec, quality, TRUE);
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < state->codec.num_components; ++i) {
         state->codec.comp_info[i].h_samp_factor = 1;
         state->codec.comp_info[i].v_samp_factor = 1;
     }
@@ -114,7 +120,7 @@ void write_jpeg(const RasterImage8& image, const JpegSink& sink, int quality) {
     while (state->codec.next_scanline < image.height) {
         // libjpeg's API predates const-correctness; input scanlines are not modified.
         auto* row = const_cast<JSAMPLE*>(image.pixels.data() +
-            static_cast<std::size_t>(state->codec.next_scanline) * image.width * 3);
+            static_cast<std::size_t>(state->codec.next_scanline) * image.width * channels);
         jpeg_write_scanlines(&state->codec, &row, 1);
     }
     jpeg_finish_compress(&state->codec);

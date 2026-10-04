@@ -6,7 +6,7 @@ codec increment, not a general image transformation engine.
 
 ## Supported requests
 
-Source: tiled TIFF/BigTIFF, top-left orientation, unsigned 8-bit contiguous RGB
+Source: tiled or strip-based TIFF/BigTIFF, top-left orientation, unsigned 8-bit grayscale or contiguous RGB
 or explicitly declared RGBA, no volume depth. RGBA is composited onto white
 before JPEG encoding; see [alpha delivery](alpha-delivery.md). The existing TIFF
 reader selects only tiles intersecting the crop in a suitable pyramid level
@@ -20,7 +20,7 @@ geometry resolver, including clipping at image edges. The resolved output size
 may equal or reduce the crop dimensions on each axis. Reductions use
 [area-weighted stored-channel averaging](area-resize.md); enlargement is not implemented. Rotation 0 or 360 is
 accepted as identity; mirroring and other rotations return 501. JPEG with default
-or color quality is supported; PNG now uses the same pipeline (see [PNG delivery](png-delivery.md)). Gray/bitonal and other output formats return 501.
+or color quality is supported; PNG now uses the same pipeline (see [PNG delivery](png-delivery.md)). Native grayscale also supports `gray` quality and one-component JPEG. RGB-to-gray conversion, bitonal and other output formats remain unsupported.
 Invalid geometry retains its previous 400/501 error mapping before rendering.
 
 After building and running CTest, from the repository root:
@@ -34,7 +34,7 @@ After building and running CTest, from the repository root:
 - `/tiled.tif/square/max/0/default.jpg`: centered 200 x 200 square.
 - `/tiled.tif/pct:25,25,50,50/max/0/default.jpg`: 160 x 100 crop.
 - `/tiled.tif/full/160,/0/default.jpg`: 160 x 100 JPEG, area-weighted reduction.
-- `/sample.tif/full/max/0/default.jpg`: 501, the older fixture uses strips.
+- `/sample.tif/full/max/0/default.jpg`: 200 JPEG from the strip-based fixture.
 
 Preflight can select the source as before. Information requests are unchanged;
 profile publication remains pending a per-resource conformance review. This first
@@ -56,7 +56,7 @@ Successful return, not a final callback, signals complete encoding.
 
 Baseline JPEG uses quality 90 and 4:4:4 sampling. The quality argument is 1..100;
 HTTP currently uses the default. ICC bytes are preserved exactly in ordered APP2
-chunks; no profile validation or color conversion occurs. Untagged RGB remains
+chunks; gray profiles receive basic GRAY header checks, without full validation or color conversion. Untagged RGB remains
 untagged. RGB is not automatically sRGB. EXIF/IPTC and other TIFF metadata are not
 copied; long-term metadata/original preservation remains a separate decision.
 
@@ -71,8 +71,10 @@ never cross the C library and longjmp never skips a live nontrivial C++ destruct
 The worker accumulates output in a string limited to 64 MiB, then moves it into
 Drogon's response. It sends 200 `image/jpeg` and `Cache-Control: no-store` only
 when decoding and encoding have completed. Partial output cannot become a
-successful response. The same encoder interface can later feed a socket/cache
-sink, but actual backpressure, cancellation and cache commit are not implemented.
+successful response. Complete output can now be committed to the optional result
+cache; a hit uses the same response bound and headers. The same encoder interface
+can later feed an incremental socket/cache sink, but actual backpressure and
+cancellation are not implemented. See [cache integration](persistent-cache.md#http-integration).
 
 The TIFF reader's decoded crop plus tile buffer limit remains 256 MiB, with its
 existing separate metadata/codec allocation bounds. libjpeg supports dimensions
@@ -104,4 +106,4 @@ GET/HEAD parity, unsupported operations, corrupt tiles inside/outside the crop,
 and successful delivery after errors. TIFF fixtures are generated locally with
 libtiff; no external image or Python imaging package is required.
 
-The resize stage bounds input + output RGB bytes + ICC to 256 MiB and reports failures as 500 `processing_failed`. TIFF reads intersecting tiles in the selected level; exact fractional-window resampling preserves the requested field of view. Reduced levels inherit the main image ICC profile.
+The resize stage bounds input + output raster bytes + ICC to 256 MiB and reports failures as 500 `processing_failed`. TIFF reads intersecting tiles or strips in the selected level; exact fractional-window resampling preserves the requested field of view. Reduced levels inherit the main image ICC profile.

@@ -15,11 +15,11 @@ public:
 /** Synchronous consumer of borrowed bytes; consume/copy during the call. */
 using PngSink = std::function<void(std::span<const std::uint8_t>)>;
 
-/** Write lossless, noninterlaced RGB8 or straight RGBA8 PNG in blocks of at most 16 KiB.
+/** Write lossless, noninterlaced gray8, RGB8 or straight RGBA8 PNG in blocks of at most 16 KiB.
  * Borrows image and sink for this call; independent calls share no codec state.
  * Emits scanlines without a second raster or full encoded-image buffer. Uses
  * compression level 6. Color and alpha bytes are unchanged: no color/gamma conversion and
- * no sRGB assumption. ICC is preserved as iCCP after basic RGB header checks
+ * no sRGB assumption. ICC is preserved as iCCP after basic matching GRAY/RGB header checks
  * and libpng's size checks. Rejected profiles/warnings fail rather than silently
  * dropping metadata. This is NOT full ICC validation or color management.
  * Untagged input remains untagged; no EXIF/IPTC or other metadata is generated.

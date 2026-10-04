@@ -1,0 +1,18 @@
+sources:
+  "20.4.15":
+    grok:
+      url: "https://github.com/GrokImageCompression/grok/archive/v20.4.15.tar.gz"
+      sha256: "01bb691dd64f1917b0bba867659f2b7e0ae07a856833b81ae8bdb904149d7277"
+      destination: "."
+    spdlog:
+      url: "https://github.com/gabime/spdlog/archive/ce0424bb375805955c0c5482a32ddb821708eb47.tar.gz"
+      sha256: "6efddb9c922df1fc548a0f3ec067d744103e6a2783d290df1b221f2186041b78"
+      destination: "src/include/spdlog"
+    taskflow:
+      url: "https://github.com/boxerab/taskflow/archive/8e85ff949e54664efe19b3df0763a6bc24aa421d.tar.gz"
+      sha256: "a09b3d3742121bb1ba7d3d17aa1ec0bf77ca9c22edd1abcbffe8f75d8c82e4a6"
+      destination: "src/include/taskflow"
+    highway:
+      url: "https://github.com/google/highway/archive/05230e7c367405e05215d61c1426aea0e3858cec.tar.gz"
+      sha256: "50bfa634575e0efa85471a3ba96120ea3d0be2a5ffd154dabc465dbedf466142"
+      destination: "src/lib/core/highway"

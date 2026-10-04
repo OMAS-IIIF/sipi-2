@@ -38,9 +38,9 @@ not a side effect of normalization.
 
 These are architectural decisions, not implemented capabilities. The current
 RGB8 TIFF crop decoder retains source ICC bytes without converting to sRGB.
-Tiled RGB/RGBA8 TIFF-to-JPEG/PNG HTTP delivery with pyramid selection is implemented; upload/import and
+Tiled or strip-based gray/RGB/RGBA8 TIFF-to-JPEG/PNG HTTP delivery with pyramid selection is implemented; upload/import and
 original preservation/download remain pending. See [JPEG delivery](jpeg-delivery.md).
-RasterImage8 now explicitly represents RGB8 and straight RGBA8; see [alpha delivery](alpha-delivery.md).
+RasterImage8 now explicitly represents gray8, RGB8 and straight RGBA8; see [alpha delivery](alpha-delivery.md).
 
 ## Repository formats and S3-ready reading (agreed 2026-10-04)
 
@@ -240,7 +240,10 @@ specified when integrating delivery.
 
 ## Cache architecture (agreed 2026-10-04)
 
-Status: agreed design, not implemented. Start with one local cache per SIPI-2
+Status: identity, persistent encoded-result storage and authorized HTTP lookup/fill
+are implemented. Source-metadata caching remains pending. See [cache identity](cache-key.md) and
+[persistent storage](persistent-cache.md) for the implemented capacity, locking,
+publication and recovery contract. Start with one local cache per SIPI-2
 instance: ordinary encoded image files in a configurable persistent directory,
 plus a SQLite index. No distributed cache, shared multi-instance directory, or
 interchangeable database abstraction is required for the first implementation.
@@ -258,7 +261,9 @@ full-source dimensions when resolving percentages, square regions or max size.
   contains dimensions, orientation and other information needed for planning.
 - An encoded-response entry contains its cache key, relative file path, byte
   length, media type, output width/height and last-use time. Source/version
-  associations must support invalidation. Exact schema remains to be designed.
+  associations must support invalidation. The current result schema and derived
+  filenames are described in [persistent storage](persistent-cache.md); explicit
+  source-indexed purge remains pending.
 - Prefer hash-derived filenames distributed among subdirectories. Define a
   deterministic key serialization and hash before implementation; do not use
   raw request paths as storage paths.
@@ -296,13 +301,13 @@ not selected defaults. Reclaim bytes, not a fixed percentage of the file count.
 Account for temporary files and concurrent in-progress writes so generation
 cannot silently exceed the intended budget. An individually oversized response
 may still be delivered within delivery limits, but is not admitted to the cache.
-Define admission/reservation details and disk-space headroom before implementation,
+The implemented admission/headroom policy is defined in [persistent storage](persistent-cache.md),
 including database/journal overhead. Active deliveries must remain safe during
 eviction; choose an explicit open-handle or entry-lifetime strategy.
 
 Batch last-use updates rather than committing a SQLite write for every hit.
 Approximate LRU is sufficient; exact timestamp persistence is not a correctness
-requirement. The batching interval remains an implementation decision.
+requirement. The current store batches every 64 hits and flushes before eviction and on shutdown.
 
 ### Persistence, publication and recovery
 
@@ -371,7 +376,7 @@ first cache increment needs no generic multi-layer cache framework.
 
 - A simple RenderPlan value could carry resolved operations, keeping URL and
   preflight interpretation out of codecs. Its interface is not yet designed.
-- RasterImage8 is the owning RGB/RGBA8 representation with an explicit PixelLayout.
+- RasterImage8 is the owning gray/RGB/RGBA8 representation with an explicit PixelLayout.
 - Lua 5.4.8 now implements the initial standalone allow/deny and optional-source
   contract; see [preflight](preflight.md). Host-provided JWT verification/signing,
   HTTPS, JSON, and restriction fields are still pending.
@@ -404,8 +409,9 @@ first cache increment needs no generic multi-layer cache framework.
 
 Recommended import target: pyramidal tiled Classic TIFF or BigTIFF, unsigned RGB8
 or RGBA8, sRGB, top-left, contiguous channels, lossless Deflate or LZW.
-Tiled sources without pyramids remain supported; strips are a future compatibility
-step. Grayscale8 is a useful later addition. Defer direct 1-bit/16-bit/float,
+Tiled sources without pyramids and strip-based sources are supported. Native
+Grayscale8 (MINISBLACK/MINISWHITE) is implemented through PNG/JPEG delivery.
+See [strips and grayscale](tiff-strips-and-gray.md). Defer direct 1-bit/16-bit/float,
 CMYK/Lab/palette, separate planes and other orientations to import conversion
 unless a concrete delivery use case justifies them. Import multi-page documents
 as separate repository images. JPEG-compressed TIFF/YCbCr needs explicit color
@@ -420,3 +426,16 @@ composition against white. Alpha filtering and white composition now use stored
 channel encoding; no implicit sRGB or linear-light conversion occurs. A future
 color-management increment must define a profile-aware working space explicitly.
 See [alpha delivery](alpha-delivery.md) for current semantics and limitations.
+
+## JPEG 2000 integration status (2026-10-04)
+
+Grok 20.4.15 header reading is integrated through ByteSource callbacks for local
+and S3 sources. JP2 and raw J2K feed existing info/geometry functions; region and
+resolution pixel decoding now feeds the shared JPEG/PNG pipeline. The small project-owned Conan recipe pins
+release/submodules and builds the shared CPU core. See
+[JPEG 2000 input](jpeg2000-input.md) for lifecycle, limits and build instructions.
+
+Repository TIFF policy: normalize non-top-left orientation during import by
+transforming pixels and setting the tag. Likewise convert YCbCr JPEG-in-TIFF and
+CMYK during import into the supported repository color models; CMYK conversion
+requires an explicit source-profile policy. Delivery does not add these variants.

@@ -57,15 +57,15 @@ does not change that opened source; in-place writes remain prohibited. See
 
 `src/http/IiifWorker.*` owns the optional Lua policy, source resolver, and size
 policy, and receives the complete parsed image/info request. Its bounded worker
-performs source resolution, opens one local or S3 byte source, then performs a four-byte
-format probe, TIFF metadata reading, and
+performs source resolution, opens one local or S3 byte source, then performs a twelve-byte
+format probe, TIFF/JPEG 2000 metadata reading, and
 image-request geometry validation away from the HTTP I/O thread.
 
-The probe recognizes little/big-endian classic TIFF and BigTIFF from bytes, without
+The probe recognizes little/big-endian classic TIFF, BigTIFF, JP2 and raw J2K from bytes, without
 requiring a filename extension. Other/unrecognized formats return
-501 source_format_not_supported. A recognized TIFF with unreadable/corrupt metadata
+501 source_format_not_supported. A recognized TIFF/JPEG 2000 source with unreadable/corrupt metadata
 returns 500 invalid_image_source. Storage read failures return 500 source_error;
-a source disappearing before open returns 404 image_not_found. Information requests do not check pixel integrity; image output validates the accessed tiles.
+a source disappearing before open returns 404 image_not_found. Information requests do not check pixel integrity; TIFF image output validates the accessed tiles or strips.
 
 For image requests, orientation-normalized width/height are passed to the existing
 format-neutral resolve_geometry function. No TIFF-specific branching is added to
@@ -76,7 +76,7 @@ valid. `^max` without a finite configured size limit returns 400; deployment siz
 limit configuration remains open. Invalid internal dimensions/policies return 500.
 
 Successful geometry is concrete before rotation and can be inspected with debug
-logging. Supported tiled RGB/RGBA8 TIFF crops, optionally reduced by area averaging, produce JPEG or PNG; enlargement, rotation
+logging. Supported tiled or strip-based gray/RGB/RGBA8 TIFF crops, optionally reduced by area averaging, produce JPEG or PNG; enlargement, rotation
 and unsupported layouts return 501 not_implemented. See [JPEG delivery](jpeg-delivery.md). An info request returns the
 orientation-normalized dimensions and public identity as JSON with status 200;
 it has no region/size to validate. See [info.json](iiif-info.md). All worker responses use Cache-Control: no-store.
@@ -96,7 +96,7 @@ ctest --preset conan-debug --output-on-failure
 ./build/Debug/sipi-2 --iiif-root build/Debug/http-test-data --log-level debug
 ```
 
-- `/project/sample.tif/full/160,/0/default.jpg`: valid geometry, 501 output pending.
+- `/project/sample.tif/full/160,/0/default.jpg`: 200 JPEG, 160 x 100.
 - `/sample.tif/320,0,1,1/max/0/default.jpg`: outside image, 400.
 - `/sample.tif/full/640,/0/default.jpg`: enlargement without caret, 400.
 - `/sample.tif/full/^640,/0/default.jpg`: 501 upscaling_disabled; with
@@ -111,3 +111,7 @@ traversal, Lua-selected alternate dimensions, HEAD, clipping, orientation, BigTI
 unsupported/corrupt headers, and enabled/disabled upscaling.
 
 S3 backend parameters and MinIO examples are documented in [configuration](command-line.md#repository-selection-local-or-s3). Source opening remains after preflight; one shared S3 client serves requests, while each request pins its own opened object version.
+
+JPEG 2000 JP2/raw J2K also supplies information, geometry checks and supported
+8-bit gray/RGB region/resolution pixel delivery through the same local/S3 source;
+see [JPEG 2000 input](jpeg2000-input.md).

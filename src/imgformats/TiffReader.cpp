@@ -278,15 +278,20 @@ std::size_t raster_bytes(std::uint32_t width, std::uint32_t height, std::size_t 
 }
 } // namespace
 
+bool TiffDirectory::is_grayscale() const noexcept {
+    return samples_per_pixel == 1 && extra_samples.empty() &&
+        (photometric == PHOTOMETRIC_MINISBLACK || photometric == PHOTOMETRIC_MINISWHITE);
+}
+
 bool supports_tiff_region(const TiffDirectory& directory) {
     const bool rgb = directory.samples_per_pixel == 3 && directory.extra_samples.empty();
     const bool rgba = directory.samples_per_pixel == 4 && directory.extra_samples.size() == 1 &&
         (directory.extra_samples[0] == EXTRASAMPLE_ASSOCALPHA ||
          directory.extra_samples[0] == EXTRASAMPLE_UNASSALPHA);
-    return (rgb || rgba) && std::holds_alternative<TiffTiles>(directory.layout) &&
+    return (((rgb || rgba) && directory.photometric == PHOTOMETRIC_RGB) || directory.is_grayscale()) &&
         directory.orientation == TiffOrientation::top_left &&
         directory.bits_per_sample == 8 &&
-        directory.sample_format == SAMPLEFORMAT_UINT && directory.photometric == PHOTOMETRIC_RGB &&
+        directory.sample_format == SAMPLEFORMAT_UINT &&
         directory.planar_config == PLANARCONFIG_CONTIG &&
         TIFFIsCODECConfigured(directory.compression);
 }
@@ -317,7 +322,7 @@ RasterImage8 decode_region(const ByteSource& source, const PixelRegion& region,
     TIFFGetFieldDefaulted(file.get(), TIFFTAG_IMAGEDEPTH, &depth);
     TIFFGetFieldDefaulted(file.get(), TIFFTAG_TILEDEPTH, &tile_depth);
     if (!supports_tiff_region(metadata) || depth != 1 || tile_depth != 1) {
-        throw TiffUnsupportedError("Unsupported TIFF: expected tiled top-left unsigned 8-bit contiguous RGB or explicitly tagged RGBA");
+        throw TiffUnsupportedError("Unsupported TIFF: expected top-left unsigned 8-bit gray, contiguous RGB or explicitly tagged RGBA");
     }
     if (region.width == 0 || region.height == 0 || region.x >= metadata.width || region.y >= metadata.height ||
         region.width > metadata.width - region.x || region.height > metadata.height - region.y) {
@@ -325,45 +330,61 @@ RasterImage8 decode_region(const ByteSource& source, const PixelRegion& region,
     }
     const auto channels = metadata.samples_per_pixel;
     const auto output_bytes = raster_bytes(region.width, region.height, channels, max_decoded_bytes);
-    const auto tile_bytes = raster_bytes(tiles->width, tiles->height, channels, max_decoded_bytes - output_bytes);
-    if (tile_bytes > static_cast<std::size_t>(std::numeric_limits<tmsize_t>::max()) ||
-        TIFFTileSize64(file.get()) != tile_bytes) {
-        throw TiffReadError("Unexpected TIFF decoded tile size");
-    }
+    // A strip spans the full image width; tiles and strips otherwise share the
+    // same rectangle-intersection/copy logic. The final strip may be shorter.
+    const auto block_width = tiles ? tiles->width : metadata.width;
+    const auto block_height = tiles ? tiles->height : std::get<TiffStrips>(metadata.layout).rows_per_strip;
+    const std::uint64_t right = static_cast<std::uint64_t>(region.x) + region.width;
+    const std::uint64_t bottom = static_cast<std::uint64_t>(region.y) + region.height;
+    const std::uint64_t first_x = region.x / block_width * static_cast<std::uint64_t>(block_width);
+    const std::uint64_t first_y = region.y / block_height * static_cast<std::uint64_t>(block_height);
+    const auto buffer_rows = tiles ? block_height :
+        static_cast<std::uint32_t>(std::min<std::uint64_t>(block_height, metadata.height - first_y));
+    const auto buffer_bytes = raster_bytes(block_width, buffer_rows, channels, max_decoded_bytes - output_bytes);
+    if (buffer_bytes > static_cast<std::size_t>(std::numeric_limits<tmsize_t>::max()) ||
+        (tiles && TIFFTileSize64(file.get()) != buffer_bytes) ||
+        (!tiles && TIFFScanlineSize64(file.get()) != static_cast<std::uint64_t>(block_width) * channels))
+        throw TiffReadError("Unexpected TIFF decoded block size");
     input.check_source();
     if (input.diagnostic.error[0] != '\0') { throw TiffReadError(input.diagnostic.error.data()); }
     RasterImage8 output{region.width, region.height, std::vector<std::uint8_t>(output_bytes), std::move(profile),
-        channels == 4 ? PixelLayout::rgba : PixelLayout::rgb};
-    std::vector<std::uint8_t> tile(tile_bytes);
-    // Use 64-bit positions even at UINT32_MAX image edges. Tile origins supplied
-    // to libtiff are still inside the image and therefore fit uint32_t.
-    const std::uint64_t right = static_cast<std::uint64_t>(region.x) + region.width;
-    const std::uint64_t bottom = static_cast<std::uint64_t>(region.y) + region.height;
-    const std::uint64_t first_x = region.x / tiles->width * static_cast<std::uint64_t>(tiles->width);
-    const std::uint64_t first_y = region.y / tiles->height * static_cast<std::uint64_t>(tiles->height);
-    for (auto ty = first_y; ty < bottom; ty += tiles->height) {
-        for (auto tx = first_x; tx < right; tx += tiles->width) {
-            const auto index = TIFFComputeTile(file.get(), static_cast<std::uint32_t>(tx),
-                                                static_cast<std::uint32_t>(ty), 0, 0);
-            const auto count = TIFFReadEncodedTile(file.get(), index, tile.data(), static_cast<tmsize_t>(tile_bytes));
-            if (count < 0 || static_cast<std::size_t>(count) != tile_bytes || input.diagnostic.error[0] != '\0') {
-                input.check_source();
-                throw TiffReadError("Cannot decode complete TIFF tile: " + std::string(input.diagnostic.error.data()));
+        channels == 1 ? PixelLayout::gray : (channels == 4 ? PixelLayout::rgba : PixelLayout::rgb)};
+    std::vector<std::uint8_t> block(buffer_bytes);
+    // uint64 positions avoid overflow at UINT32_MAX edges. Codec coordinates
+    // are inside the image and still fit uint32_t.
+    for (auto by = first_y; by < bottom; by += block_height) {
+        const auto rows = tiles ? block_height :
+            static_cast<std::uint32_t>(std::min<std::uint64_t>(block_height, metadata.height - by));
+        const auto expected_bytes = raster_bytes(block_width, rows, channels, buffer_bytes);
+        for (auto bx = first_x; bx < right; bx += block_width) {
+            tmsize_t count;
+            if (tiles) {
+                const auto index = TIFFComputeTile(file.get(), static_cast<std::uint32_t>(bx),
+                                                    static_cast<std::uint32_t>(by), 0, 0);
+                count = TIFFReadEncodedTile(file.get(), index, block.data(), static_cast<tmsize_t>(expected_bytes));
+            } else {
+                const auto index = TIFFComputeStrip(file.get(), static_cast<std::uint32_t>(by), 0);
+                count = TIFFReadEncodedStrip(file.get(), index, block.data(), static_cast<tmsize_t>(expected_bytes));
             }
-            // Intersect in absolute image coordinates, then translate separately
-            // into tile-local and crop-local offsets (the legacy code mixed these).
-            const auto left = std::max<std::uint64_t>(tx, region.x);
-            const auto top = std::max<std::uint64_t>(ty, region.y);
-            const auto end_x = std::min(tx + tiles->width, right);
-            const auto end_y = std::min(ty + tiles->height, bottom);
+            if (count < 0 || static_cast<std::size_t>(count) != expected_bytes || input.diagnostic.error[0] != '\0') {
+                input.check_source();
+                throw TiffReadError(std::string(tiles ? "Cannot decode complete TIFF tile: " :
+                    "Cannot decode complete TIFF strip: ") + input.diagnostic.error.data());
+            }
+            const auto left = std::max<std::uint64_t>(bx, region.x);
+            const auto top = std::max<std::uint64_t>(by, region.y);
+            const auto end_x = std::min(bx + block_width, right);
+            const auto end_y = std::min(by + rows, bottom);
             const auto row_bytes = static_cast<std::size_t>(end_x - left) * channels;
             for (auto y = top; y < end_y; ++y) {
-                const auto source = static_cast<std::size_t>((y - ty) * tiles->width + left - tx) * channels;
+                const auto source = static_cast<std::size_t>((y - by) * block_width + left - bx) * channels;
                 const auto destination = static_cast<std::size_t>((y - region.y) * region.width + left - region.x) * channels;
-                std::memcpy(output.pixels.data() + destination, tile.data() + source, row_bytes);
+                std::memcpy(output.pixels.data() + destination, block.data() + source, row_bytes);
             }
         }
     }
+    if (metadata.is_grayscale() && metadata.photometric == PHOTOMETRIC_MINISWHITE)
+        for (auto& value : output.pixels) value = static_cast<std::uint8_t>(255 - value);
     input.check_source();
     if (channels == 4 && metadata.extra_samples[0] == EXTRASAMPLE_ASSOCALPHA) {
         // Normalize only requested pixels, not unused tile padding. Division
