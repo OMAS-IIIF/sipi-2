@@ -20,12 +20,13 @@ import time
 
 
 @contextlib.contextmanager
-def server(executable, root, extra=(), cache="cache"):
+def server(executable, root, extra=(), cache="cache", variables=None):
     """Own one listener; retain its log for hit/miss assertions after shutdown."""
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     env = {k: v for k, v in os.environ.items() if not k.startswith("SIPI_")}
+    env.update(variables or {})
     log = []
     with tempfile.TemporaryFile(mode="w+") as output:
         args = [str(executable), "--port", str(port), "--iiif-root", "images",
@@ -125,10 +126,10 @@ def main():
             assert get(port, path, "HEAD", "denied")[0] == 403
             assert get(port, "/tiled.tif/info.json", authorization="denied")[0] == 403
             assert get(port, path, authorization="failure")[0] == 500
-            for bad in ("/tiled.tif/full/80,/90/default.png", "/tiled.tif/full/80,/!0/default.png",
-                        "/tiled.tif/full/80,/0/gray.png", "/rotated.tif/full/max/0/default.png",
+            for bad in ("/rotated.tif/full/max/0/default.png",
                         "/sixteen.jp2/full/max/0/default.png"):
                 assert get(port, bad)[0] == 501, bad
+            assert get(port, "/tiled.tif/full/80,/361/default.png")[0] == 400
             assert get(port, "/tiled.tif/999,0,1,1/max/0/default.png")[0] == 400
             assert rows(root) == first
             for bad in ("/broken-tile.tif/full/max/0/default.png", "/corrupt-tile.jp2/full/max/0/default.png",

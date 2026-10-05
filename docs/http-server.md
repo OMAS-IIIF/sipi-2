@@ -47,7 +47,9 @@ syntax returns, for example:
 The actual message explains the rejected syntax. Valid image and `info.json`
 requests proceed to optional preflight. Without a script, they use the configured iiif-root mapping. Supported tiled or strip-based gray/RGB/RGBA8 TIFF crops return JPEG or PNG after metadata
 and geometry checks. Unsupported layouts/operations return `not_implemented`
-with status 501; corrupt pixel reads return 500. See [JPEG delivery](jpeg-delivery.md). Information requests return actual metadata; see
+with status 501; valid arbitrary rotation angles use bilinear interpolation;
+corrupt pixel reads return 500. Horizontal mirroring and clockwise quarter turns
+are applied after crop/size; see [orthogonal transforms](orthogonal-transforms.md). See [JPEG delivery](jpeg-delivery.md). Information requests return actual metadata; see
 [info.json](iiif-info.md) for the explicitly incomplete compliance declaration.
 Information requests validate headers, while successful JPEG output also requires pixel decoding.
 There is no temporary success JSON representation of parsed requests. Debug logs
@@ -71,12 +73,12 @@ not necessarily the public HTTPS URL.
 level, validates an optional script, and transfers it to `run_http_server(config, policy)`. `HttpServer.cpp` registers free handler
 functions, a method-checking advice, and an IIIF handler retaining the optional worker. Each handler
 creates a response and invokes Drogon's callback; shared ownership keeps it alive for transmission.
-IIIF processing uses one dedicated worker in `src/http/IiifWorker.*`,
+IIIF processing uses a bounded worker pool in `src/http/IiifWorker.*`,
 with at most 64 queued requests. Lua, filesystem checks, TIFF metadata, and geometry run there, not on the
 I/O thread. Queued jobs own decoded request data and a completion retaining the
 HTTP request. Drogon's response callback schedules transmission on its I/O loop.
-After app.run returns, stop rejects new jobs, discards queued jobs, and joins the
-current job; the worker owns the script snapshot throughout. Disconnected clients
+After app.run returns, stop rejects new jobs, discards queued jobs, and joins all
+active jobs; the worker owns the script snapshot throughout. Disconnected clients
 may still incur evaluation; cancellation-aware delivery is deferred.
 
 Drogon may create its default `uploads/` runtime directory in the working
@@ -125,6 +127,7 @@ semantics; raw header ordering/duplicates cannot be recovered by this adapter.
 | Actual upscaling disabled | 501 / upscaling_disabled |
 | TIFF metadata validated for info.json | 200 / information document |
 | Supported TIFF crop and JPEG/PNG output | 200 / image/jpeg or image/png |
+| Invalid rotation syntax/range | Existing parser error mapping (400) |
 | Unsupported TIFF pixel layout or transformation/output format | 501 / not_implemented |
 | Corrupt TIFF pixels / decoder limit failure | 500 / invalid_image_source |
 | JPEG/PNG codec or encoded-response limit failure | 500 / encoding_failed |
@@ -171,7 +174,25 @@ the completed encoding. Both paths retain the 64 MiB response bound and identica
 content type and `Cache-Control: no-store`. No cache identifiers are exposed in
 headers. GET/HEAD share entries; Drogon suppresses HEAD bodies as before.
 
-Information documents, errors and authorization decisions are not cached. Header
-reads still occur, and the single bounded worker still serializes image processing.
+Information documents, errors and authorization decisions are not cached. Source
+header facts can now come from the version-bound [memory cache](metadata-cache.md),
+including when the persistent result cache is disabled. Independent requests run concurrently in the bounded pool; see
+[worker concurrency](worker-pool.md).
 See [persistent cache](persistent-cache.md#http-integration) for failure boundaries,
-lifecycle, tests and deferred streaming/metadata work.
+lifecycle, tests and deferred streaming work.
+
+
+JPEG input also supports `info.json` and HEAD using the shared metadata cache.
+Only 8-bit gray/RGB/YCbCr and absent/Top-left EXIF orientation are accepted. JPEG
+pixels use full decode followed by the existing crop/resize/transform/encode and
+result-cache pipeline; malformed source data returns 500.
+See [JPEG input](jpeg-input.md) for the supported subset and limits.
+
+
+PNG input supports information and pixel GET/HEAD through the existing metadata/
+result caches, locally and over S3. Full decode expands palettes, low-bit gray and
+transparency before common processing. Unsupported color encodings return 501;
+malformed data returns 500. See [PNG input](png-input.md).
+
+Arbitrary angles expand the canvas with transparent borders (white for JPEG),
+using alpha-weighted bilinear interpolation. See [rotation](arbitrary-rotation.md).

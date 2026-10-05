@@ -193,7 +193,9 @@ key `preflight-script`. Startup validates the file and entry point before listen
 invalid configured scripts fail startup. Relative paths use the working directory.
 No script is loaded by default. Denials return 403, script failures 500, and
 missing selected files 404; invalid geometry returns 400. Supported tiled or strip-based gray/RGB/RGBA8 TIFF crops now return JPEG or PNG; unsupported layouts and
-transformations return 501. Information requests now
+transformations return 501, except unsupported rotation angles (400).
+Horizontal mirroring and 90° steps are supported; see
+[transformation behavior and examples](docs/orthogonal-transforms.md). Information requests now
 return 200 with real dimensions and public service identity. See [HTTP behavior](docs/http-server.md).
 
 After this dependency change, rerun the Conan install and CMake configure/build
@@ -292,6 +294,73 @@ CLI > environment > TOML > defaults. Without a directory it stays disabled.
 The default encoded-file limit is 1 GiB, with LRU cleanup to 90%; both are
 configurable. Startup recovery and exclusive directory locking are implemented.
 JPEG/PNG image responses now use authorized cache lookup/fill, including local and
-S3 sources. Hits skip pixel decoding, processing and encoding; header reads still
-run. Cache failures fall back to uncached delivery. See [persistent cache](docs/persistent-cache.md) and
+S3 sources. Hits skip pixel decoding, processing and encoding. A bounded in-memory
+metadata cache also reuses unchanged source headers after version checks. Cache failures fall back to uncached delivery. See [persistent cache](docs/persistent-cache.md) and
 [startup configuration](docs/command-line.md).
+
+
+The [in-memory metadata cache](docs/metadata-cache.md) retains immutable TIFF/J2K
+source facts, including ICC profiles and resolution information, for up to 256
+entries / 64 MiB of accounted storage by default. Configure
+`metadata-cache-max-entries` and `metadata-cache-max-bytes` via CLI/environment/TOML;
+either zero disables retention. It is independent of `cache-dir` and empty
+after restart. Preflight and local/S3 source-version checks still run on every
+request; successful metadata and encoded-result hits avoid repeated image reads.
+
+### Parallel IIIF processing
+
+Image work runs in a bounded pool, defaulting to the detected logical CPU count
+capped at four (fallback one). Configure `--iiif-workers`, `SIPI_IIIF_WORKERS`, or
+TOML `iiif-workers` (1..32). The metadata cache is shared; persistent-cache fills
+for the same result are coordinated. See [worker concurrency](docs/worker-pool.md)
+for lifecycle, memory considerations and test coverage.
+
+
+### Measuring worker concurrency
+
+The opt-in [tile benchmark](docs/benchmarks.md) builds deterministic large TIFF/J2K
+fixtures and compares 1/2/4 workers in Release with empty/populated result caches.
+It records throughput, latency, sampled RSS and verifies every response against
+serial output. An isolated Drogon/Trantor TSan build is documented there too.
+
+
+### JPEG input
+
+Accepted 8-bit gray/RGB JPEGs now support `/{identifier}/info.json` and HEAD,
+locally and over S3, plus cropped/reduced JPEG and PNG output with mirroring and
+quarter turns. Baseline/progressive pixels are fully decoded; ICC profiles are
+retained. EXIF orientation must be absent or Top-left. See [JPEG input](docs/jpeg-input.md).
+
+
+### PNG input
+
+PNG sources now support information and JPEG/PNG pixel delivery locally and over
+S3, with palette/low-bit expansion, transparency, Adam7 and ICC preservation.
+The existing processing/cache pipeline is reused. Current exclusions include
+16-bit, EXIF/APNG and gamma/chromaticity-only declarations; see
+[PNG input](docs/png-input.md) for the complete color policy and limits.
+
+Explicit PNG sRGB now survives processing and PNG/JPEG output without a pixel color
+transform. See [color declarations and conversions](docs/color-management.md) for
+the exact assignment/preservation rules and remaining limitations.
+
+Arbitrary IIIF rotation angles now use bilinear interpolation with transparent
+borders (white in JPEG). Exact quarter turns retain their fast paths. See
+[arbitrary-angle rotation](docs/arbitrary-rotation.md) for geometry, color and limits.
+
+IIIF `gray` now converts supported RGB/RGBA sources with LittleCMS to Gray Gamma
+2.2/D50, preserving alpha and embedding the target ICC. Untagged RGB assumes sRGB
+only for this conversion; native grayscale keeps its values/profile. See
+[color handling](docs/color-management.md) for the complete policy and limitations.
+
+
+IIIF `bitonal` now builds on that grayscale conversion: composite transparency on
+white, then threshold at 128 without dithering. PNG contains exact black/white
+samples (currently 8-bit storage); JPEG compression may introduce gray artifacts.
+See [the bitonal policy](docs/color-management.md#bitonal-quality).
+
+
+Optional `--bitonal-method=floyd-steinberg` enables serpentine error diffusion;
+`SIPI_BITONAL_METHOD` and TOML `bitonal-method` use the usual precedence.
+Threshold remains the default. See [color management](docs/color-management.md)
+for the important limitation when rendering separate IIIF tiles.

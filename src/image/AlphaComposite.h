@@ -8,10 +8,10 @@ public:
     using std::runtime_error::runtime_error;
 };
 
-/** Consume straight RGBA8 and composite onto encoded RGB white (255,255,255).
+/** Consume straight RGBA8 or gray-alpha8 and composite onto encoded white (255).
  * RGB and gray input are returned unchanged. ICC is retained; processing uses the stored
  * channel encoding, NOT linear light or implicit sRGB. Alpha is coverage.
- * Compacts RGBA storage in place to RGB; no second raster is allocated. Pass
+ * Compacts alpha-bearing storage in place to RGB or gray; no second raster is allocated. Pass
  * std::move to transfer ownership. Budget covers input pixel bytes + ICC, not
  * retained vector capacity, allocator overhead or a process-wide memory total.
  * Invalid dimensions/layout/byte count or budget throws CompositeError before

@@ -5,6 +5,7 @@ drogon/1.9.13
 libtiff/4.7.2
 libjpeg/9f
 libpng/1.6.58
+lcms/2.19.1
 grok/20.4.15
 lua/5.4.8
 aws-sdk-cpp/1.11.692

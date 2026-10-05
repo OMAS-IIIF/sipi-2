@@ -39,6 +39,10 @@ int main(int argc, char** argv) {
         save(root / "gray.png", {3,1,{0,127,255},gray_profile,sipi::PixelLayout::gray});
         const sipi::PngSink discard = [](auto) {};
         rejects([&] { sipi::write_png(image, {}); });
+        auto conflicting = image; conflicting.srgb_intent = 0;
+        rejects([&] { sipi::write_png(conflicting, discard); });
+        conflicting.icc_profile.clear(); conflicting.srgb_intent = 4;
+        rejects([&] { sipi::write_png(conflicting, discard); });
         rejects([&] { sipi::write_png({1,1,{0},fixture::icc_header(),sipi::PixelLayout::gray}, discard); });
         rejects([&] { sipi::write_png({1,1,{0,0,0},gray_profile}, discard); });
         rejects([&] { sipi::write_png({1,1,{1,2,3},{},sipi::PixelLayout::rgba}, discard); });

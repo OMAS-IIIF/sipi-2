@@ -64,8 +64,14 @@ int main(int argc, char* argv[]) {
     if (const char* value = std::getenv("SIPI_CACHE_DIR")) cache_environment.directory = value;
     if (const char* value = std::getenv("SIPI_CACHE_MAX_BYTES")) cache_environment.max_bytes = value;
     if (const char* value = std::getenv("SIPI_CACHE_TARGET_PERCENT")) cache_environment.target_percent = value;
+    if (const char* value = std::getenv("SIPI_METADATA_CACHE_MAX_ENTRIES")) cache_environment.metadata_max_entries = value;
+    if (const char* value = std::getenv("SIPI_METADATA_CACHE_MAX_BYTES")) cache_environment.metadata_max_bytes = value;
+    std::optional<std::string_view> env_iiif_workers;
+    if (const char* value = std::getenv("SIPI_IIIF_WORKERS")) env_iiif_workers = value;
+    std::optional<std::string_view> env_bitonal_method;
+    if (const char* value = std::getenv("SIPI_BITONAL_METHOD")) env_bitonal_method = value;
     const auto parsed = sipi::load_startup_options(arguments, env_log_level, env_port,
-        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment);
+        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment, env_iiif_workers, env_bitonal_method);
     if (const auto* error = std::get_if<sipi::ParseError>(&parsed)) {
         std::cerr << "Configuration error: " << error->message << '\n';
         return 2;

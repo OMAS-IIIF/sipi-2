@@ -1,4 +1,5 @@
 """Opt-in MinIO HTTP integration. Own disposable buckets and local server processes."""
+from concurrent.futures import ThreadPoolExecutor
 import contextlib
 import http.client
 import json
@@ -12,7 +13,7 @@ import tempfile
 import time
 import uuid
 
-exe, fixtures = map(lambda p: Path(p).resolve(), sys.argv[1:])
+exe, fixtures, jpeg_fixtures, png_fixtures = map(lambda p: Path(p).resolve(), sys.argv[1:])
 bucket = 'sipi-http-' + uuid.uuid4().hex
 endpoint = 'http://127.0.0.1:9000'
 auth = ['curl', '--fail-with-body', '--silent', '--show-error', '--max-time', '10',
@@ -69,6 +70,10 @@ s3('PUT')
 try:
     for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif', 'alpha-pyramid.tif', 'gray-pyramid.tif', 'strip-rgba.tif', 'source.jp2', 'source.j2k', 'offset.jp2'):
         s3('PUT', key, fixtures / (key if key in ('pyramid.tif','alpha-pyramid.tif', 'gray-pyramid.tif', 'strip-rgba.tif', 'source.jp2', 'source.j2k', 'offset.jp2') else 'tiled.tif'))
+    for name in ('rgb.jpg', 'icc.jpg', 'orientation.jpg', 'broken.jpg'):
+        s3('PUT', name, jpeg_fixtures / name)
+    for name in ('rgb.png', 'icc.png', 'rgba.png', 'adam7-large.png', 'srgb.png', 'srgb-gray.png', 'sixteen.png', 'bad-crc.png'):
+        s3('PUT', name, png_fixtures / name)
     with tempfile.TemporaryDirectory() as directory:
         policy = Path(directory, 'policy.lua')
         # Lua performs the project-specific prefix mapping explicitly.
@@ -94,22 +99,58 @@ try:
             expected_png = get(local, pyramid_path.replace('.jpg', '.png'))
             assert expected_png[0] == 200
             alpha_path = '/alpha-pyramid.tif/3,1,29,17/14,8/0/default.'
+            expected_rotated_alpha = get(local,alpha_path.replace('/0/','/!270/')+'png')
+            assert expected_rotated_alpha[0] == 200
             expected_alpha = {fmt:get(local,alpha_path+fmt) for fmt in ('png','jpg')}
             assert all(r[0]==200 for r in expected_alpha.values())
             strip_paths = ['/gray-pyramid.tif/3,1,31,21/15,10/0/default.'+fmt for fmt in ('png','jpg')]
             strip_paths += ['/strip-rgba.tif/3,4,19,8/7,3/0/default.'+fmt for fmt in ('png','jpg')]
             j2k_paths = ['/'+name+'/1,1,35,21/7,4/0/default.'+fmt
                          for name in ('source.jp2','source.j2k','offset.jp2') for fmt in ('png','jpg')]
+            j2k_paths += [path.replace('/0/', '/!90/') for path in j2k_paths]
+            j2k_paths += [path.replace('/0/', '/!37.5/') for path in j2k_paths if '/0/' in path]
             expected_j2k = {path:get(local,path) for path in j2k_paths}
             assert all(r[0]==200 for r in expected_j2k.values())
             expected_strips = {path:get(local,path) for path in strip_paths}
             assert all(r[0]==200 for r in expected_strips.values())
+        jpeg_paths = ['/'+name+'/3,4,20,12/10,6/!90/default.'+fmt
+                      for name in ('rgb.jpg','icc.jpg') for fmt in ('jpg','png')]
+        with server(['--iiif-root', str(jpeg_fixtures)]) as local:
+            jpeg_reference = {path:get(local,path) for path in jpeg_paths}
+            assert all(result[0] == 200 for result in jpeg_reference.values())
+        png_paths = ['/'+name+'/full/2,1/!37.5/default.'+fmt
+                     for name in ('rgb.png','icc.png','rgba.png','adam7-large.png','srgb.png','srgb-gray.png') for fmt in ('png','jpg')]
+        png_paths += [path.replace('default.',quality+'.') for path in png_paths if 'icc.png' not in path for quality in ('gray','bitonal')]
+        with server(['--iiif-root', str(png_fixtures)]) as local:
+            png_reference = {path:get(local,path) for path in png_paths}
+            assert all(result[0] == 200 for result in png_reference.values())
         cache = Path(directory, 'cache')
-        with server(['--preflight-script', str(policy), '--cache-dir', str(cache)], {
+        with server(['--iiif-workers=4', '--preflight-script', str(policy), '--cache-dir', str(cache)], {
             'SIPI_IIIF_STORAGE': 's3', 'SIPI_S3_BUCKET': bucket, 'SIPI_S3_REGION': 'us-east-1',
             'SIPI_S3_ENDPOINT': endpoint, 'SIPI_S3_PATH_STYLE': 'true',
             'SIPI_S3_ACCESS_KEY': 'sipi-test', 'SIPI_S3_SECRET_KEY': 'sipi-local-test-password',
         }) as remote:
+            for name in ('rgb.png', 'icc.png'):
+                status, _, body = get(remote, '/museum/' + name + '/info.json')
+                info = json.loads(body)
+                assert status == 200 and (info['width'], info['height']) == (3,2)
+                assert 'rotationBy90s' in info['extraFeatures']
+                assert get(remote, '/' + name + '/info.json', 'HEAD')[0] == 200
+                assert get(remote, '/' + name + '/full/max/0/default.png')[0] == 200
+            assert get(remote, '/sixteen.png/info.json')[0] == 501
+            assert get(remote, '/bad-crc.png/info.json')[0] == 500
+            for path, reference in {**jpeg_reference, **png_reference}.items():
+                actual = get(remote, path)
+                assert actual[0] == 200 and actual[2] == reference[2]
+            for name in ('rgb.jpg', 'icc.jpg'):
+                status, _, body = get(remote, '/' + name + '/info.json')
+                assert status == 200
+                info = json.loads(body)
+                assert (info['width'], info['height']) == (37, 23) and 'rotationBy90s' in info['extraFeatures']
+                assert get(remote, '/' + name + '/info.json', 'HEAD')[0] == 200
+                assert get(remote, '/' + name + '/full/max/0/default.jpg')[0] == 200
+            assert get(remote, '/orientation.jpg/info.json')[0] == 501
+            assert get(remote, '/broken.jpg/info.json')[0] == 500
             for path in ('/tiled.tif', '/museum/tiled.tif', '/museum/alias', '/local'):
                 result = get(remote, path + crop)
                 assert result[0] == 200 and result[2] == expected[2], (path, result[0])
@@ -121,6 +162,12 @@ try:
                 assert get(remote, '/'+name+'/info.json', 'HEAD')[0] == 200
                 assert get(remote, '/'+name+'/full/max/0/default.jpg')[0] == 200
                 assert get(remote, '/'+name+'/100,0,1,1/max/0/default.jpg')[0] == 400
+            # Cold concurrent S3 range reads exercise the shared AWS client and
+            # independent Grok streams before the subsequent cache-hit checks.
+            with ThreadPoolExecutor(max_workers=8) as clients:
+                actuals = list(clients.map(lambda path: get(remote, path), list(expected_j2k) * 3))
+            for path, actual in zip(list(expected_j2k) * 3, actuals):
+                assert actual[0] == 200 and actual[2] == expected_j2k[path][2]
             for path, expected_response in expected_j2k.items():
                 actual = get(remote,path)
                 assert actual[0] == 200 and actual[2] == expected_response[2]
@@ -128,6 +175,9 @@ try:
             assert actual_pyramid[0] == 200 and actual_pyramid[2] == expected_pyramid[2]
             actual_png = get(remote, pyramid_path.replace('.jpg', '.png'))
             assert actual_png[0] == 200 and actual_png[2] == expected_png[2]
+            for _ in range(2):
+                actual = get(remote,alpha_path.replace('/0/','/!270/')+'png')
+                assert actual[0] == 200 and actual[2] == expected_rotated_alpha[2]
             for fmt in ('png','jpg'):
                 actual = get(remote,alpha_path+fmt)
                 assert actual[0] == 200 and actual[2] == expected_alpha[fmt][2]
@@ -168,5 +218,9 @@ try:
 finally:
     for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif', 'alpha-pyramid.tif', 'gray-pyramid.tif', 'strip-rgba.tif', 'source.jp2', 'source.j2k', 'offset.jp2'):
         s3('DELETE', key)
+    for name in ('rgb.jpg', 'icc.jpg', 'orientation.jpg', 'broken.jpg'):
+        s3('DELETE', name)
+    for name in ('rgb.png', 'icc.png', 'rgba.png', 'adam7-large.png', 'srgb.png', 'srgb-gray.png', 'sixteen.png', 'bad-crc.png'):
+        s3('DELETE', name)
     s3('DELETE')
 print('S3 HTTP info, JPEG, HEAD, Lua overrides and prefix mapping passed')

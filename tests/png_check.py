@@ -15,8 +15,8 @@ def decode_png(data):
         chunks.append(kind)
         if kind == b'IHDR':
             width, height, depth, color, compression, filtering, interlace = struct.unpack('>IIBBBBB', payload)
-            assert (depth, compression, filtering, interlace) == (8, 0, 0, 0) and color in (0,2,6)
-            channels = {0:1,2:3,6:4}[color]
+            assert (depth, compression, filtering, interlace) == (8, 0, 0, 0) and color in (0,2,4,6)
+            channels = {0:1,2:3,4:2,6:4}[color]
         elif kind == b'IDAT':
             compressed.extend(payload)
         elif kind == b'iCCP':

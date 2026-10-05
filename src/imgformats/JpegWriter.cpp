@@ -1,4 +1,5 @@
 #include "JpegWriter.h"
+#include "image/SrgbProfiles.h"
 
 #include <cstddef>
 #include <cstdio>
@@ -83,6 +84,12 @@ void write_jpeg(const RasterImage8& image, const JpegSink& sink, int quality) {
          std::memcmp(image.icc_profile.data()+16, "GRAY", 4) != 0))
         throw JpegWriteError("Grayscale JPEG requires a gray ICC profile header");
 
+    if (image.srgb_intent && (*image.srgb_intent > 3 || !image.icc_profile.empty()))
+        throw JpegWriteError("sRGB declaration must be valid and mutually exclusive with ICC");
+    // Both owning objects precede setjmp; codec errors cannot skip their destruction.
+    const auto assigned = image.srgb_intent ? srgb_profile(image.layout, *image.srgb_intent) :
+                                            std::vector<std::uint8_t>{};
+    const auto& profile = image.srgb_intent ? assigned : image.icc_profile;
     const auto state = std::make_unique<Encoder>(sink);
     state->codec.err = jpeg_std_error(&state->error.manager);
     state->error.manager.error_exit = fail;
@@ -110,11 +117,11 @@ void write_jpeg(const RasterImage8& image, const JpegSink& sink, int quality) {
     jpeg_start_compress(&state->codec, TRUE);
     // ICC APP2 payload: signature including NUL, sequence number, chunk count.
     std::memcpy(state->marker.data(), "ICC_PROFILE\0", 12);
-    state->marker[13] = static_cast<JOCTET>((image.icc_profile.size() + icc_chunk_bytes - 1) / icc_chunk_bytes);
-    for (std::size_t offset = 0; offset < image.icc_profile.size(); offset += icc_chunk_bytes) {
-        const auto count = std::min(icc_chunk_bytes, image.icc_profile.size() - offset);
+    state->marker[13] = static_cast<JOCTET>((profile.size() + icc_chunk_bytes - 1) / icc_chunk_bytes);
+    for (std::size_t offset = 0; offset < profile.size(); offset += icc_chunk_bytes) {
+        const auto count = std::min(icc_chunk_bytes, profile.size() - offset);
         state->marker[12] = static_cast<JOCTET>(offset / icc_chunk_bytes + 1);
-        std::memcpy(state->marker.data() + 14, image.icc_profile.data() + offset, count);
+        std::memcpy(state->marker.data() + 14, profile.data() + offset, count);
         jpeg_write_marker(&state->codec, JPEG_APP0 + 2, state->marker.data(), static_cast<unsigned>(count + 14));
     }
     while (state->codec.next_scanline < image.height) {

@@ -10,8 +10,8 @@ echoes the backend URL with HTML escaping. Port defaults to 8080 and is configur
 through --port, SIPI_PORT, or TOML. The listener binds only to 127.0.0.1. The initial executable ran successfully in CLion
 according to the owner. A standalone IIIF Image API 3 syntax parser now produces
 owning typed image/info requests. The HTTP catch-all maps invalid syntax to 400 JSON and applies configured
-preflight to valid requests, returning information JSON or JPEG/PNG for supported tiled or strip-based gray/RGB/RGBA8 TIFF crops; exact /health returns liveness/version JSON. Area-weighted reduction is integrated; rotation
-and socket streaming are not integrated yet. A standalone TIFF metadata reader
+preflight to valid requests, returning information JSON or JPEG/PNG for supported tiled or strip-based gray/RGB/RGBA8 TIFF crops; exact /health returns liveness/version JSON. Area-weighted reduction, horizontal mirroring and exact clockwise quarter turns
+are integrated; arbitrary-angle rotation and socket streaming remain pending. A standalone TIFF metadata reader
 and pure IIIF region/size resolver are implemented and tested together. The HTTP
 worker now resolves sources, reads TIFF headers, and validates geometry.
 Information output and initial TIFF crop/JPEG delivery are implemented.
@@ -270,7 +270,7 @@ instruction budgets; native operations still need their own timeouts.
 ## HTTP source/metadata/geometry pipeline (updated 2026-10-04)
 
 src/http/IiifWorker (formerly IiifPreflight) owns the optional script, SourceResolver,
-size policy, and one worker, with 64 waiting jobs; reject overload with 503 iiif_busy.
+size policy, and a bounded worker pool, with 64 total waiting jobs; reject overload with 503 iiif_busy.
 Parse before dispatch; authorize image/info GET and HEAD alike. Deny returns 403;
 Lua/contract/quota failures 500. Resolve and probe the definitive source, read TIFF
 metadata, and pass orientation-normalized dimensions to the pure geometry resolver.
@@ -310,7 +310,8 @@ Parser rejects dot-only resource segments to prevent URL normalization changing 
 Explicit owner-approved development compromise: omit mandatory profile until pixel
 delivery supports a genuine IIIF compliance level; current documents are not fully
 IIIF 3 conformant. Do not advertise parser support, input codecs or TIFF pyramid
-storage as output capabilities. No sizes/tiles/formats/extraFeatures yet; neither
+storage as output capabilities. No sizes/tiles/formats yet; pixel-readable sources advertise mirroring/rotationBy90s
+via extraFeatures. Neither
 sizeUpscaling nor higher profiles may be advertised merely from configuration.
 JSON-LD content negotiation, CORS and base-URI redirects remain later increments.
 
@@ -330,7 +331,9 @@ intersecting TIFF tiles and collects JPEG blocks into a <=64 MiB string. Publish
 Top-left, unsigned RGB/RGBA8, contiguous tiled TIFF; explicit alpha only.
 Any region syntax works; resolved output dimensions may stay unchanged or shrink independently.
 Reduction uses the format-independent AreaResize module in stored channel values.
-Rotation 0/360, no mirroring, default/color JPG only. Other requests return 501;
+Initially rotation 0/360 and default/color JPG only; PNG, native gray, mirroring
+and quarter turns were added subsequently (see the sections below). Unsupported
+operations return 501, except unsupported rotation angles (400);
 TiffUnsupportedError distinguishes layout support from corrupt data (500).
 HEAD still performs encoding for identical status/headers; optimize later with a
 clear validation/content-length contract. No backpressure-aware HTTP streaming yet.
@@ -367,8 +370,8 @@ content proof; later prefer import-assigned source versions. Planning/decoding
 now share one open local descriptor, supporting atomic replacement while reads
 are in flight; in-place writes remain prohibited. Preserve the option of versioned public identities for
 citations/annotations. Storage implementation/defaults are described in the
-2026-10-05 storage section below. Source metadata caching and coalesced generation for multiple workers remain
-open. No distributed cache, backend abstraction or browser cache policy change.
+2026-10-05 storage section below. Source metadata caching is now implemented in memory; coalesced generation for
+multiple workers remains open. No distributed cache, backend abstraction or browser cache policy change.
 
 ## S3-ready repository reading (agreed 2026-10-04)
 
@@ -527,8 +530,8 @@ use stored channel encoding, not linear light; ICC remains unchanged.
 Memory bounds count 4 channels for RGBA. Tests cover both source alpha modes,
 transparent hidden colors, partial/zero coverage, fractional windows, corrupt
 pixels outside/inside crops, inherited ICC and local/S3 PNG/JPEG/HEAD delivery.
-See docs/alpha-delivery.md. Next work includes color management, other TIFF layouts,
-rotation/mirroring, range buffering and cache; alpha does not imply those features.
+See docs/alpha-delivery.md. Color management and further source layouts remain
+separate work. Cache and orthogonal transforms were added subsequently.
 
 ## Strip TIFF and native grayscale (2026-10-04)
 
@@ -550,7 +553,7 @@ SIPI stays C++20; Grok builds internally as C++23 and ships as a shared CPU core
 No GPU/Rust/bindings/network clients. Include the Grok shared library in deployment.
 J2kReader owns codec/cursor per call, borrows the existing local/S3 ByteSource,
 contains callback exceptions and copies owning metadata/ICC. One process runtime
-uses one worker; all calls finish before static teardown. Input budget is 16 MiB
+uses synchronous codec-local execution per request; all calls finish before static teardown. Input budget is 16 MiB
 with 64 KiB buffering, not a codec-allocation cap. Nonzero reference-grid origins
 are subtracted when exposing dimensions. HTTP recognizes JP2/J2K bytes and uses
 the existing info/geometry functions; valid pixel requests remain explicitly 501.
@@ -634,8 +637,8 @@ single bodies above the lower target may occupy the cache alone up to the maximu
 LRU touches batch every 64 hits, before eviction, and best-effort on destruction.
 
 main initializes/reconciles and holds the configured store, warns/falls back if
-unavailable. HTTP lookup/fill is now implemented below. Next: source metadata
-caching and coalesced generation when a worker pool is introduced. No browser cache policy
+unavailable. HTTP lookup/fill and worker-local metadata reuse are now implemented
+below. Concurrent fills are now coordinated by the worker pool (see below). No browser cache policy
 change, streaming/socket tee, distributed cache or generic database abstraction.
 See docs/persistent-cache.md and docs/command-line.md. Tests cover real startup,
 configuration precedence, restart/abrupt exit, injected publication failures,
@@ -646,7 +649,7 @@ recovery, collisions, LRU/hysteresis/pinning, schema rejection and concurrency.
 
 main -> run_http_server -> IiifWorker share ownership of the configured ResultCache.
 Every image request still runs preflight, opens the definitive version-bound source,
-reads its header, resolves geometry and checks current source/operation support.
+reuses/reads its header, resolves geometry and checks current source/operation support.
 Then the worker builds the original-variant identity using actual source layout,
 JPEG quality 90 (also explicitly passed to the writer) or fixed PNG parameters.
 Hit metadata must match the output plan; complete bounded reads precede 200. A hit
@@ -656,10 +659,316 @@ source/policy/codec failures retain normal error mapping. No cached info/errors.
 
 GET/HEAD share results; HEAD retains Drogon's body suppression and may fill/read
 cache. Responses remain buffered up to 64 MiB with unchanged no-store headers.
-Debug logs report cache outcomes without key/source/auth values. The single worker
-serializes current requests; no new thread pool/single-flight machinery added.
-Header caching and true streaming remain open. Native gray, RGBA, TIFF and J2K
+Debug logs report cache outcomes without key/source/auth values. The worker pool now serializes same-key fills while rendering different keys concurrently (see below).
+Header caching is implemented below; true streaming remains open. Native gray, RGBA, TIFF and J2K
 reuse the same result path. Tests cover actual hit logs, alias equivalence, denial,
 source override/version changes and deletion, local/S3 replacement, restart, HEAD,
 failed encodings, missing/truncated cached files, DB fault injection and disabled/
 undersized caches. See docs/persistent-cache.md#http-integration.
+
+
+## Worker-local source metadata cache (2026-10-05)
+
+src/cache/MetadataCache.h/.cpp provides metadatacache: a bounded LRU list holding
+SourceInfo identity/version/size and shared_ptr<const variant<TiffMetadata,
+J2kMetadata>>. Defaults are 256 entries and 64 MiB accounted resident storage;
+resolved metadata-cache-max-entries / metadata-cache-max-bytes configure these bounds,
+with SIPI_METADATA_CACHE_MAX_ENTRIES / SIPI_METADATA_CACHE_MAX_BYTES environment
+counterparts and standard CLI > environment > TOML > defaults. Either zero disables
+retention. MetadataCacheLimits defines the shared defaults and flows through startup,
+server and worker into the cache constructor. Accounting includes
+key/node estimates and vector capacities, ICC profiles, TIFF nested extra samples
+and J2K component arrays; allocator overhead/caller-retained evicted values are extra.
+Linear scans are bounded by the small entry limit; no duplicate map index.
+An external mutex in IiifWorker now serializes shared-cache operations.
+
+IiifWorker owns the cache and is its sole caller. It runs preflight and opens the
+current source before lookup; hits skip signature probe/application metadata reads.
+Misses read using that same source, retain only successes, and proceed uncached if
+admission fails/exceeds budget. No cached errors/unknown formats. Independently
+active without cache-dir, empty after restart. Public info documents still generated
+per request. Codec-internal header reads can still occur on pixel decode misses.
+Local replacement and S3 version changes cannot match the old source key.
+
+Cached metadata is immutable; TIFF read planning filters a local directory-only
+copy instead of erasing shared pyramid levels, with no ICC duplication for planning.
+Snapshot ownership survives eviction/destruction. Pool-wide cache access is
+serialized under the worker metadata mutex; header I/O stays outside that lock. No SQLite metadata schema, TTL, background maintenance or recipe change.
+See docs/metadata-cache.md. Unit and real HTTP tests cover budgets/LRU/ownership,
+version/format replacement, failures, authorization, aliases and cold restarts;
+existing result-cache and MinIO tests cover the combined delivery path.
+
+## Orthogonal transforms (2026-10-05)
+
+src/image/OrthogonalTransform.* in imageprocessing consumes an owning RasterImage8;
+call with std::move. Supports exact gray/RGB/straight-RGBA8 pixel permutations,
+preserving ICC and hidden RGB under zero alpha. The worker applies crop/size first,
+then horizontal mirroring and clockwise 0/90/180/270/360 rotation, before JPEG alpha
+composition/encoding. Identity/mirror/180 reuse storage; 90/270 allocate one extra
+pixel buffer and swap axes. Default 256 MiB operation budget includes both buffers
+and ICC. No codec/IIIF dependencies or shared state in the processor.
+Arbitrary angles now use ImageTransform bilinear interpolation (see below).
+Pixel-readable info.json sources advertise mirroring/rotationBy90s/rotationArbitrary; profile remains deliberately absent.
+Cache key geometry stays pre-rotation; indexed result dimensions are post-rotation.
+Existing key rotation fields suffice; recipe unchanged because prior identity
+output is unchanged and newly supported operations had no cached results.
+See docs/orthogonal-transforms.md. Unit and HTTP tests cover all permutations,
+alpha/ICC, budget failures, TIFF/J2K, cache/HEAD and local/MinIO parity.
+
+
+## Bounded parallel delivery (2026-10-05)
+
+IiifWorker now owns a fixed joinable thread pool and one globally bounded 64-job
+queue. iiif-workers / SIPI_IIIF_WORKERS / --iiif-workers use normal CLI > env >
+TOML > default priority, valid 1..32. WorkerLimits.h defines the default as detected
+logical CPUs clamped to 1..4 (zero detection falls back to one). The conservative
+cap limits memory multiplication; it is not an RSS quota. Larger explicit settings
+require operator memory planning. One restores serial execution.
+All shared state is ready before threads start; partial startup failure joins
+started threads. Owner-only stop wakes all, drops queued jobs and joins active work.
+Completion exceptions are contained. No forced cancellation or detached threads.
+
+MetadataCache remains externally synchronized: one short worker-owned mutex around
+get/put, header I/O outside locks, immutable snapshots shared across requests.
+Configured limits are pool-wide; simultaneous cold reads may duplicate header work.
+The persistent cache retains its internal index/file mutex. An additional weak
+per-key mutex registry in IiifWorker coordinates lookup/render/publication using
+full serialized identities after independent policy/source/capability checks.
+Waiters recheck the cache; declined/failed fills permit retries. Registry entries
+are pruned on acquisition. Different keys render concurrently; waiting same-key
+requests occupy worker slots. No result cache means independent rendering. No new
+in-memory response cache or policy/error reuse. Grok keeps synchronous codec-local
+execution and thread-local diagnostics rather than nested decode pools.
+
+See docs/worker-pool.md for limitations and configuration. All 34 Debug suites and
+selected ASan/UBSan tests pass, including concurrent local/S3 TIFF/J2K delivery.
+The direct real-rendering worker test passes TSan. Initial HTTP reports with
+uninstrumented Drogon/Trantor disappear with both HTTP libraries rebuilt under
+TSan (four parallel HTTP runs clean); other native dependencies remain
+uninstrumented. No suppressions or blanket claim about all server paths. Recipe/response bytes
+unchanged. Future work: measured concurrency tuning, async waiters if hot-key
+contention warrants it, streaming/backpressure and remaining IIIF capabilities.
+
+
+## Reproducible performance measurements (2026-10-05)
+
+benchmarks/CreateImages.cpp provides an opt-in EXCLUDE_FROM_ALL benchmark-images
+CMake target: deterministic 4096px RGB8 tiled LZW TIFF pyramid and lossless tiled
+JP2. benchmarks/tile_load.py owns local listeners and measures 1/2/4 workers with
+8 persistent clients, 128 adjacent tile URLs across two zoom levels, empty then
+populated result caches. Default five repetitions and 128 warm rounds; metadata
+warmed, OS caches untouched. Checks response status/MIME/256px dimensions and
+per-URL SHA-256 equivalence with serial reference. Records raw request times,
+throughput, median/p95, sampled RSS, binary/source hashes and generated summary.
+Results/large fixtures stay under ignored build/; no timing pass/fail thresholds.
+
+Release dependencies/build use an isolated Conan output directory, preserving
+CLion Debug presets. benchmarks/build_http_tsan.py independently rebuilds pinned
+Drogon/Trantor and SIPI with TSan without replacing Conan package binaries; the
+other native dependencies stay uninstrumented. Requires local profiles/cached
+source trees. Uses isolated CMake target/path adapters matching recipe aliases.
+
+See docs/benchmarks.md and docs/benchmarks/2026-10-05-local.md. On the development
+M5 Max (18 logical CPUs, 36 GiB), 495,360 measured responses matched references;
+four-worker cold-cache throughput was 2.29x TIFF / 3.85x JP2 relative to one worker.
+Warm cache around 15k req/s showed no reliable worker scaling in this local client
+setup. Keep default cap four; do not generalize synthetic format performance or
+sampled small-tile RSS to whole-image requests. HTTP TSan passed four instrumented
+runs; the earlier transport reports disappeared without suppressions. Next useful
+measurements: real archival masters, S3 and isolated render-vs-publication costs
+if profiling is needed. No production behavior/defaults changed by this step.
+
+
+## JPEG source metadata (2026-10-05)
+
+src/imgformats/JpegReader.* / jpegreader uses pinned libjpeg/9f over ByteSource,
+without pixel decompression or pathname reopening. Owning JpegMetadata contains
+SOF width/height, logical gray/RGB, progressive flag and reconstructed ICC bytes.
+Accept 8-bit gray/RGB/YCbCr, baseline/progressive, EXIF absent or orientation 1.
+Reject CMYK/YCCK/other precision and orientations 2..8; ingestion must normalize.
+Malformed recognized EXIF/ICC, codec warnings, truncation and budgets are errors.
+Parse only bounded IFD0 orientation, never thumbnail pointers or EXIF dimensions.
+ICC APP2 assembly requires consistent complete unique chunks; preserve opaque bytes.
+
+Heap-owned libjpeg state/source callbacks follow JpegWriter's longjmp discipline;
+storage exceptions unwind within callbacks and propagate unchanged afterwards.
+16 KiB prefetch, default 16 MiB cumulative header input, ICC assembly at most
+16 MiB extra; codec/node overhead is additional. Stop at first SOS: metadata
+success does not validate entropy/EOI or post-SOS markers. Per-call state permits
+concurrent local/S3 use. Byte sniffing recognizes JPEG independently of suffix.
+
+The shared MetadataCache variant includes JpegMetadata and charges ICC capacity.
+The worker supplies neutral dimensions to existing info/geometry builders, with
+normal prefix identity, preflight and source-version checks. Accepted info/HEAD
+returns 200 with mirroring/rotationBy90s and native-gray quality capabilities.
+Unsupported JPEG headers return 501; malformed data returns 500 invalid_image_source.
+JPEG image requests use the existing result cache and full pixel decode pipeline.
+Existing profile omission remains the user-approved development boundary. No
+rendering-recipe bump because existing pixel output is unchanged.
+
+See docs/jpeg-input.md. Tests cover libjpeg-generated baseline/progressive/gray/
+RGB/CMYK, YCCK/12-bit rejection, endian EXIF, ICC chunk validation, input/storage
+errors, header-only acceptance, concurrent reads, cache accounting, HTTP/HEAD/
+authorization/replacement and MinIO.
+
+## JPEG pixel delivery (2026-10-06)
+
+read_jpeg_image rechecks version-bound header metadata/ICC, fully decodes baseline,
+progressive and native-gray/RGB JPEGs into RasterImage8 and requires EOI. The existing
+PixelWindow resampler crops/reduces, then orthogonal transforms and JPEG/PNG encoders
+run unchanged. No scaled IDCT or JPEG ROI optimization. Default input limit is 256 MiB;
+pixels + ICC + estimated multiscan coefficient arrays share a 256 MiB working bound,
+with native scratch/markers additional. Codec warnings/truncation fail rather than
+return partial output. EXIF/ICC interpretation remains pre-first-SOS only.
+Successful results enter the existing persistent cache; existing source formats and
+recipe outputs are unchanged. Tests cover pixel-reference equality, limits, corrupt
+entropy/EOI, crop/transforms, ICC, parallel reads and local/S3 output parity.
+PNG input is implemented below; arbitrary-angle rotation remains a separate step.
+
+
+## PNG source metadata (2026-10-06)
+
+src/imgformats/PngReader.* / pngreader uses the existing libpng over ByteSource.
+PngMetadata owns IHDR dimensions, original color/depth, transparency/interlace and
+ICC. Accept legal <=8-bit gray/palette and 8-bit RGB/gray-alpha/RGBA, including
+Adam7/tRNS. Reject 16-bit and all eXIf-bearing pre-IDAT headers; no orientation or
+color conversion. ICC is validated by libpng and retained; traditional color
+declarations are flagged. APNG/CICP/HDR are rejected. Text/suggested palettes are skipped.
+
+Read only through the first IDAT header: no pixel/IDAT CRC/IEND/post-IDAT validation.
+16 KiB buffering, 16 MiB default cumulative input/per-chunk allocation limit,
+1,000,000 per-axis dimension cap. Warnings/CRCs fail; storage errors propagate;
+heap codec state and a narrow setjmp boundary preserve C++ ownership. Native overhead
+and ICC copies are additional to limits.
+
+The shared metadata variant accounts for PNG ICC capacity. Worker signature sniffing,
+preflight/source versions, geometry and info/HEAD use the existing path. Pixel
+capabilities depend on supports_png_pixels; supported requests now use result caching.
+No recipe/config/dependency change. Tests cover header subsets, malformed data,
+limits/concurrent reads, ICC/cache accounting and local/MinIO information delivery.
+See docs/png-input.md. PNG pixel decoding and explicit color/animation boundaries are now implemented below.
+
+
+## PNG pixel delivery (2026-10-06)
+
+read_png_image rechecks metadata and fully decodes through IEND into gray/RGB/straight
+RGBA8. Palette/low-bit/tRNS expansion is lossless; gray-alpha expands to RGBA.
+Adam7 combines passes in one zero-initialized raster. Existing crop/reduction,
+quarter-turn/mirroring, JPEG/PNG output and persistent cache are reused. Cache layout
+includes PNG alpha; source capabilities are checked before lookup. Header success
+still does not guarantee pixel validity. Truncation/CRC/warnings fail with no output.
+
+Defaults: 256 MiB pixel input and 256 MiB raster+ICC; header cap remains 16 MiB,
+native scratch/metadata copies additional. Reject EXIF/APNG, including post-IDAT;
+16-bit and CICP/HDR remain unsupported. Traditional gAMA/cHRM without ICC or explicit sRGB and
+gray+alpha with GRAY ICC are metadata-only (501 for pixels), avoiding lost color
+meaning or mismatched profiles. ICC is authoritative when present; no gamma/color
+conversion or assumed sRGB for untagged data. See docs/png-input.md.
+
+Tests compare independently generated raw samples including real Adam7, gray/alpha/
+palettes/tRNS, strict late errors, budgets, HTTP transforms/cache/restart/denial and
+local/S3 output parity. No config/dependency or recipe bump; old output unchanged.
+Next candidates: explicit color-management support or arbitrary-angle rotation.
+
+
+## Explicit sRGB delivery (2026-10-06)
+
+RasterImage8 now carries optional srgb_intent (0..3), mutually exclusive with ICC.
+PNG sources retain explicit sRGB when no ICC is present; ICC takes precedence,
+then sRGB, then traditional gamma/chromaticity declarations. Resampling preserves
+this field; transforms/compositing retain the owning raster. No pixel color/gamma
+conversion is performed. Untagged sources remain untagged; original ICC is unchanged.
+
+PNG writer emits sRGB plus intent. JPEG writer assigns embedded channel-matching
+ICC v4 (sRGB for RGB/composited alpha, sGrey for native gray), preserving intent and
+clearing the optional profile ID. src/image/SrgbProfiles.* is linked into jpegwriter.
+Pinned CC0 profiles, hashes/license and verification notes live in third_party/compact-icc;
+no runtime profile files or new library are required. Gray-alpha sRGB can expand to
+RGBA safely; gray-alpha with an arbitrary GRAY ICC remains unsupported.
+
+See docs/color-management.md for the conversion/assignment table, actual sample-changing
+operations and remaining limitations. Tests cover every intent/layout, full/reduced/
+rotated output, exact ICC bytes, unchanged JPEG scan data and local/S3 parity.
+No recipe bump: explicit sRGB source pixel requests were previously rejected; older
+supported output is unchanged. Future profile/template or color-algorithm changes
+must update the recipe. LittleCMS was used only for local verification, not runtime.
+
+
+## Arbitrary rotation (2026-10-06)
+
+src/image/ImageTransform.* provides rotated_size (shared HTTP/cache/raster geometry)
+and transform_image. Exact quarter turns delegate unchanged; other 0..360 angles
+use centered inverse mapping, ceil pixel-edge bounds and alpha-weighted bilinear
+stored samples, with transparent-black exterior. Mirror precedes rotation. No
+angle snapping, profile transform or linear-light filtering. ICC/sRGB survives.
+
+Added PixelLayout::gray_alpha so arbitrary gray rotation preserves GRAY ICC while
+adding transparent borders. Exact transforms, area resampling, PNG encoding and
+in-place white composition support this layout; JPEG receives gray after composition.
+PNG source decoding keeps its prior subset/expansion rules (no unrelated output change).
+General rotation checks input+output+ICC against 256 MiB before allocation. Native
+capacity/overhead remains additional. Invalid size/angle/overflow throws TransformError.
+
+Worker advertises rotationArbitrary for pixel-readable sources; result dimensions
+come from rotated_size before cache lookup. No cache recipe bump: previous supported
+angles are byte-unchanged and new angles had no entries. Future interpolation/rounding/
+background changes must bump the recipe. See docs/arbitrary-rotation.md and the color
+management table. Tests cover analytic sampling, transparent fringes, GRAY ICC/sRGB,
+independent HTTP oracle, restart/denial/cache dimensions and local/MinIO parity.
+
+
+## Color-managed gray quality (2026-10-06)
+
+Conan now pins lcms/2.19.1; imageprocessing privately links lcms::lcms.
+src/image/GrayConversion.* consumes RGB/RGBA after crop/resize/mirror/rotation and
+converts to native gray/gray-alpha with Gray Gamma 2.2/D50 ICC v4.3. Embedded RGB ICC
+wins; otherwise explicit sRGB or the approved untagged-RGB sRGB assumption. Invalid,
+mismatched or unusable profiles fail without fallback. Fixed relative-colorimetric
+intent + black-point compensation; alpha copied unchanged. Existing gray is an
+owning no-op, retaining profile or absence thereof. Default/color requests do not
+invoke the converter. Source objects are never rewritten.
+
+Per-call LCMS context/error state/profiles/transform avoids shared mutation. Budget
+covers input/output/source+target ICC (256 MiB), native scratch additional. Target
+profile description names Gamma 2.2/D50; fixed creation date and unset profile ID
+make output deterministic across fresh processes. Conversion failures map to 500
+color_conversion_failed and are not cached. Untagged fallback is debug-logged.
+
+PNG now retains native gray-alpha including GRAY ICC, using the already-supported
+raster/writer/compositor layout. Cache key accepts gray-alpha and normalizes native
+gray quality aliases. Rendering recipe bumped to sipi-render-v2; old disk entries
+cannot match but are not deleted eagerly. info.json advertises gray for supported
+pixel sources. See docs/color-management.md, the maintained foundation for a future
+GLAM color handbook, including exact stage order, assumptions and limitations.
+
+Tests cover analytical neutral transforms (sRGB vs linear RGB ICC), target gamma/
+white point/intent, alpha/native gray, failure/no-fallback, budgets/concurrency,
+HTTP/JPEG/PNG/cache/restart/fresh determinism and local/MinIO parity. Next: bitonal
+quality, or further IIIF compliance; broad color/HDR/linear-light work remains separate.
+
+
+## Bitonal quality (2026-10-06)
+
+The worker now accepts and advertises `bitonal` alongside `gray`. After geometry
+and the existing grayscale conversion, `src/image/Bitonal.*` composites alpha on
+white and thresholds stored samples at 128 in place, producing opaque gray8 with
+values 0/255 and retained grayscale color metadata. No dithering/configuration.
+PNG is exact two-tone (8-bit encoding); lossy JPEG may decode intermediate values.
+Native gray keeps its encoding; the threshold is not a linear-luminance midpoint.
+See docs/color-management.md for the full GLAM-facing rationale and limitations.
+Existing cache quality keys separate bitonal; no recipe bump because it previously
+returned 501. Future threshold/compositing changes require a bump. Packed 1-bit PNG,
+adaptive thresholding and broader color conversion remain separate future choices.
+
+
+## Configurable bitonal dithering (2026-10-06)
+
+`BitonalMethod` now selects threshold (unchanged default) or serpentine
+Floyd–Steinberg, through `--bitonal-method` / `SIPI_BITONAL_METHOD` /
+TOML `bitonal-method`, with existing precedence. Error diffusion follows gray
+conversion and white composition, uses stored samples and two budgeted double
+rows, and resets per output raster. Independent IIIF tiles can have pattern
+discontinuities: do not promise seamless full-image equivalence. No new IIIF URL
+syntax. Worker configuration is immutable; cache serialization adds an explicit
+method field only for dithered bitonal, retaining existing keys for threshold and
+other qualities. Algorithm/color/operational details live in docs/color-management.md.

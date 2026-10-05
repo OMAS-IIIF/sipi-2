@@ -3,12 +3,12 @@
 `src/cache/ResultCache.h/.cpp` implements a local file store with a SQLite index.
 `CacheKey` determines rendering identity; `ResultCache` stores **complete encoded
 bytes** and output metadata. It has no knowledge of Lua, HTTP, image decoders or
-source authorization. Source metadata caching is a separate future increment.
+source authorization. Source metadata reuse is provided by a separate [in-memory cache](metadata-cache.md).
 
 The executable initializes the configured store and shares ownership with the IIIF
 worker. JPEG/PNG image requests now use authorized lookup/fill for both local and
 S3-backed TIFF/JPEG 2000 sources. A hit skips pixel decoding, resizing and encoding;
-source opening/version checks and header reads still run. Browser/proxy responses
+source opening/version checks still run, while unchanged headers can come from the metadata cache. Browser/proxy responses
 retain `Cache-Control: no-store`; server-side reuse is independent of that policy.
 
 ## Configuration and layout
@@ -174,7 +174,7 @@ checks cached S3 responses and replacement/deletion under an unchanged IIIF URL.
 ## HTTP integration
 
 The order is: parse -> preflight -> resolve/open definitive version-bound source ->
-read metadata -> resolve geometry -> check current source layout and requested
+reuse/read version-bound metadata -> resolve geometry -> check current source layout and requested
 operations -> construct key -> lookup. There is no shortcut around authorization,
 source existence/version or today's renderer capabilities. `info.json` and errors
 are not stored in the encoded-result cache.
@@ -199,12 +199,17 @@ the cache. There is no new HTTP cache-status header; debug logs report hit/miss,
 stored/declined without keys, source paths or credentials. Warning logs identify
 lookup/publication fallback without private diagnostics.
 
-The current single IIIF worker naturally serializes queued requests, so a second
-request normally finds the first completed fill. There is no separate single-flight
-mechanism for a future worker pool. Blocking cache reads/writes remain off Drogon's
-I/O loop, and complete response buffering/64 MiB limits are retained. Source metadata
-reuse, coalesced generation for multiple workers and streaming tee/backpressure
-remain separate increments. No generic database backend interface is needed.
+The bounded IIIF pool coordinates lookup/render/publication with a separate mutex
+per full serialized result identity. A waiting request rechecks the cache after
+the previous fill completes. Different results render concurrently. Failed or
+capacity-declined publication permits retries; no response/error is shared in
+memory. Coordination is enabled with the persistent cache only. See
+[worker concurrency](worker-pool.md) for ownership, limits and shutdown behavior.
+Cache reads/writes remain off Drogon's I/O loop. Streaming/backpressure is separate.
 
 SQLite API references: [opening connections](https://www.sqlite.org/c3ref/open.html),
 [application/version and durability pragmas](https://www.sqlite.org/pragma.html).
+
+For [orthogonal transforms](orthogonal-transforms.md), indexed width/height
+describe the final encoded image (swapped for 90/270 degrees). Capability checks
+precede lookup; cached output never enables unsupported angles.

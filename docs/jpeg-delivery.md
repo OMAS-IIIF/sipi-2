@@ -18,9 +18,11 @@ remain separate steps. Metadata reading still supports more layouts than pixel d
 All existing region forms (full, square, pixel and percentage) work through the
 geometry resolver, including clipping at image edges. The resolved output size
 may equal or reduce the crop dimensions on each axis. Reductions use
-[area-weighted stored-channel averaging](area-resize.md); enlargement is not implemented. Rotation 0 or 360 is
-accepted as identity; mirroring and other rotations return 501. JPEG with default
-or color quality is supported; PNG now uses the same pipeline (see [PNG delivery](png-delivery.md)). Native grayscale also supports `gray` quality and one-component JPEG. RGB-to-gray conversion, bitonal and other output formats remain unsupported.
+[area-weighted stored-channel averaging](area-resize.md); enlargement is not implemented. Horizontal mirroring and clockwise 0/90/180/270/360-degree rotations are
+applied after reduction, without interpolation. Other valid angles use
+[bilinear rotation](arbitrary-rotation.md) with transparent borders composited onto
+white for JPEG. See also [orthogonal transforms](orthogonal-transforms.md). JPEG with default
+or color quality is supported; PNG now uses the same pipeline (see [PNG delivery](png-delivery.md)). Native grayscale also supports `gray` quality and one-component JPEG. RGB-to-gray conversion now uses LittleCMS (see [color management](color-management.md)); bitonal follows that grayscale conversion with white compositing and a fixed threshold. JPEG compression can introduce gray artifacts; use PNG for exact two-tone output. Other output formats remain unsupported.
 Invalid geometry retains its previous 400/501 error mapping before rendering.
 
 After building and running CTest, from the repository root:
@@ -107,3 +109,8 @@ and successful delivery after errors. TIFF fixtures are generated locally with
 libtiff; no external image or Python imaging package is required.
 
 The resize stage bounds input + output raster bytes + ICC to 256 MiB and reports failures as 500 `processing_failed`. TIFF reads intersecting tiles or strips in the selected level; exact fractional-window resampling preserves the requested field of view. Reduced levels inherit the main image ICC profile.
+
+Explicit source sRGB is now retained: PNG emits an sRGB chunk; JPEG assigns a
+matching embedded RGB/gray ICC v4 profile. Original ICC remains unchanged and
+untagged input stays untagged. No profile conversion occurs. See
+[color management](color-management.md) for the complete decision table.

@@ -241,7 +241,9 @@ specified when integrating delivery.
 ## Cache architecture (agreed 2026-10-04)
 
 Status: identity, persistent encoded-result storage and authorized HTTP lookup/fill
-are implemented. Source-metadata caching remains pending. See [cache identity](cache-key.md) and
+are implemented. Source metadata is now reused through a bounded worker-local
+[in-memory cache](metadata-cache.md); a persistent metadata table is not needed
+for this increment. See [cache identity](cache-key.md) and
 [persistent storage](persistent-cache.md) for the implemented capacity, locking,
 publication and recovery contract. Start with one local cache per SIPI-2
 instance: ordinary encoded image files in a configurable persistent directory,

@@ -146,6 +146,14 @@ int main(int argc, char** argv) {
             try { sipi::write_jpeg(bad, collect); } catch (const sipi::JpegWriteError&) { failed = true; }
             require(failed, "invalid raster rejected");
         }
+        for (const bool conflict : {false,true}) {
+            auto invalid = image;
+            if (!conflict) invalid.icc_profile.clear();
+            invalid.srgb_intent = conflict ? 0 : 4;
+            bool failed = false;
+            try { sipi::write_jpeg(invalid, collect); } catch (const sipi::JpegWriteError&) { failed = true; }
+            require(failed, "invalid color declaration rejected");
+        }
         // Large ICC triggers failure during a full block; tiny JPEG fails at final flush.
         for (int attempt = 0; attempt < 2; ++attempt) {
             bool failed = false;

@@ -3,9 +3,13 @@
 The existing TIFF pipeline now accepts `.png` as well as `.jpg`. It performs the
 same authorization, source selection, geometry validation, pyramid/tile selection
 and fractional-window reduction before choosing the encoder. Supported qualities
-are `default` and `color`, plus `gray` for native grayscale sources; source support remains top-left tiled or strip-based gray/RGB/RGBA8 TIFF/BigTIFF.
-PNG output preserves straight RGBA transparency. It does not yet add PNG input, RGB-to-gray conversion or bitonal output, enlargement,
-mirroring or rotation. `info.json` conformance declarations remain unchanged.
+are `default`, `color`, `gray` and `bitonal`; see the shared
+[color policy](color-management.md) and input-format documents for current source support.
+PNG output preserves straight RGBA transparency, including through
+[horizontal mirroring and quarter-turn rotations](orthogonal-transforms.md).
+PNG input, RGB-to-gray conversion and arbitrary-angle rotation are now supported.
+Bitonal output is opaque grayscale with samples 0/255 in an 8-bit PNG.
+Enlargement remains future work. `info.json` still omits the mandatory `profile`.
 
 After building and running the tests:
 
@@ -66,3 +70,8 @@ pixels, pyramids, inherited ICC, malformed-profile errors, MIME type and HEAD.
 MinIO tests compare PNG output from the same pyramid locally and remotely.
 
 See [alpha delivery](alpha-delivery.md) for TIFF alpha normalization, filtering and JPEG composition.
+
+Explicit source sRGB is now retained: PNG emits an sRGB chunk; JPEG assigns a
+matching embedded RGB/gray ICC v4 profile. Original ICC remains unchanged and
+untagged input stays untagged. No profile conversion occurs. See
+[color management](color-management.md) for the complete decision table.

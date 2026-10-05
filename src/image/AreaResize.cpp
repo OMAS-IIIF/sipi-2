@@ -25,18 +25,18 @@ struct WeightedPixel {
     double alpha = 0;
 
     void add(const std::uint8_t* pixel, double weight, std::size_t channels) {
-        if (channels == 4) {
-            weight *= pixel[3];
+        if (channels == 4 || channels == 2) {
+            weight *= pixel[channels-1];
             alpha += weight;
         }
-        for (std::size_t c = 0; c < std::min<std::size_t>(channels, 3); ++c) colors[c] += pixel[c] * weight;
+        for (std::size_t c = 0; c < (channels <= 2 ? 1 : 3); ++c) colors[c] += pixel[c] * weight;
     }
     void store(std::uint8_t* pixel, double area, std::size_t channels) const {
-        if (channels == 4) {
-            pixel[3] = quantize(alpha / area);
+        if (channels == 4 || channels == 2) {
+            pixel[channels-1] = quantize(alpha / area);
             // Fully transparent output has deterministic black hidden color.
-            for (std::size_t c = 0; c < 3; ++c)
-                pixel[c] = pixel[3] ? quantize(colors[c] / alpha) : 0;
+            for (std::size_t c = 0; c < channels-1; ++c)
+                pixel[c] = pixel[channels-1] ? quantize(colors[c] / alpha) : 0;
         } else {
             for (std::size_t c = 0; c < channels; ++c) pixel[c] = quantize(colors[c] / area);
         }
@@ -57,7 +57,7 @@ RasterImage8 downsample_area(RasterImage8 image, std::uint32_t width, std::uint3
         (!identity && output_bytes > max_working_bytes - input_bytes - image.icc_profile.size()))
         throw ResizeError("Resize working memory exceeds limit");
     if (identity) return image;
-    RasterImage8 output{width, height, std::vector<std::uint8_t>(output_bytes), std::move(image.icc_profile), image.layout};
+    RasterImage8 output{width, height, std::vector<std::uint8_t>(output_bytes), std::move(image.icc_profile), image.layout, image.srgb_intent};
     // Use integer coordinates in units of 1/target_dimension source pixels.
     // Source pixel boundaries are multiples of target_dimension; target pixel
     // boundaries are multiples of source_dimension. Thus fractional overlaps
@@ -139,7 +139,7 @@ RasterImage8 downsample_area(RasterImage8 image, const PixelWindow& window,
     if (input_bytes > max_working_bytes || image.icc_profile.size() > max_working_bytes - input_bytes ||
         output_bytes > max_working_bytes - input_bytes - image.icc_profile.size())
         throw ResizeError("Resize working memory exceeds limit");
-    RasterImage8 output{width, height, std::vector<std::uint8_t>(output_bytes), std::move(image.icc_profile), image.layout};
+    RasterImage8 output{width, height, std::vector<std::uint8_t>(output_bytes), std::move(image.icc_profile), image.layout, image.srgb_intent};
     for (std::uint32_t y = 0; y < height; ++y) {
         const auto top = boundary(window.vertical, y, height);
         const auto bottom = boundary(window.vertical, y + 1, height);

@@ -3,6 +3,7 @@
 #include <CLI/CLI.hpp>
 
 #include <fstream>
+#include <limits>
 #include <map>
 #include <charconv>
 #include <regex>
@@ -73,7 +74,9 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                                 std::optional<std::string_view> env_public_base_url,
                                 S3CredentialEnvironment s3_environment,
                                 RepositoryEnvironment repository_environment,
-                                CacheEnvironment cache_environment) {
+                                CacheEnvironment cache_environment,
+                                std::optional<std::string_view> env_iiif_workers,
+                                std::optional<std::string_view> env_bitonal_method) {
     StartupOptions result;
     bool help = false;
     bool version = false;
@@ -84,6 +87,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     std::string public_base_url;
     std::string storage = "local", bucket, path_style = "false";
     std::string log_level = "info";
+    std::string bitonal_method = "threshold";
     std::string size_upscaling = "false";
     CLI::App app{"SIPI-2 IIIF server", "sipi-2"};
     // Ordinary flags preserve our policy: validate all CLI input before help/version.
@@ -128,12 +132,26 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
         return value.empty() || value.find_first_not_of("0123456789") != std::string::npos
             ? std::string{"Expected unsigned decimal integer"} : std::string{};
     }, "INTEGER");
+    auto* bitonal_option = app.add_option("--bitonal-method", bitonal_method,
+        "Bitonal method (SIPI_BITONAL_METHOD; default: threshold)")
+        ->check(CLI::IsMember({"threshold", "floyd-steinberg"}));
+    auto* workers_option = app.add_option("--iiif-workers", result.config.iiif_workers,
+        "IIIF workers (SIPI_IIIF_WORKERS; default: CPU count capped at 4; range: 1..32)")
+        ->check(unsigned_decimal)->check(CLI::Range(1u, http::maximum_worker_count));
     auto* cache_max_option = app.add_option("--cache-max-bytes", result.config.cache_limits.max_bytes,
         "Encoded cache byte limit (SIPI_CACHE_MAX_BYTES; default: 1073741824)")
         ->check(unsigned_decimal)->check(CLI::Range(std::uint64_t{1}, std::uint64_t{INT64_MAX}/2));
     auto* cache_target_option = app.add_option("--cache-target-percent", result.config.cache_limits.target_percent,
         "Cleanup target percent (SIPI_CACHE_TARGET_PERCENT; default: 90)")
         ->check(unsigned_decimal)->check(CLI::Range(1,99));
+    auto* metadata_entries_option = app.add_option("--metadata-cache-max-entries",
+        result.config.metadata_cache_limits.max_entries,
+        "Metadata cache entry limit (SIPI_METADATA_CACHE_MAX_ENTRIES; default: 256; 0 disables)")
+        ->check(unsigned_decimal)->check(CLI::Range(std::size_t{0}, std::numeric_limits<std::size_t>::max()));
+    auto* metadata_bytes_option = app.add_option("--metadata-cache-max-bytes",
+        result.config.metadata_cache_limits.max_bytes,
+        "Metadata cache byte budget (SIPI_METADATA_CACHE_MAX_BYTES; default: 67108864; 0 disables)")
+        ->check(unsigned_decimal)->check(CLI::Range(std::size_t{0}, std::numeric_limits<std::size_t>::max()));
     auto* public_url_option = app.add_option("--public-base-url", public_base_url,
         "Public origin and proxy mount (SIPI_PUBLIC_BASE_URL; default: local listener)")
         ->check(CLI::Validator(validate_public_base_url, "URL"))->type_name("URL");
@@ -200,6 +218,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
         if (help || version) {
             result.config.log_level = levels.at(log_level);
             result.config.size_upscaling = size_upscaling == "true";
+            result.config.bitonal_method = bitonal_method == "threshold" ? BitonalMethod::threshold : BitonalMethod::floyd_steinberg;
             if (!preflight_option->empty()) result.config.preflight_script = preflight_script;
             if (!root_option->empty()) result.config.iiif_root = iiif_root;
             if (!cache_dir_option->empty()) result.config.cache_dir = cache_dir;
@@ -260,6 +279,8 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                 option->run_callback();
             }
         };
+        load_setting(metadata_entries_option, cache_environment.metadata_max_entries);
+        load_setting(metadata_bytes_option, cache_environment.metadata_max_bytes);
         load_setting(cache_dir_option, cache_environment.directory);
         load_setting(cache_max_option, cache_environment.max_bytes);
         load_setting(cache_target_option, cache_environment.target_percent);
@@ -271,6 +292,8 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
         load_setting(access_option, s3_environment.access_key);
         load_setting(secret_option, s3_environment.secret_key);
         load_setting(token_option, s3_environment.session_token);
+        load_setting(workers_option, env_iiif_workers);
+        load_setting(bitonal_option, env_bitonal_method);
         if (!config_option->empty()) {
             std::ifstream input{config_path};
             if (!input) {
@@ -302,6 +325,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     save_public_url();
     result.config.log_level = levels.at(log_level);
     result.config.size_upscaling = size_upscaling == "true";
+    result.config.bitonal_method = bitonal_method == "threshold" ? BitonalMethod::threshold : BitonalMethod::floyd_steinberg;
     return result;
 }
 

@@ -174,7 +174,7 @@ void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPre
     const auto public_base_url = config.public_base_url.value_or("http://127.0.0.1:" + std::to_string(config.port));
     std::optional<S3Client> s3_client;
     if (config.s3_bucket) s3_client.emplace(config.s3);
-    auto worker = std::make_shared<http::IiifWorker>(std::move(policy), std::move(sources), size_policy, public_base_url, std::move(s3_client), std::move(result_cache));
+    auto worker = std::make_shared<http::IiifWorker>(std::move(policy), std::move(sources), size_policy, public_base_url, std::move(s3_client), std::move(result_cache), config.metadata_cache_limits, config.iiif_workers, config.bitonal_method);
     const auto port = config.port;
     auto& app = drogon::app();
     app.addListener("127.0.0.1", port);

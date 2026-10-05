@@ -2,7 +2,10 @@
 
 #include "storage/S3ByteSource.h"
 #include "cache/ResultCache.h"
+#include "cache/MetadataCache.h"
 #include "image/ImageSource.h"
+#include "http/WorkerLimits.h"
+#include "image/Bitonal.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -30,6 +33,9 @@ struct ServerConfig {
     // Absent disables the persistent cache. Relative paths use the working directory.
     std::optional<std::filesystem::path> cache_dir;
     cache::CacheLimits cache_limits;
+    cache::MetadataCacheLimits metadata_cache_limits;
+    unsigned iiif_workers = http::default_worker_count();
+    BitonalMethod bitonal_method = BitonalMethod::threshold;
     LogLevel log_level = LogLevel::info;
     std::uint16_t port = 8080;
     bool size_upscaling = false;
@@ -72,9 +78,12 @@ struct RepositoryEnvironment {
     std::optional<std::string_view> storage, bucket, region, endpoint, path_style;
 };
 
-/** Caller-supplied SIPI_CACHE_{DIR,MAX_BYTES,TARGET_PERCENT} snapshots. */
+/** Caller-supplied SIPI_CACHE_{DIR,MAX_BYTES,TARGET_PERCENT} and
+ * SIPI_METADATA_CACHE_{MAX_ENTRIES,MAX_BYTES} snapshots. */
 struct CacheEnvironment {
     std::optional<std::string_view> directory, max_bytes, target_percent;
+    std::optional<std::string_view> metadata_max_entries = std::nullopt;
+    std::optional<std::string_view> metadata_max_bytes = std::nullopt;
 };
 
 /**
@@ -93,6 +102,9 @@ struct CacheEnvironment {
  * SIPI_S3_SESSION_TOKEN. Resolve each field independently, then require the
  * access/secret pair; a session token requires that pair. Help/version validate
  * supplied CLI field syntax but skip pair checks and environment/file loading.
+ * env_iiif_workers supplies SIPI_IIIF_WORKERS (1..32); absent defaults to detected
+ * logical CPU count capped at four, with a fallback of one.
+ * env_bitonal_method supplies SIPI_BITONAL_METHOD (threshold or floyd-steinberg).
  * cache_environment supplies the optional cache directory and capacity settings.
  * Parsing validates syntax only; persistent cache initialization belongs to startup.
  * Input views need only live for this call. The returned result owns its data.
@@ -113,6 +125,8 @@ struct CacheEnvironment {
     std::optional<std::string_view> env_public_base_url = std::nullopt,
     S3CredentialEnvironment s3_environment = {},
     RepositoryEnvironment repository_environment = {},
-    CacheEnvironment cache_environment = {});
+    CacheEnvironment cache_environment = {},
+    std::optional<std::string_view> env_iiif_workers = std::nullopt,
+    std::optional<std::string_view> env_bitonal_method = std::nullopt);
 
 } // namespace sipi

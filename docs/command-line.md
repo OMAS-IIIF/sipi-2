@@ -4,7 +4,7 @@ The working implementation uses CLI11 in `src/CommandLine.cpp`.
 `load_startup_options` returns either owning `StartupOptions` or `ParseError`.
 `main` supplies argument views (excluding argv[0]) and an optional snapshot of
 `SIPI_LOG_LEVEL`, `SIPI_PORT`, `SIPI_SIZE_UPSCALING`, `SIPI_PREFLIGHT_SCRIPT`,
-`SIPI_IIIF_ROOT`, `SIPI_PUBLIC_BASE_URL`, the three `SIPI_CACHE_*` settings, and the three `SIPI_S3_*` credential variables. The loader reads an explicitly selected file, but does not log,
+`SIPI_IIIF_ROOT`, `SIPI_PUBLIC_BASE_URL`, the three `SIPI_CACHE_*` settings, the two `SIPI_METADATA_CACHE_*` settings, and the three `SIPI_S3_*` credential variables. The loader reads an explicitly selected file, but does not log,
 print, exit, or change logging/environment state.
 
 ## Sources and precedence
@@ -53,10 +53,11 @@ Duplicate scalar options/flags and conflicting help/version actions are errors.
 CLI11's standard `--` end-of-options marker is accepted; positional tokens after
 it remain errors. Flag value overrides such as `--help=false` are rejected.
 
-The supported file schema has seventeen root keys: `log-level`, `port`, `size-upscaling`,
+The supported file schema has nineteen root keys: `log-level`, `port`, `size-upscaling`,
 `preflight-script`, `iiif-root`, `public-base-url`, `s3-access-key`, `s3-secret-key`,
 `s3-session-token`, `iiif-storage`, `s3-bucket`, `s3-region`, `s3-endpoint`,
-`s3-path-style`, `cache-dir`, `cache-max-bytes`, and `cache-target-percent`. Unknown keys
+`s3-path-style`, `cache-dir`, `cache-max-bytes`, and `cache-target-percent`,
+`metadata-cache-max-entries`, and `metadata-cache-max-bytes`. Unknown keys
 and startup actions in the file are rejected. CLI11's built-in TOML-style reader
 is used directly; this is not a promise of full TOML grammar validation (including
 all malformed syntax or duplicate-key checks). Revisit the parser if the schema
@@ -296,5 +297,61 @@ initialization failure logs a warning and allows uncached operation.
 Startup initializes, recovers and locks the store. JPEG/PNG image GET/HEAD requests
 now reuse complete encoded results after current preflight, source/version, header,
 geometry and capability checks. Hits skip pixel decoding/processing/encoding;
-header reads are not cached yet. Storage failures fall back to uncached delivery.
+unchanged headers are reused by the independent [metadata cache](metadata-cache.md).
+Its defaults are 256 entries / 64 MiB accounted resident storage;
+these are independent of the persistent cache limits. Storage failures fall back
+to uncached delivery.
 See [HTTP cache integration](persistent-cache.md#http-integration).
+
+
+## Metadata cache limits
+
+| CLI / TOML key | Environment | Default |
+| --- | --- | --- |
+| `metadata-cache-max-entries` | `SIPI_METADATA_CACHE_MAX_ENTRIES` | `256` |
+| `metadata-cache-max-bytes` | `SIPI_METADATA_CACHE_MAX_BYTES` | `67108864` (64 MiB) |
+
+Both settings independently follow **CLI > environment > TOML > default**.
+Use unsigned decimal integers, from zero to the platform's `size_t` maximum
+(`18446744073709551615` on supported 64-bit builds). No signs, units, fractions or
+empty values. Overflow, duplicates, missing arguments and unknown keys are errors.
+Either setting at **0 disables metadata retention**; header reading and delivery
+continue normally. Limits are resolved even when the persistent file cache is off.
+Help/version validate explicit CLI values but skip environment and file loading.
+
+```toml
+metadata-cache-max-entries = 256
+metadata-cache-max-bytes = 67108864
+```
+
+The limits bound resident entry count and accounted metadata bytes (including ICC
+profiles and directory/component vector capacities). Allocator overhead and
+caller-retained evicted snapshots are additional. See [metadata cache](metadata-cache.md).
+`MetadataCacheLimits` is the shared source of default values; startup passes the
+resolved value through the server into its single worker. A limit does not eagerly
+allocate that amount of memory. Tests verify precedence and runtime zero/one-entry
+behavior, including environment wiring and CLI re-enablement.
+
+## IIIF worker concurrency
+
+| CLI / TOML key | Environment | Default | Valid values |
+| --- | --- | --- | --- |
+| `iiif-workers` | `SIPI_IIIF_WORKERS` | Detected logical CPU count capped at 4; fallback 1 | Integer 1..32 |
+
+Example: `--iiif-workers 2` or `iiif-workers = 2` in TOML. Priority remains
+CLI > environment > TOML > default; zero is invalid. One selects serial processing.
+This setting is independent of Drogon's I/O thread and metadata-cache capacity.
+See [worker concurrency](worker-pool.md) for memory planning and cache coordination.
+
+## Bitonal rendering
+
+| CLI | Environment | TOML | Default |
+| --- | --- | --- | --- |
+| `--bitonal-method` | `SIPI_BITONAL_METHOD` | `bitonal-method` | `threshold` |
+
+Allowed case-sensitive values are `threshold` and `floyd-steinberg`. Empty,
+unknown or duplicate selected values fail startup. Normal CLI > environment >
+TOML > default precedence applies; help/version skip environment/file loading.
+The setting changes only `bitonal` requests, not their IIIF URL. The persistent
+cache separates methods. See [color policy](color-management.md)
+for the encoded-space algorithm, memory accounting and independent-tile limitation.

@@ -181,14 +181,14 @@ end
                              "/a%252Fb/full/max/0/default.jpg", "/a+b/full/max/0/default.jpg",
                              "/id/full/max/0/default.jpg?size=bad"):
                     assert request(path)[0] == 200
-                assert request('/id/%66ull/max/%210/default%2Ejpg')[0] == 501
+                assert request('/id/%66ull/max/%210/default%2Ejpg')[0] == 200
 
                 for name in ('source.jp2', 'source.j2k', 'offset.jp2', 'metadata-box.jp2'):
                     _, info = json_request('/museum/'+name+'/info.json', 200)
                     assert (info['width'], info['height']) == (37, 23)
                     assert info['id'].endswith('/museum/'+name)
                     assert 'profile' not in info
-                    assert info.get('extraQualities', []) == (['gray'] if name == 'source.j2k' else [])
+                    assert info.get('extraQualities', []) == ['gray', 'bitonal']
                     status, _, data = request('/'+name+'/info.json', method='HEAD')
                     assert status == 200 and not data
                     assert request('/'+name+'/full/max/0/default.jpg')[0] == 200
@@ -238,6 +238,8 @@ end
                         "id": public_base + service_path,
                         "type": "ImageService3", "protocol": "http://iiif.io/api/image",
                         "width": dimensions[0], "height": dimensions[1],
+                        **({"extraFeatures": ["mirroring", "rotationBy90s", "rotationArbitrary"], "extraQualities": ["gray", "bitonal"]}
+                           if service_path != "/rotated.tif" else {}),
                     }, (path, document)
                     assert headers.get("cache-control") == "no-store"
                     status, head_headers, body = request(path, "HEAD")
@@ -370,7 +372,7 @@ end
                     hs,hh,hb=request(path+'png','HEAD')
                     assert hs==200 and not hb and hh['content-length']==str(len(body))
                     _,document=json_request('/'+name+'/info.json',200)
-                    assert document['extraQualities']==['gray'] and (document['width'],document['height'])==(37,23)
+                    assert document['extraQualities']==['gray', 'bitonal'] and (document['width'],document['height'])==(37,23)
                 assert gray_bodies[0]==gray_bodies[1]==gray_bodies[2]
                 from fractions import Fraction as F
                 from math import floor,ceil
@@ -392,9 +394,7 @@ end
                 expected=bytes(v for y in range(4,12) for x in range(3,22)
                                for v in (*[((x*7+y*11)%256+c*31)%256 for c in range(3)],((x+y)%3)*127))
                 assert (w,h,pixels)==(19,8,expected)
-                for suffix in ("full/max/90/default.jpg",
-                               "full/max/!0/default.jpg", "full/max/0/gray.jpg",
-                               "full/max/0/bitonal.jpg", "full/max/0/default.tif"):
+                for suffix in ("full/max/0/default.tif",):
                     _, body = json_request("/tiled.tif/" + suffix, 501)
                     assert body["error"] == "not_implemented", body
                 _, body = json_request("/broken-tile.tif/full/max/0/default.jpg", 500)
@@ -446,7 +446,7 @@ end
                     ("/rotated.tif/0,210,1,1/max/0/default.jpg", 501, "not_implemented"),
                     ("/sample.tif/full/900,/0/default.jpg", 400, "invalid_iiif_geometry"),
                     ("/broken.tif/info.json", 500, "invalid_image_source"),
-                    ("/other.png/info.json", 501, "source_format_not_supported"),
+                    ("/other.png/info.json", 500, "invalid_image_source"),
                     ("/..%2Fpolicy%20with%20spaces.lua/info.json", 403, "source_not_allowed"),
                     ("/outside-link%2Fpolicy%20with%20spaces.lua/info.json", 403 if configured else 404,
                      "source_not_allowed" if configured else "image_not_found"),

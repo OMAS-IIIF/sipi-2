@@ -55,9 +55,11 @@ void write_png(const RasterImage8& image, const PngSink& sink) {
     // but do not fully validate ICC semantics; do not imply color validation.
     if (!image.icc_profile.empty() && (image.icc_profile.size() < 132 ||
         std::memcmp(image.icc_profile.data() + 36, "acsp", 4) != 0 ||
-        std::memcmp(image.icc_profile.data() + 16, channels == 1 ? "GRAY" : "RGB ", 4) != 0))
+        std::memcmp(image.icc_profile.data() + 16, channels <= 2 ? "GRAY" : "RGB ", 4) != 0))
         throw PngWriteError("PNG requires an ICC header matching its color model");
 
+    if (image.srgb_intent && (*image.srgb_intent > 3 || !image.icc_profile.empty()))
+        throw PngWriteError("sRGB declaration must be valid and mutually exclusive with ICC");
     const auto state = std::make_unique<Encoder>(sink);
     // Treat warnings as failures too: an invalid profile must not disappear.
     state->codec = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, fail, fail);
@@ -71,13 +73,15 @@ void write_png(const RasterImage8& image, const PngSink& sink) {
     png_set_write_fn(state->codec, state.get(), emit, flush);
     png_set_compression_level(state->codec, 6);
     png_set_IHDR(state->codec, state->info, image.width, image.height, 8,
-                 channels == 1 ? PNG_COLOR_TYPE_GRAY : (channels == 4 ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_RGB), PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+                 channels == 1 ? PNG_COLOR_TYPE_GRAY : channels == 2 ? PNG_COLOR_TYPE_GRAY_ALPHA : (channels == 4 ? PNG_COLOR_TYPE_RGBA : PNG_COLOR_TYPE_RGB), PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
     if (!image.icc_profile.empty()) {
         png_set_iCCP(state->codec, state->info, "Source ICC", PNG_COMPRESSION_TYPE_BASE,
                      image.icc_profile.data(), static_cast<png_uint_32>(image.icc_profile.size()));
         if (!png_get_valid(state->codec, state->info, PNG_INFO_iCCP))
             throw PngWriteError("PNG encoder rejected ICC profile");
     }
+    if (image.srgb_intent)
+        png_set_sRGB(state->codec, state->info, static_cast<int>(*image.srgb_intent));
     png_write_info(state->codec, state->info);
     for (std::uint32_t y = 0; y < image.height; ++y)
         png_write_row(state->codec, image.pixels.data() + static_cast<std::size_t>(y) * image.width * channels);

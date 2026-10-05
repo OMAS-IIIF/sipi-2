@@ -31,6 +31,11 @@ struct Case {
     std::optional<std::filesystem::path> cache_dir = std::nullopt;
     std::uint64_t cache_max_bytes = 1073741824;
     unsigned cache_target_percent = 90;
+    sipi::cache::MetadataCacheLimits metadata_limits = {};
+    std::optional<std::string_view> workers_environment = std::nullopt;
+    unsigned workers = sipi::http::default_worker_count();
+    std::optional<std::string_view> bitonal_environment = std::nullopt;
+    sipi::BitonalMethod bitonal_method = sipi::BitonalMethod::threshold;
 };
 
 /** Check either a complete typed result or a nonempty diagnostic. */
@@ -53,7 +58,7 @@ bool check(const Case& test) {
     std::optional<std::string_view> url_environment;
     if (test.url_environment) url_environment = *test.url_environment;
     const auto result = sipi::load_startup_options(arguments, environment, port_environment,
-        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment);
+        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment, test.workers_environment, test.bitonal_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&result)) {
         if (test.error && !error->message.empty()) {
             return true;
@@ -63,6 +68,8 @@ bool check(const Case& test) {
     }
     const auto& options = std::get<sipi::StartupOptions>(result);
     const bool matches = !test.error && options.command == test.command &&
+                         options.config.iiif_workers == test.workers &&
+                         options.config.bitonal_method == test.bitonal_method &&
                          options.config.log_level == test.level && options.config.port == test.port &&
                          options.config.size_upscaling == test.upscale &&
                          options.config.preflight_script == test.preflight_script &&
@@ -71,6 +78,8 @@ bool check(const Case& test) {
                          options.config.cache_dir == test.cache_dir &&
                          options.config.cache_limits.max_bytes == test.cache_max_bytes &&
                          options.config.cache_limits.target_percent == test.cache_target_percent &&
+                         options.config.metadata_cache_limits.max_entries == test.metadata_limits.max_entries &&
+                         options.config.metadata_cache_limits.max_bytes == test.metadata_limits.max_bytes &&
                          (options.command != sipi::Command::help ||
                           options.help_text.find("--log-level") != std::string::npos);
     if (!matches) {
@@ -312,6 +321,82 @@ int main(int argc, char* argv[]) {
         cache_case("invalid cache CLI/file",args,{}, {},1073741824,90,true);
     for (const auto& env : std::vector<sipi::CacheEnvironment>{{"",{},{}},{{},"0",{}},{{},{},"100"}})
         cache_case("invalid cache environment",{},env,{},1073741824,90,true);
+    const auto metadata_case = [&](std::vector<std::string> args,
+                                   std::optional<std::string_view> entries,
+                                   std::optional<std::string_view> bytes,
+                                   sipi::cache::MetadataCacheLimits expected,
+                                   bool error = false, Command command = Command::run) {
+        Case test;
+        test.name = "metadata cache configuration";
+        test.arguments = std::move(args);
+        test.cache_environment.metadata_max_entries = entries;
+        test.cache_environment.metadata_max_bytes = bytes;
+        test.metadata_limits = expected;
+        test.error = error; test.command = command;
+        cases.push_back(std::move(test));
+    };
+    metadata_case({"--config",file("metadata-cache.toml")}, {}, {}, {12,4096});
+    metadata_case({"--config",file("metadata-cache.toml")}, "20", "8192", {20,8192});
+    metadata_case({"--config",file("metadata-cache.toml"),"--metadata-cache-max-entries=0"}, "20", "8192", {0,8192});
+    metadata_case({"--config",file("metadata-cache.toml"),"--metadata-cache-max-entries=256","--metadata-cache-max-bytes=67108864"},
+                  "0", "0", {});
+    metadata_case({}, "0", "0", {0,0});
+    metadata_case({"--metadata-cache-max-bytes=0"}, {}, {}, {256,0});
+    metadata_case({"--metadata-cache-max-entries=1","--metadata-cache-max-bytes=2"}, "bad", "bad", {1,2});
+    metadata_case({"--config",file("invalid-metadata-cache.toml")}, "1", "2", {1,2});
+    metadata_case({"--config",file("invalid-metadata-cache.toml")}, {}, {}, {}, true);
+    metadata_case({"--help"}, "bad", "bad", {}, false, Command::help);
+    metadata_case({"--version"}, "bad", "bad", {}, false, Command::version);
+    for (const char* invalid_value : {"", "-1", "+1", "1.5", "1MB", "18446744073709551616"}) {
+        metadata_case({"--metadata-cache-max-entries",invalid_value}, {}, {}, {}, true);
+        metadata_case({"--metadata-cache-max-bytes",invalid_value}, {}, {}, {}, true);
+        metadata_case({}, invalid_value, {}, {}, true);
+        metadata_case({}, {}, invalid_value, {}, true);
+    }
+    metadata_case({"--metadata-cache-max-entries"}, {}, {}, {}, true);
+    metadata_case({"--metadata-cache-max-bytes=1","--metadata-cache-max-bytes=2"}, {}, {}, {}, true);
+    metadata_case({"--help","--metadata-cache-max-entries=-1"}, {}, {}, {}, true);
+    const auto worker_case = [&](std::vector<std::string> args,
+                                  std::optional<std::string_view> env, unsigned expected,
+                                  bool error = false, Command command = Command::run) {
+        Case test{"worker configuration", std::move(args)};
+        test.workers_environment = env; test.workers = expected;
+        test.error = error; test.command = command; cases.push_back(std::move(test));
+    };
+    worker_case({"--config",file("workers.toml")}, {}, 2);
+    worker_case({"--config",file("workers.toml")}, "3", 3);
+    worker_case({"--config",file("workers.toml"),"--iiif-workers=1"}, "3", 1);
+    worker_case({"--iiif-workers=32"}, "bad", 32);
+    worker_case({"--help"}, "bad", sipi::http::default_worker_count(), false, Command::help);
+    for (const char* invalid : {"", "0", "33", "-1", "+2", "1.5", "999999999999999999999"}) {
+        worker_case({"--iiif-workers",invalid}, {}, 0, true);
+        worker_case({}, invalid, 0, true);
+    }
+    worker_case({"--iiif-workers=1","--iiif-workers=2"}, {}, 0, true);
+    worker_case({"--help","--iiif-workers=0"}, {}, 0, true);
+    const auto bitonal_case = [&](std::vector<std::string> args,
+                                  std::optional<std::string_view> env,
+                                  sipi::BitonalMethod expected, bool error = false,
+                                  Command command = Command::run) {
+        Case test{"bitonal configuration", std::move(args)};
+        test.bitonal_environment = env; test.bitonal_method = expected;
+        test.error = error; test.command = command; cases.push_back(std::move(test));
+    };
+    using enum sipi::BitonalMethod;
+    bitonal_case({}, {}, threshold);
+    bitonal_case({"--config",file("bitonal.toml")}, {}, floyd_steinberg);
+    bitonal_case({"--config",file("bitonal.toml")}, "threshold", threshold);
+    bitonal_case({"--config",file("bitonal.toml"),"--bitonal-method=floyd-steinberg"}, "threshold", floyd_steinberg);
+    bitonal_case({"--bitonal-method=threshold"}, "invalid", threshold);
+    bitonal_case({"--help"}, "invalid", threshold, false, Command::help);
+    bitonal_case({"--version"}, "invalid", threshold, false, Command::version);
+    for (const char* invalid : {"", "floyd", "FLOYD-STEINBERG", "ordered"}) {
+        bitonal_case({"--bitonal-method",invalid}, {}, threshold, true);
+        bitonal_case({}, invalid, threshold, true);
+    }
+    bitonal_case({"--config",file("invalid-bitonal.toml")}, {}, threshold, true);
+    bitonal_case({"--bitonal-method=threshold","--bitonal-method=floyd-steinberg"}, {}, threshold, true);
+    bitonal_case({"--help","--bitonal-method=bad"}, {}, threshold, true);
     int failures = 0;
     for (const auto& test : cases) {
         failures += !check(test);

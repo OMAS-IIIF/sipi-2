@@ -1,6 +1,7 @@
 #pragma once
 
 #include "image/RasterImage.h"
+#include "image/Bitonal.h"
 #include "iiifparser/IIIFGeometry.h"
 #include "storage/ByteSource.h"
 #include <optional>
@@ -13,8 +14,9 @@ namespace sipi::cache {
 /** Bump when fixed rendering behavior or codec changes can alter output bytes.
  * v1: current TIFF/Grok level planning; stored-sample area filtering; preserved
  * ICC; straight alpha; JPEG white composition, baseline 4:4:4; PNG level 6,
- * noninterlaced. This is independent of the cache serialization schema. */
-inline constexpr std::string_view current_render_recipe = "sipi-render-v1";
+ * noninterlaced. v2: LCMS gray conversion and native PNG gray-alpha preservation.
+ * This is independent of the cache serialization schema. */
+inline constexpr std::string_view current_render_recipe = "sipi-render-v2";
 
 /** Actual JPEG encoder quality, not the IIIF quality parameter; range 1..100.
  * No default here: callers must supply the value used for encoding. */
@@ -49,6 +51,7 @@ struct RenderIdentity {
     Encoding encoding;
     std::optional<SourceInfo> watermark;
     std::string recipe = std::string(current_render_recipe);
+    BitonalMethod bitonal_method = BitonalMethod::threshold;
 };
 
 /** Immutable identity bytes and their SHA-256 digest, owning all storage.

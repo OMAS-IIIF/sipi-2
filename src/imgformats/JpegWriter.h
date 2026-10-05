@@ -23,6 +23,8 @@ using JpegSink = std::function<void(std::span<const std::uint8_t>)>;
  * quality is 1..100 (default 90), with RGB 4:4:4 sampling to retain chroma detail.
  * Embedded ICC bytes are preserved in APP2 markers; no color conversion occurs.
  * Gray profiles undergo basic GRAY header checks, not full ICC validation.
+ * Explicit srgb_intent assigns a matching embedded RGB/gray sRGB ICC v4 profile,
+ * preserving intent without transforming pixels. Simultaneous ICC/sRGB is rejected.
  * Untagged RGB stays untagged. EXIF/IPTC and other source metadata are not copied.
  *
  * Dimensions must fit libjpeg (1..65500) and pixels must contain exactly w*h*channel_count()

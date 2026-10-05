@@ -42,11 +42,11 @@ std::string angle(double degrees) {
 }
 
 std::string_view effective_quality(iiif::Quality quality, PixelLayout layout) {
-    if (layout != PixelLayout::gray && layout != PixelLayout::rgb && layout != PixelLayout::rgba)
+    if (layout != PixelLayout::gray && layout != PixelLayout::rgb && layout != PixelLayout::rgba && layout != PixelLayout::gray_alpha)
         throw std::invalid_argument("Invalid cache input layout");
     switch (quality) {
     case iiif::Quality::default_quality:
-    case iiif::Quality::color: return layout == PixelLayout::gray ? "gray" : "color";
+    case iiif::Quality::color: return (layout == PixelLayout::gray || layout == PixelLayout::gray_alpha) ? "gray" : "color";
     case iiif::Quality::gray: return "gray";
     case iiif::Quality::bitonal: return "bitonal";
     }
@@ -58,6 +58,9 @@ std::string serialize(const RenderIdentity& value) {
     if (value.watermark) validate_source(*value.watermark);
     if (value.variant.empty() || value.recipe.empty())
         throw std::invalid_argument("Cache variant and rendering recipe must be explicit");
+    if (value.bitonal_method != BitonalMethod::threshold &&
+        value.bitonal_method != BitonalMethod::floyd_steinberg)
+        throw std::invalid_argument("Invalid cache bitonal method");
     const auto& crop = value.geometry.region;
     if (!crop.width || !crop.height || !value.geometry.output_width || !value.geometry.output_height ||
         std::uint64_t{crop.x}+crop.width > UINT32_MAX || std::uint64_t{crop.y}+crop.height > UINT32_MAX)
@@ -89,6 +92,11 @@ std::string serialize(const RenderIdentity& value) {
     } else {
         field(result,"encoding","png");
     }
+    // Absent means the original threshold policy, preserving existing v1 keys.
+    // Only bitonal output depends on this setting.
+    if (value.quality == iiif::Quality::bitonal &&
+        value.bitonal_method == BitonalMethod::floyd_steinberg)
+        field(result,"bitonal.method","floyd-steinberg");
     field(result,"recipe",value.recipe);
     return result;
 }

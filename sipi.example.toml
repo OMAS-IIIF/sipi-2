@@ -11,6 +11,9 @@ port = 8080
 # Permit actual IIIF enlargement when the request explicitly uses ^.
 size-upscaling = false
 
+# Bitonal output: threshold or floyd-steinberg (per-request diffusion; tile patterns may differ).
+bitonal-method = "threshold"
+
 # Optional trusted Lua policy; relative paths use the process working directory.
 # Startup validates the script; IIIF GET/HEAD requests execute it before source lookup.
 # preflight-script = "examples/preflight.lua"
@@ -43,3 +46,12 @@ size-upscaling = false
 # cache-dir = "data/cache"
 # cache-max-bytes = 1073741824       # 1 GiB of encoded files; DB/overhead additional.
 # cache-target-percent = 90         # On overflow, reclaim LRU bytes to this target.
+
+# In-memory metadata cache, independent of cache-dir. Either 0 disables retention.
+# CLI > SIPI_METADATA_CACHE_* environment > TOML > defaults below.
+# metadata-cache-max-entries = 256
+# metadata-cache-max-bytes = 67108864  # 64 MiB accounted metadata storage.
+
+# Optional override: 1..32 processing workers. If omitted, detected CPUs capped at 4.
+# More workers multiply per-request memory; this is not an RSS budget.
+# iiif-workers = 4
