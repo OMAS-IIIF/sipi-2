@@ -6,6 +6,7 @@
 #include "image/ImageSource.h"
 #include "http/WorkerLimits.h"
 #include "image/Bitonal.h"
+#include "image/OutputLimits.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -14,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <variant>
+#include <vector>
 
 namespace sipi {
 
@@ -39,6 +41,10 @@ struct ServerConfig {
     LogLevel log_level = LogLevel::info;
     std::uint16_t port = 8080;
     bool size_upscaling = false;
+    OutputLimits output_limits;
+    // Wildcard is exclusive; explicit origins are matched exactly, never reflected blindly.
+    std::vector<std::string> cors_origins{"*"};
+    bool cors_credentials = false;
     // Absent disables preflight; relative paths use the process working directory.
     std::optional<std::filesystem::path> preflight_script;
     // Optional repository root; relative values use the process working directory.
@@ -86,6 +92,16 @@ struct CacheEnvironment {
     std::optional<std::string_view> metadata_max_bytes = std::nullopt;
 };
 
+/** Caller-owned CORS snapshots; origins is * or a comma-separated origin list. */
+struct CorsEnvironment {
+    std::optional<std::string_view> origins, credentials;
+};
+
+/** Caller-owned SIPI_MAX_WIDTH, SIPI_MAX_HEIGHT and SIPI_MAX_AREA snapshots. */
+struct OutputLimitEnvironment {
+    std::optional<std::string_view> width, height, area;
+};
+
 /**
  * Resolve startup options in CLI > environment > TOML file > default order.
  *
@@ -105,6 +121,11 @@ struct CacheEnvironment {
  * env_iiif_workers supplies SIPI_IIIF_WORKERS (1..32); absent defaults to detected
  * logical CPU count capped at four, with a fallback of one.
  * env_bitonal_method supplies SIPI_BITONAL_METHOD (threshold or floyd-steinberg).
+ * output_environment supplies SIPI_MAX_WIDTH/HEIGHT/AREA; zero and values above
+ * OutputLimits ceilings are rejected. Absent height inherits the resolved width.
+ * cors_environment supplies SIPI_CORS_ORIGINS/CREDENTIALS. Origins is * or a
+ * comma-separated list of exact HTTP(S) origins; credentials requires a list.
+ * Help/version skip the cross-field check, as with S3 credentials.
  * cache_environment supplies the optional cache directory and capacity settings.
  * Parsing validates syntax only; persistent cache initialization belongs to startup.
  * Input views need only live for this call. The returned result owns its data.
@@ -127,6 +148,8 @@ struct CacheEnvironment {
     RepositoryEnvironment repository_environment = {},
     CacheEnvironment cache_environment = {},
     std::optional<std::string_view> env_iiif_workers = std::nullopt,
-    std::optional<std::string_view> env_bitonal_method = std::nullopt);
+    std::optional<std::string_view> env_bitonal_method = std::nullopt,
+    OutputLimitEnvironment output_environment = {},
+    CorsEnvironment cors_environment = {});
 
 } // namespace sipi

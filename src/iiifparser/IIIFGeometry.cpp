@@ -122,8 +122,8 @@ GeometryResult resolve_geometry(const Region& region, const Size& size,
         return GeometryError{GeometryErrorCode::invalid_size, "Output dimensions must be finite and positive"};
     }
     // Round only after all scale choices; a zero-pixel result is not deliverable.
-    const double rounded_w = std::round(output_w);
-    const double rounded_h = std::round(output_h);
+    const double rounded_w = adaptive ? std::max(1.0, std::round(output_w)) : std::round(output_w);
+    const double rounded_h = adaptive ? std::max(1.0, std::round(output_h)) : std::round(output_h);
     constexpr auto maximum = std::numeric_limits<std::uint32_t>::max();
     if (rounded_w < 1 || rounded_h < 1 || rounded_w > maximum || rounded_h > maximum) {
         return GeometryError{GeometryErrorCode::invalid_size, "Output dimensions are outside the supported range [1, UINT32_MAX]"};
@@ -135,6 +135,11 @@ GeometryResult resolve_geometry(const Region& region, const Size& size,
     if (adaptive && !within_limits(out_w, out_h, policy)) {
         out_w = static_cast<std::uint32_t>(std::max(1.0, std::floor(output_w)));
         out_h = static_cast<std::uint32_t>(std::max(1.0, std::floor(output_h)));
+        // On very thin images the one-pixel minimum can dominate the area.
+        if (policy.max_area && out_h == 1)
+            out_w = static_cast<std::uint32_t>(std::min<std::uint64_t>(out_w, *policy.max_area));
+        if (policy.max_area && out_w == 1)
+            out_h = static_cast<std::uint32_t>(std::min<std::uint64_t>(out_h, *policy.max_area));
     }
     if (!within_limits(out_w, out_h, policy)) {
         return GeometryError{GeometryErrorCode::size_limit_exceeded, "Requested size exceeds the configured limits"};

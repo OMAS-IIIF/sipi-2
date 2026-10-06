@@ -15,8 +15,9 @@ namespace sipi::cache {
  * v1: current TIFF/Grok level planning; stored-sample area filtering; preserved
  * ICC; straight alpha; JPEG white composition, baseline 4:4:4; PNG level 6,
  * noninterlaced. v2: LCMS gray conversion and native PNG gray-alpha preservation.
+ * v3: pack bitonal PNG as one-bit grayscale.
  * This is independent of the cache serialization schema. */
-inline constexpr std::string_view current_render_recipe = "sipi-render-v2";
+inline constexpr std::string_view current_render_recipe = "sipi-render-v3";
 
 /** Actual JPEG encoder quality, not the IIIF quality parameter; range 1..100.
  * No default here: callers must supply the value used for encoding. */

@@ -59,7 +59,7 @@ CacheKey does not invent policy semantics or turn an arbitrary role label into
 a safe variant. The opaque identity is an explicit contract with that future
 policy implementation, not a substitute for implementing it.
 
-`current_render_recipe = "sipi-render-v2"` covers current TIFF/Grok resolution
+`current_render_recipe = "sipi-render-v3"` covers current TIFF/Grok resolution
 planning, stored-sample area filtering, preserved ICC, straight alpha, encoded
 white JPEG composition, baseline JPEG/4:4:4 and PNG compression level 6 without
 interlacing. JPEG quality is already variable and is therefore an explicit field.
@@ -145,7 +145,7 @@ width/height at 90/270 degrees. The rendering recipe remains unchanged for this
 addition: previously supported identity output is byte-for-byte unchanged, and
 unsupported mirrored/rotated requests never populated the result cache.
 
-Current rendering recipe is `sipi-render-v2`: LCMS gray conversion and native PNG
+Rendering recipe v2 introduced LCMS gray conversion and native PNG
 gray-alpha preservation. The serialization schema remains v1; prior v1 recipe
 entries no longer match and are evicted normally.
 
@@ -153,5 +153,12 @@ entries no longer match and are evicted normally.
 For `bitonal` with `floyd-steinberg`, serialization adds the named
 `bitonal.method` field. Its absence means the original threshold renderer.
 Other qualities ignore the setting and preserve their keys. This additive v1
-extension preserves all pre-existing keys; the fixed recipe remains v2.
+extension preserved existing method identities. The fixed recipe is now v3
+because bitonal PNG uses packed 1-bit encoding.
 Future algorithm changes still require a recipe increment.
+
+
+Rendering recipe `sipi-render-v3` invalidates prior encoded results to guarantee
+one-bit `bitonal.png` on cache hits as well as misses. This intentionally versions
+the whole renderer, so other-quality entries are regenerated too. No SQLite schema
+migration or cache directory deletion is necessary; old entries age out normally.

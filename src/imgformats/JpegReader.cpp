@@ -120,6 +120,8 @@ void read_header(Decoder& state) {
         throw JpegReadError("Missing JPEG image header");
 }
 
+std::uint64_t coefficient_bytes(const jpeg_decompress_struct& codec);
+
 JpegMetadata extract_metadata(const jpeg_decompress_struct& codec) {
     // All remaining processing is ordinary C++; no further codec calls can jump.
     const bool gray = codec.num_components == 1 && codec.jpeg_color_space == JCS_GRAYSCALE;
@@ -154,6 +156,7 @@ JpegMetadata extract_metadata(const jpeg_decompress_struct& codec) {
     }
     if (exif_orientation && *exif_orientation != 1)
         throw JpegUnsupportedError("JPEG EXIF orientation must be normalized on ingestion");
+    result.coefficient_bytes = coefficient_bytes(codec);
     result.icc_profile.reserve(total);
     for (unsigned i = 1; i <= chunk_count; ++i) {
         if (chunks[i].empty()) throw JpegReadError("Incomplete JPEG ICC profile");
@@ -215,11 +218,11 @@ RasterImage8 read_jpeg_image(const ByteSource& source, const JpegMetadata& metad
     auto actual = extract_metadata(state->codec);
     if (actual.width != metadata.width || actual.height != metadata.height ||
         actual.color != metadata.color || actual.progressive != metadata.progressive ||
-        actual.icc_profile != metadata.icc_profile)
+        actual.icc_profile != metadata.icc_profile || actual.coefficient_bytes != metadata.coefficient_bytes)
         throw JpegReadError("JPEG header changed since metadata planning");
     const std::uint64_t channels = actual.color == JpegColor::gray ? 1 : 3;
     const auto pixels = std::uint64_t(actual.width) * actual.height * channels;
-    const auto coefficients = coefficient_bytes(state->codec);
+    const auto coefficients = actual.coefficient_bytes;
     if (pixels > max_decoded_bytes || coefficients > max_decoded_bytes - pixels ||
         actual.icc_profile.size() > max_decoded_bytes - pixels - coefficients)
         throw JpegReadError("JPEG decoding exceeds working memory limit");

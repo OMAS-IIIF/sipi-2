@@ -13,9 +13,9 @@ namespace sipi::http {
  * resource contains once-decoded path segments. No filesystem paths or request
  * headers enter the document. The returned JSON owns all strings.
  *
- * Development boundary agreed with the owner: profile is absent until image
- * output can satisfy an IIIF compliance level. Do not infer advertised output
- * capabilities from the parser, TIFF storage layout, or upscaling setting.
+ * Caller must admit the source under the shared delivery policy before publishing
+ * this level2 document. The HTTP stack supplies negotiation, redirects and CORS;
+ * source-specific extra qualities/features and limits are added by the worker.
  */
 [[nodiscard]] Json::Value make_info_document(const iiif::Resource& resource,
                                             std::uint32_t width, std::uint32_t height,

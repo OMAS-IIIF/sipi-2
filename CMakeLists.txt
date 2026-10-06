@@ -114,7 +114,7 @@ set_target_properties(pngwriter PROPERTIES CXX_EXTENSIONS OFF)
 
 add_executable(sipi-2 src/main.cpp src/CommandLine.h
         src/CommandLine.cpp src/HttpServer.h src/HttpServer.cpp
-        src/http/IiifWorker.h src/http/IiifWorker.cpp src/http/IiifInfo.h src/http/IiifInfo.cpp)
+        src/http/IiifWorker.h src/http/IiifWorker.cpp src/http/HttpProtocol.cpp src/http/DeliveryPolicy.cpp src/http/DeliveryPolicy.h src/http/IiifInfo.h src/http/IiifInfo.cpp src/http/ImageUri.cpp)
 target_link_libraries(sipi-2 PRIVATE metadatacache resultcache spdlog::spdlog CLI11::CLI11 Drogon::Drogon iiifparser preflight imagesource imagestorage s3storage tiffreader j2kreader jpegreader pngreader jpegwriter pngwriter imageprocessing)
 target_compile_definitions(sipi-2 PRIVATE SIPI_VERSION="${PROJECT_VERSION}")
 
@@ -161,6 +161,19 @@ if(BUILD_TESTING)
     target_link_libraries(tiff-strip-gray-tests PRIVATE tiffreader imagestorage imageprocessing TIFF::TIFF)
     set_target_properties(tiff-strip-gray-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME tiff-strip-gray COMMAND tiff-strip-gray-tests "${CMAKE_CURRENT_BINARY_DIR}/strip-gray-test-data")
+    add_executable(image-uri-tests tests/ImageUriTests.cpp src/http/ImageUri.cpp)
+    target_link_libraries(image-uri-tests PRIVATE iiifparser)
+    set_target_properties(image-uri-tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME image-uri COMMAND image-uri-tests)
+
+    add_executable(http-protocol-tests tests/HttpProtocolTests.cpp src/http/HttpProtocol.cpp)
+    target_link_libraries(http-protocol-tests PRIVATE iiifparser)
+    set_target_properties(http-protocol-tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME http-protocol COMMAND http-protocol-tests)
+    add_executable(delivery-policy-tests tests/DeliveryPolicyTests.cpp src/http/DeliveryPolicy.cpp)
+    target_link_libraries(delivery-policy-tests PRIVATE tiffreader j2kreader jpegwriter imageprocessing iiifparser)
+    set_target_properties(delivery-policy-tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME delivery-policy COMMAND delivery-policy-tests)
     add_executable(bitonal-tests tests/BitonalTests.cpp)
     target_link_libraries(bitonal-tests PRIVATE imageprocessing)
     add_test(NAME bitonal COMMAND bitonal-tests)
@@ -197,7 +210,7 @@ if(BUILD_TESTING)
     set_target_properties(byte-source-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME byte-source COMMAND byte-source-tests "${CMAKE_CURRENT_BINARY_DIR}/byte-source-test-data")
     set_tests_properties(byte-source PROPERTIES TIMEOUT 15)
-    add_executable(iiif-worker-tests tests/http/IiifWorkerTests.cpp src/http/IiifWorker.cpp src/http/IiifInfo.cpp)
+    add_executable(iiif-worker-tests tests/http/IiifWorkerTests.cpp src/http/IiifWorker.cpp src/http/HttpProtocol.cpp src/http/DeliveryPolicy.cpp src/http/IiifInfo.cpp src/http/ImageUri.cpp)
     target_link_libraries(iiif-worker-tests PRIVATE metadatacache resultcache preflight imagesource imagestorage s3storage tiffreader j2kreader jpegreader pngreader jpegwriter pngwriter imageprocessing iiifparser Drogon::Drogon spdlog::spdlog Threads::Threads)
     set_target_properties(iiif-worker-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME iiif-worker COMMAND iiif-worker-tests
@@ -274,6 +287,12 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/png_metadata.py" $<TARGET_FILE:png-metadata-tests>
         "${CMAKE_CURRENT_BINARY_DIR}/png-input-test-data")
     set_tests_properties(png-metadata PROPERTIES TIMEOUT 30 FIXTURES_SETUP png_inputs)
+    add_test(NAME iiif-http-protocol COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/iiif_http_protocol.py" $<TARGET_FILE:sipi-2>)
+    set_tests_properties(iiif-http-protocol PROPERTIES TIMEOUT 60)
+    add_test(NAME output-limits-http COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/output_limits_http.py" $<TARGET_FILE:sipi-2>)
+    set_tests_properties(output-limits-http PROPERTIES TIMEOUT 60)
     add_test(NAME dither-http COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/dither_http.py" $<TARGET_FILE:sipi-2>)
     set_tests_properties(dither-http PROPERTIES TIMEOUT 60)

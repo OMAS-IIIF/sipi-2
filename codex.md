@@ -972,3 +972,87 @@ discontinuities: do not promise seamless full-image equivalence. No new IIIF URL
 syntax. Worker configuration is immutable; cache serialization adds an explicit
 method field only for dithered bitonal, retaining existing keys for threshold and
 other qualities. Algorithm/color/operational details live in docs/color-management.md.
+
+
+## Packed bitonal PNG (2026-10-06)
+
+Both threshold and Floyd–Steinberg now deliver 1-bit grayscale PNG. The worker
+explicitly requests `PngBitDepth::one`; internal `RasterImage8` stays unchanged.
+PngWriter validates opaque gray 0/255 input before output, packs MSB-first into
+one ceil(width/8) scratch row with zero padding, and retains ICC/sRGB metadata.
+Default PNG encoding remains 8-bit for other qualities; JPEG is unchanged.
+Rendering recipe is v3 to prevent previous encoded cache entries being reused;
+this intentionally regenerates all qualities under the shared recipe. Independent
+decoder and HTTP tests verify exact pixels, IHDR, odd-width packing, profiles and
+both bitonal methods. See docs/png-delivery.md and docs/color-management.md.
+
+
+## IIIF 3 conformance audit (2026-10-06)
+
+See docs/iiif-conformance.md and tests/iiif_conformance_audit.py.
+27/41 diagnostic checks pass; remaining checks include optional links and repeated
+CORS probes, not 14 independent mandatory failures. Existing 43 CTest suites pass.
+Runtime behavior and the approved missing-profile boundary remain unchanged.
+Target level2 after resource eligibility/output limits, base redirects, CORS and
+JSON-LD negotiation. Do not publish it globally yet. An orientation-6 TIFF has
+info 200/image 501; a 70000x1 PNG has info 200/full JPEG 500. Resolve these contracts
+before advertising a profile. Credential-aware CORS and common output limits are
+the next concrete decisions. Evidence: docs/audits/iiif-3-2026-10-06.json.
+
+
+## Resource admission and output limits (2026-10-06)
+
+ServerConfig has OutputLimits: max-width/max-height/max-area and SIPI_MAX_* use
+normal precedence. Default width 8192, absent height inherits width, area 8388608;
+hard ceilings axes32768/area8388608 fit the current buffered pipeline.
+IiifWorker bounds SizePolicy, rejects unsupported layouts on info and images,
+plans full/max admission, and validates each request before result-cache hits.
+DeliveryPolicy shares supported TIFF level selection with decode and accounts
+for TIFF buffers, J2K tiles, full JPEG/PNG decode, cached JPEG coefficient bytes
+and conservative processing scratch. Encoder dimension/ICC limits come from
+JpegWriter. info reports source dimensions plus effective public limits.
+Adaptive max/fit retain one pixel for thin sources, respecting area limits.
+Admission501 / request working-limit400 / corrupt-source existing500 remain
+distinct. Large masters without affordable full/max can now be refused entirely.
+Rotated canvases also have the technical area ceiling; native allocations and
+late corruption are not guaranteed from headers. See docs/output-limits.md.
+Target is IIIF Image API 3 Level 2 plus optional features; HTTP/profile audit gaps
+remain. Existing keys are safe because all policy checks run before cache lookup.
+
+## HTTP compliance and configurable CORS (2026-10-06)
+
+Supersedes earlier missing-profile/HTTP-gap notes: admitted resources now publish
+level2; info negotiates JSON/JSON-LD with Vary: Accept, per-resource extra qualities
+and profile links. Base URIs reuse info authorization/admission before 303.
+HttpProtocol owns pure routing/Accept/preflight helpers; HttpServer applies CORS
+outside the encoded cache. CLI/env/TOML cors-origins defaults to *, credentials
+false; explicit exact origin lists optionally enable credentials and Vary: Origin.
+Wildcard+credentials fails startup. OPTIONS never authorizes pixels. See
+docs/iiif-http.md for ambiguous-path precedence and deployment contract.
+Focused audit 40/41 passes; optional canonical links and external validator/browser
+checks remain next steps. No external certification is claimed.
+
+## Canonical image links (2026-10-06)
+
+ImageUri.* now owns shared public service URI encoding and the pure
+canonical_image_uri function. Worker supplies resolved geometry, effective source
+dimensions, SizePolicy and native-gray semantics after admission. Uses clipped
+crop, policy-dependent max or explicit pre-rotation size, normalized angles and
+current quality equivalences. Responses deliver 200 directly and combine canonical
+and profile links, including cache hits/HEAD; info advertises canonicalLinkHeader.
+No encoded-cache recipe/schema change: links are recomputed for each public
+identity, never stored with shared source bytes. See docs/canonical-uri.md.
+Focused audit now 41/41; external validator/browser/Caddy validation is next.
+Future virtual restricted sources must feed effective identity/dimensions here.
+
+## Consortium validator run (2026-10-06)
+
+Unmodified IIIF/image-validator f05e365a1cb28f8707cbd50466a86d8f611d1ab8 passed
+31/31 API3 level2 tests and 8/8 selected optional tests against the official PNG
+reference image and temporary loopback server. No runtime changes. Opt-in runner
+tests/external_iiif_validator.py owns disposable server/storage and preserves raw
+output/dependency/commit/image/binary provenance. See docs/external-validation.md.
+Validator checkout/venv live under ignored build; Homebrew libmagic is a test
+dependency. Upstream random/shallow optional checks complement project tests.
+Remaining interoperability work: actual browser/viewer, Caddy/TLS and cookies;
+this successful external validation is not formal certification.

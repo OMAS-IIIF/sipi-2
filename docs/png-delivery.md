@@ -8,7 +8,8 @@ are `default`, `color`, `gray` and `bitonal`; see the shared
 PNG output preserves straight RGBA transparency, including through
 [horizontal mirroring and quarter-turn rotations](orthogonal-transforms.md).
 PNG input, RGB-to-gray conversion and arbitrary-angle rotation are now supported.
-Bitonal output is opaque grayscale with samples 0/255 in an 8-bit PNG.
+Bitonal output is opaque **1-bit grayscale PNG**, for both threshold and dithering.
+Decoded samples remain exactly 0/255. Other qualities retain their 8-bit encoding.
 Enlargement remains future work. `info.json` still omits the mandatory `profile`.
 
 After building and running the tests:
@@ -27,7 +28,7 @@ The same URI shape works with S3-backed sources and preflight overrides.
 After pulling this change, run the normal Conan install command and reload CMake
 in CLion. Existing locked dependencies retain their versions/revisions.
 
-The encoder borrows the owning `RasterImage8` and writes noninterlaced 8-bit gray, RGB or straight RGBA rows
+The encoder borrows the owning `RasterImage8` and writes noninterlaced 8-bit gray, gray-alpha, RGB or straight RGBA rows
 with compression level 6. It emits borrowed blocks of at most 16 KiB to a
 synchronous sink, without creating another raster or a complete PNG buffer.
 Input samples are preserved losslessly; prior resampling remains a separate step.
@@ -75,3 +76,25 @@ Explicit source sRGB is now retained: PNG emits an sRGB chunk; JPEG assigns a
 matching embedded RGB/gray ICC v4 profile. Original ICC remains unchanged and
 untagged input stays untagged. No profile conversion occurs. See
 [color management](color-management.md) for the complete decision table.
+
+
+## Packed bitonal output
+
+The HTTP worker explicitly selects `PngBitDepth::one` only for `bitonal.png`.
+The internal raster stays gray8; the encoder validates opaque gray layout and
+samples exactly 0/255 before sending any bytes to the sink. It does not perform
+thresholding or remove alpha. The default writer mode remains `PngBitDepth::eight`,
+even when an ordinary grayscale image happens to contain only black and white.
+
+Each row uses ceil(width/8) scratch bytes: white becomes bit 1, black bit 0,
+leftmost pixel first in the most significant bit. Unused low bits in the final
+byte are zero, and every row starts at a byte boundary. PNG IHDR uses bit depth 1
+and grayscale color type 0, not a palette. ICC/sRGB handling and compression level
+6 are unchanged. The heap-owned row buffer survives libpng error jumps safely.
+
+The raw scanline payload is smaller; the actual compressed file saving depends
+on image content, filters and metadata. No fixed compression ratio is promised.
+Independent tests decode the packed PNGs to 8-bit samples and compare exact
+pixels, CRCs, profiles, sRGB and padding for byte-aligned and unaligned widths.
+HTTP tests cover both methods, rotation/alpha, caching and local/S3 delivery.
+Rendering recipe v3 prevents reuse of previous 8-bit encoded cache entries.

@@ -49,6 +49,7 @@ def main():
                                   for i in range(0,len(samples),2))
                 status,_,data=get(port,path)
                 assert status==200
+                assert data[24:26]==bytes([1,0])
                 assert decode_png(data)[:4]==(w,h,reference(w,h,samples),profile)
                 assert data!=old[path]
                 assert get(port,path[:-3]+'jpg')[0]==200

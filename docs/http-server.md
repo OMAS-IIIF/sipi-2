@@ -17,7 +17,9 @@ are later steps. No TLS listener or certificates are configured in SIPI-2.
 | GET `/project/id/info.json` | 200 JSON: authorized TIFF dimensions and public service identity |
 | GET an invalid IIIF path, including `/` | 400 JSON with error, component, and message |
 | HEAD any of the above | Same status/headers, no response body |
-| POST/PUT/DELETE/PATCH/OPTIONS on these paths | 405 JSON with `Allow: GET, HEAD` |
+| OPTIONS | 204 for supported method/header discovery; otherwise 403 |
+| POST/PUT/DELETE/PATCH on these paths | 405 JSON with `Allow: GET, HEAD, OPTIONS` |
+| GET a valid base URI | Authorized 303 to info.json |
 
 The version in `/health` comes from `SIPI_VERSION`, defined by CMake; it is not
 hardcoded in the handler. Health is a **liveness** check, not a check of storage,
@@ -30,11 +32,11 @@ an HTML hello request. `/health/id/info.json` is an IIIF request with prefix
 400. Drogon matches registered routes case-insensitively, so `/HEALTH` also works;
 IIIF parameter keywords retain the parser's case-sensitive semantics.
 
-All current application endpoints accept only GET/HEAD. A pre-routing advice
+All current application endpoints accept GET/HEAD plus OPTIONS discovery. A pre-routing advice
 rejects other methods before they can fall through to IIIF or trigger automatic
 Drogon CORS handling. This policy must evolve when adding a write endpoint such
 as `/upload`. Framework-level requests such as `OPTIONS *` are handled by Drogon
-outside the application routing policy. No CORS policy is configured here.
+outside the application routing policy. Configurable wildcard or explicit-origin CORS applies; see [HTTP policy](iiif-http.md).
 
 The IIIF handler passes `getOriginalPath()` to the parser, preserving percent
 escapes for exactly one decode. Query parameters do not affect parsing. Invalid
@@ -50,7 +52,7 @@ and geometry checks. Unsupported layouts/operations return `not_implemented`
 with status 501; valid arbitrary rotation angles use bilinear interpolation;
 corrupt pixel reads return 500. Horizontal mirroring and clockwise quarter turns
 are applied after crop/size; see [orthogonal transforms](orthogonal-transforms.md). See [JPEG delivery](jpeg-delivery.md). Information requests return actual metadata; see
-[info.json](iiif-info.md) for the explicitly incomplete compliance declaration.
+[info.json](iiif-info.md) for the admitted-resource level2 declaration.
 Information requests validate headers, while successful JPEG output also requires pixel decoding.
 There is no temporary success JSON representation of parsed requests. Debug logs
 record the identifier and prefix count, plus rotation/mirroring/upscaling for image

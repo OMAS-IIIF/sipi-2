@@ -17,6 +17,10 @@ public:
  * consume it immediately. Throw to abort. No HTTP/file/cache ownership is implied. */
 using JpegSink = std::function<void(std::span<const std::uint8_t>)>;
 
+/** Codec/marker bounds for metadata-only delivery planning; no allocation or I/O. */
+[[nodiscard]] std::uint32_t jpeg_maximum_dimension() noexcept;
+[[nodiscard]] std::size_t jpeg_maximum_icc_bytes() noexcept;
+
 /** Encode an owning gray8 or RGB8 raster as baseline JPEG, emitting bounded byte blocks.
  * Input and sink must live for this call; independent calls share no codec state.
  * PixelLayout::gray and rgb are accepted; RGBA must be composited explicitly first.

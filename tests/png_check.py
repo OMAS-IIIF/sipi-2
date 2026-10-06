@@ -1,4 +1,4 @@
-"""Independent RGB/RGBA8 PNG test decoder using only struct/zlib, without color conversion."""
+"""Independent gray1/gray8/gray-alpha8/RGB8/RGBA8 PNG decoder without color conversion."""
 import struct
 import zlib
 
@@ -15,7 +15,8 @@ def decode_png(data):
         chunks.append(kind)
         if kind == b'IHDR':
             width, height, depth, color, compression, filtering, interlace = struct.unpack('>IIBBBBB', payload)
-            assert (depth, compression, filtering, interlace) == (8, 0, 0, 0) and color in (0,2,4,6)
+            assert (compression, filtering, interlace) == (0, 0, 0) and color in (0,2,4,6)
+            assert depth == 8 or (depth == 1 and color == 0)
             channels = {0:1,2:3,4:2,6:4}[color]
         elif kind == b'IDAT':
             compressed.extend(payload)
@@ -26,7 +27,8 @@ def decode_png(data):
         offset += size + 12
     assert offset == len(data) and chunks[0] == b'IHDR' and chunks[-1] == b'IEND'
     raw = zlib.decompress(compressed)
-    stride = width * channels
+    stride = (width * channels * depth + 7) // 8
+    filter_bytes = max(1, (channels * depth + 7) // 8)
     assert len(raw) == height*(stride+1)
     pixels, previous = bytearray(), bytearray(stride)
     for y in range(height):
@@ -34,13 +36,18 @@ def decode_png(data):
         row = bytearray(raw[y*(stride+1)+1:(y+1)*(stride+1)])
         assert method in range(5)
         for x in range(stride):
-            a, b, c = (row[x-channels] if x >= channels else 0), previous[x], (previous[x-channels] if x >= channels else 0)
+            a, b, c = (row[x-filter_bytes] if x >= filter_bytes else 0), previous[x], (previous[x-filter_bytes] if x >= filter_bytes else 0)
             p = a+b-c
             distances = (abs(p-a), abs(p-b), abs(p-c))
             paeth = (a, b, c)[distances.index(min(distances))]
             predictor = (0, a, b, (a+b)//2, paeth)[method]
             row[x] = (row[x]+predictor) & 255
-        pixels.extend(row)
+        if depth == 1:
+            pixels.extend(255 if row[x//8] & (0x80 >> (x%8)) else 0 for x in range(width))
+            if width % 8:
+                assert row[-1] & ((1 << (8-width%8))-1) == 0, "Nonzero padding bits"
+        else:
+            pixels.extend(row)
         previous = row
     return width, height, bytes(pixels), profile, chunks
 
@@ -76,4 +83,16 @@ if __name__ == '__main__':
         assert decode_png((root/'one.png').read_bytes())[:3] == (1,1,bytes([0,127,255]))
         assert decode_png((root/'column.png').read_bytes())[:3] == (1,3,bytes(range(1,10)))
         assert decode_png((root/'row.png').read_bytes())[:3] == (3,1,bytes(range(1,10)))
+        for width in (1,7,8,9,17,257):
+            data=(root/f'bitonal-{width}.png').read_bytes()
+            assert data[24:26]==bytes([1,0]) # IHDR: one-bit gray, not palette.
+            w,h,pixels,profile,chunks=decode_png(data)
+            expected=bytes(255 if (x+2*y)%3==0 else 0 for y in range(5) for x in range(width))
+            assert (w,h,pixels)==(width,5,expected)
+            assert profile[16:20]==b'GRAY'
+        data=(root/'bitonal-srgb.png').read_bytes()
+        assert data[24:26]==bytes([1,0])
+        assert decode_png(data)[2]==bytes([0,255,0])
+        assert b'sRGB' in decode_png(data)[4]
+        assert (root/'binary-eight.png').read_bytes()[24]==8
     print('Independent PNG pixel, chunk CRC, ICC and untagged round trips passed')

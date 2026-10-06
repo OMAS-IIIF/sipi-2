@@ -1,5 +1,7 @@
 #include "HttpServer.h"
+#include <algorithm>
 #include "http/IiifWorker.h"
+#include "http/HttpProtocol.h"
 #include "iiifparser/IIIFParser.h"
 
 #include <drogon/HttpAppFramework.h>
@@ -39,9 +41,26 @@ void read_only_methods(const drogon::HttpRequestPtr& request,
         next();
         return;
     }
+    if (request->method() == drogon::Options) {
+        const auto method = request->getHeader("access-control-request-method");
+        if (!method.empty() && !http::allowed_cors_preflight(method,
+                request->getHeader("access-control-request-headers"))) {
+            callback(json_error(drogon::k403Forbidden, "cors_preflight_denied",
+                                "Requested cross-origin method or headers are not supported"));
+            return;
+        }
+        auto response = drogon::HttpResponse::newHttpResponse();
+        response->setStatusCode(drogon::k204NoContent);
+        response->addHeader("Allow", "GET, HEAD, OPTIONS");
+        response->addHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        response->addHeader("Access-Control-Allow-Headers", "Authorization, Accept, Content-Type");
+        response->addHeader("Cache-Control", "no-store");
+        callback(response);
+        return;
+    }
     auto response = json_error(drogon::k405MethodNotAllowed, "method_not_allowed",
-                               "This resource accepts GET and HEAD only");
-    response->addHeader("Allow", "GET, HEAD");
+                               "This resource accepts GET, HEAD and OPTIONS only");
+    response->addHeader("Allow", "GET, HEAD, OPTIONS");
     callback(response);
 }
 
@@ -74,7 +93,8 @@ std::string_view component_name(iiif::Component component) {
 void iiif_request(const drogon::HttpRequestPtr& request,
                   std::function<void(const drogon::HttpResponsePtr&)>&& callback,
                   const std::shared_ptr<http::IiifWorker>& worker) {
-    const auto result = iiif::parse_path(request->getOriginalPath());
+    const auto routed = http::route_iiif_path(request->getOriginalPath());
+    const auto& result = routed.query;
     if (const auto* error = std::get_if<iiif::ParseError>(&result)) {
         Json::Value body;
         body["error"] = "invalid_iiif_syntax";
@@ -108,6 +128,8 @@ void iiif_request(const drogon::HttpRequestPtr& request,
     // Retain the HTTP request until completion, including after disconnect.
     http::IiifWorker::Callback complete = [request, callback](const auto& response) { callback(response); };
     http::IiifWorker::Request input{std::move(query), header("authorization"), header("cookie")};
+    input.accept = header("accept");
+    input.redirect_to_info = routed.redirect_to_info;
     for (const auto& [name, value] : request->cookies()) input.cookies.emplace(name, value);
     if (!worker->submit(std::move(input), complete)) {
         auto response = json_error(drogon::k503ServiceUnavailable, "iiif_busy",
@@ -171,6 +193,10 @@ void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPre
     SourceResolver sources(config.iiif_root, config.iiif_storage, config.s3_bucket); // Validate configured root before listening.
     iiif::SizePolicy size_policy;
     size_policy.allow_upscaling = config.size_upscaling;
+    size_policy.max_width = config.output_limits.max_width;
+    size_policy.max_height = config.output_limits.max_height
+        ? config.output_limits.max_height : config.output_limits.max_width;
+    size_policy.max_area = config.output_limits.max_area;
     const auto public_base_url = config.public_base_url.value_or("http://127.0.0.1:" + std::to_string(config.port));
     std::optional<S3Client> s3_client;
     if (config.s3_bucket) s3_client.emplace(config.s3);
@@ -180,6 +206,22 @@ void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPre
     app.addListener("127.0.0.1", port);
     app.setThreadNum(1);
     app.setFileTypes({});
+    app.registerPreSendingAdvice([origins = config.cors_origins,
+                                  credentials = config.cors_credentials](
+            const drogon::HttpRequestPtr& request, const drogon::HttpResponsePtr& response) {
+        // Apply to successes, errors and redirects, outside the encoded-image cache.
+        const bool wildcard = origins.size() == 1 && origins.front() == "*";
+        const auto& origin = request->getHeader("origin");
+        if (!wildcard) {
+            const auto vary = response->getHeader("vary");
+            response->addHeader("Vary", vary.empty() ? "Origin" : vary + ", Origin");
+        }
+        if (wildcard || std::find(origins.begin(), origins.end(), origin) != origins.end()) {
+            response->addHeader("Access-Control-Allow-Origin", wildcard ? "*" : origin);
+            if (credentials) response->addHeader("Access-Control-Allow-Credentials", "true");
+            response->addHeader("Access-Control-Expose-Headers", "Link, Location");
+        }
+    });
     app.registerPreRoutingAdvice(&read_only_methods);
     app.registerHandler("/health", &health, {drogon::Get});
     // Exact routes win; regex routes are tried in registration order.

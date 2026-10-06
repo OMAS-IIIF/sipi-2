@@ -109,8 +109,8 @@ def main():
                 assert success(get(port,prefix+'90.0/default.png'))==success(get(port,prefix+'90/default.png'))
                 assert rows(root)==before # Angle spellings reuse the existing entries.
                 info=json.loads(get(port,f'/{name}/info.json')[2])
-                assert set(info['extraFeatures'])=={'mirroring','rotationBy90s','rotationArbitrary'}
-                assert 'profile' not in info # Existing explicit development boundary.
+                assert set(info['extraFeatures'])=={'canonicalLinkHeader','mirroring','profileLinkHeader','rotationArbitrary'}
+                assert info['profile']=='level2'
             assert get(port,saved[0],authorization='denied')[0]==403
             assert 'extraFeatures' not in json.loads(get(port,'/rotated.tif/info.json')[2])
             for name,region,size in cases:

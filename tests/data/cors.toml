@@ -1,0 +1,2 @@
+cors-origins = "https://viewer.example,https://other.example"
+cors-credentials = true

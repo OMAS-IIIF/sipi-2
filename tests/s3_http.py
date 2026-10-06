@@ -134,7 +134,7 @@ try:
                 status, _, body = get(remote, '/museum/' + name + '/info.json')
                 info = json.loads(body)
                 assert status == 200 and (info['width'], info['height']) == (3,2)
-                assert 'rotationBy90s' in info['extraFeatures']
+                assert info['profile']=='level2'
                 assert get(remote, '/' + name + '/info.json', 'HEAD')[0] == 200
                 assert get(remote, '/' + name + '/full/max/0/default.png')[0] == 200
             assert get(remote, '/sixteen.png/info.json')[0] == 501
@@ -146,7 +146,7 @@ try:
                 status, _, body = get(remote, '/' + name + '/info.json')
                 assert status == 200
                 info = json.loads(body)
-                assert (info['width'], info['height']) == (37, 23) and 'rotationBy90s' in info['extraFeatures']
+                assert (info['width'], info['height']) == (37, 23) and info['profile']=='level2'
                 assert get(remote, '/' + name + '/info.json', 'HEAD')[0] == 200
                 assert get(remote, '/' + name + '/full/max/0/default.jpg')[0] == 200
             assert get(remote, '/orientation.jpg/info.json')[0] == 501

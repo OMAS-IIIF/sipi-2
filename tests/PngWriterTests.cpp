@@ -11,13 +11,14 @@ template<class F> void rejects(F action) {
     try { action(); } catch (const sipi::PngWriteError&) { return; }
     throw std::runtime_error("Expected PNG failure");
 }
-void save(const std::filesystem::path& path, const sipi::RasterImage8& image) {
+void save(const std::filesystem::path& path, const sipi::RasterImage8& image,
+          sipi::PngBitDepth depth = sipi::PngBitDepth::eight) {
     std::ofstream output(path, std::ios::binary);
     output.exceptions(std::ios::badbit | std::ios::failbit);
     sipi::write_png(image, [&](auto bytes) {
         check(!bytes.empty() && bytes.size() <= 16384, "Unbounded sink block");
         output.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
-    });
+    }, depth);
 }
 }
 int main(int argc, char** argv) {
@@ -37,8 +38,26 @@ int main(int argc, char** argv) {
         auto gray_profile = fixture::icc_header();
         std::copy_n("GRAY",4,gray_profile.begin()+16);
         save(root / "gray.png", {3,1,{0,127,255},gray_profile,sipi::PixelLayout::gray});
+        for (const unsigned width : {1,7,8,9,17,257}) {
+            sipi::RasterImage8 binary{width,5,std::vector<std::uint8_t>(width*5),
+                gray_profile,sipi::PixelLayout::gray};
+            for (unsigned y=0; y<5; ++y)
+                for (unsigned x=0; x<width; ++x)
+                    binary.pixels[y*width+x] = (x+2*y)%3==0 ? 255 : 0;
+            save(root / ("bitonal-"+std::to_string(width)+".png"),binary,sipi::PngBitDepth::one);
+        }
+        sipi::RasterImage8 binary{3,1,{0,255,0},{},sipi::PixelLayout::gray,2};
+        save(root / "bitonal-srgb.png",binary,sipi::PngBitDepth::one);
+        save(root / "binary-eight.png",binary);
         const sipi::PngSink discard = [](auto) {};
         rejects([&] { sipi::write_png(image, {}); });
+        std::size_t invalid_calls=0;
+        const sipi::PngSink must_not_emit=[&](auto) { ++invalid_calls; };
+        rejects([&] { sipi::write_png(image,must_not_emit,sipi::PngBitDepth::one); });
+        rejects([&] { sipi::write_png({1,1,{127},{},sipi::PixelLayout::gray},must_not_emit,sipi::PngBitDepth::one); });
+        rejects([&] { sipi::write_png({1,1,{0,255},{},sipi::PixelLayout::gray_alpha},must_not_emit,sipi::PngBitDepth::one); });
+        rejects([&] { sipi::write_png(binary,must_not_emit,static_cast<sipi::PngBitDepth>(99)); });
+        check(invalid_calls==0,"Invalid one-bit data emitted bytes");
         auto conflicting = image; conflicting.srgb_intent = 0;
         rejects([&] { sipi::write_png(conflicting, discard); });
         conflicting.icc_profile.clear(); conflicting.srgb_intent = 4;
@@ -69,6 +88,17 @@ int main(int argc, char** argv) {
             catch (const SinkFailure&) { caught = true; }
             check(caught && seen == at, "Sink exception lost or output continued");
             sipi::write_png(image, discard);
+        }
+        calls=0;
+        sipi::write_png(binary,[&](auto) { ++calls; },sipi::PngBitDepth::one);
+        for (const auto at : {std::size_t{1}, calls/2, calls}) {
+            std::size_t seen=0;
+            bool caught=false;
+            try {
+                sipi::write_png(binary,[&](auto) { if (++seen==at) throw SinkFailure{}; },sipi::PngBitDepth::one);
+            } catch (const SinkFailure&) { caught=true; }
+            check(caught && seen==at,"One-bit sink exception lost");
+            sipi::write_png(binary,discard,sipi::PngBitDepth::one);
         }
         std::cout << "PNG validation, ownership, bounded callbacks and failure recovery passed\n";
     } catch (const std::exception& error) {

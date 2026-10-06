@@ -25,6 +25,7 @@ struct JpegMetadata {
     JpegColor color = JpegColor::rgb;
     bool progressive = false;
     std::vector<std::uint8_t> icc_profile;
+    std::uint64_t coefficient_bytes = 0; // Header-derived multiscan allocation estimate.
 };
 
 /** Read through the first SOS using libjpeg, without decompressing any pixels.

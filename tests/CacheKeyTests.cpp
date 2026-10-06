@@ -74,10 +74,10 @@ rotation.binary64:16:0000000000000000
 quality:5:color
 encoding:4:jpeg
 jpeg.quality:2:90
-recipe:14:sipi-render-v2
+recipe:14:sipi-render-v3
 )";
         require(original.serialized()==expected,"stable v1 serialization");
-        require(original.digest()=="22a6b756032d0de4fe1a30a6a7859666b593ad82729e371685fdf314d41df4f9","stable SHA-256 digest");
+        require(original.digest()=="d115eb903dc4f7466cb37ef11bd673e912d268c7629e5e8ec6b3b7ccbd58aebd","stable SHA-256 digest");
         require(original.digest().size()==64 && original.digest().find_first_not_of("0123456789abcdef")==std::string_view::npos,
                 "digest is a filename-safe lowercase SHA-256");
 

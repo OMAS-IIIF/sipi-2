@@ -1,0 +1,399 @@
+{
+  "passed": 27,
+  "total": 41,
+  "checks": [
+    {
+      "check": "info.required_profile",
+      "passed": false,
+      "evidence": {
+        "@context": "http://iiif.io/api/image/3/context.json",
+        "extraFeatures": [
+          "mirroring",
+          "rotationBy90s",
+          "rotationArbitrary"
+        ],
+        "extraQualities": [
+          "gray",
+          "bitonal"
+        ],
+        "height": 200,
+        "id": "http://127.0.0.1:<port>/color.png",
+        "protocol": "http://iiif.io/api/image",
+        "type": "ImageService3",
+        "width": 320
+      }
+    },
+    {
+      "check": "info.color_quality",
+      "passed": false,
+      "evidence": [
+        "gray",
+        "bitonal"
+      ]
+    },
+    {
+      "check": "info.png_discovery",
+      "passed": false,
+      "evidence": {
+        "profile": null,
+        "extraFormats": null
+      }
+    },
+    {
+      "check": "http.base_redirect",
+      "passed": false,
+      "evidence": {
+        "status": 400,
+        "location": null
+      }
+    },
+    {
+      "check": "http.jsonld",
+      "passed": false,
+      "evidence": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8"
+      }
+    },
+    {
+      "check": "http.cors:/color.png/info.json",
+      "passed": false,
+      "evidence": {
+        "status": 200,
+        "allowOrigin": null
+      }
+    },
+    {
+      "check": "http.cors:/color.png/full/max/0/default.png",
+      "passed": false,
+      "evidence": {
+        "status": 200,
+        "allowOrigin": null
+      }
+    },
+    {
+      "check": "http.cors:/missing.png/info.json",
+      "passed": false,
+      "evidence": {
+        "status": 404,
+        "allowOrigin": null
+      }
+    },
+    {
+      "check": "http.cors_preflight",
+      "passed": false,
+      "evidence": {
+        "status": 405,
+        "headers": {
+          "content-length": "82",
+          "content-type": "application/json; charset=utf-8",
+          "server": "drogon/1.9.13",
+          "allow": "GET, HEAD",
+          "date": "Tue, 06 Oct 2026 16:40:52 GMT"
+        }
+      }
+    },
+    {
+      "check": "geometry:full/max",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          320,
+          200
+        ]
+      }
+    },
+    {
+      "check": "geometry:10,20,100,80/max",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          100,
+          80
+        ]
+      }
+    },
+    {
+      "check": "geometry:pct:10,20,50,50/max",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          160,
+          100
+        ]
+      }
+    },
+    {
+      "check": "geometry:square/max",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          200,
+          200
+        ]
+      }
+    },
+    {
+      "check": "geometry:full/160,",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          160,
+          100
+        ]
+      }
+    },
+    {
+      "check": "geometry:full/,100",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          160,
+          100
+        ]
+      }
+    },
+    {
+      "check": "geometry:full/pct:50",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          160,
+          100
+        ]
+      }
+    },
+    {
+      "check": "geometry:full/!100,100",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          100,
+          63
+        ]
+      }
+    },
+    {
+      "check": "geometry:full/100,100",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          100,
+          100
+        ]
+      }
+    },
+    {
+      "check": "geometry:300,190,100,100/max",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          20,
+          10
+        ]
+      }
+    },
+    {
+      "check": "rotation:90",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          200,
+          320
+        ]
+      }
+    },
+    {
+      "check": "rotation:180",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          320,
+          200
+        ]
+      }
+    },
+    {
+      "check": "rotation:270",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          200,
+          320
+        ]
+      }
+    },
+    {
+      "check": "rotation:!0",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          320,
+          200
+        ]
+      }
+    },
+    {
+      "check": "delivery:default.jpg",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/jpeg"
+      }
+    },
+    {
+      "check": "delivery:default.png",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/png"
+      }
+    },
+    {
+      "check": "delivery:color.jpg",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/jpeg"
+      }
+    },
+    {
+      "check": "delivery:color.png",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/png"
+      }
+    },
+    {
+      "check": "delivery:gray.jpg",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/jpeg"
+      }
+    },
+    {
+      "check": "delivery:gray.png",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/png"
+      }
+    },
+    {
+      "check": "delivery:bitonal.jpg",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/jpeg"
+      }
+    },
+    {
+      "check": "delivery:bitonal.png",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/png"
+      }
+    },
+    {
+      "check": "http.head",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "bytes": 0
+      }
+    },
+    {
+      "check": "optional.link:profile",
+      "passed": false,
+      "evidence": null
+    },
+    {
+      "check": "optional.link:canonical",
+      "passed": false,
+      "evidence": null
+    },
+    {
+      "check": "error.unsupported_format",
+      "passed": false,
+      "evidence": {
+        "status": 501,
+        "recommended": 400
+      }
+    },
+    {
+      "check": "error.unsupported_upscaling",
+      "passed": true,
+      "evidence": {
+        "status": 501
+      }
+    },
+    {
+      "check": "error.outside_region",
+      "passed": true,
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "check": "identity.prefix",
+      "passed": true,
+      "evidence": {
+        "status": 200
+      }
+    },
+    {
+      "check": "source.unsupported_png_precision",
+      "passed": true,
+      "evidence": {
+        "status": 501
+      }
+    },
+    {
+      "check": "source.metadata_only",
+      "passed": false,
+      "evidence": {
+        "infoStatus": 200,
+        "imageStatus": 501,
+        "document": {
+          "@context": "http://iiif.io/api/image/3/context.json",
+          "height": 2,
+          "id": "http://127.0.0.1:<port>/oriented.tif",
+          "protocol": "http://iiif.io/api/image",
+          "type": "ImageService3",
+          "width": 3
+        }
+      }
+    },
+    {
+      "check": "limits.wide_jpeg",
+      "passed": false,
+      "evidence": {
+        "infoStatus": 200,
+        "width": 70000,
+        "maxWidth": null,
+        "imageStatus": 500,
+        "error": {
+          "error": "encoding_failed",
+          "message": "JPEG output could not be produced"
+        }
+      }
+    }
+  ]
+}

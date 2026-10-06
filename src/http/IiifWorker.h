@@ -36,11 +36,15 @@ public:
         std::optional<std::string> authorization;
         std::optional<std::string> cookie;
         std::map<std::string, std::string> cookies{};
+        std::optional<std::string> accept = std::nullopt;
+        bool redirect_to_info = false; // Info authorization/admission, then base-URI 303.
     };
     /** Take ownership of policy/source settings and start the pool.
      * public_base_url must be validated configuration without a trailing slash;
      * it supplies information-document identities, never filesystem locations.
      * metadata_limits bounds one shared cache; either zero disables retention.
+     * size_policy is bounded by the buffered renderer's public defaults/ceilings;
+     * the same policy is advertised and enforced, with source admission on full/max.
      * worker_count must be 1..32. Construction joins started threads if startup fails. */
     IiifWorker(std::optional<preflight::LuaPreflight> policy, SourceResolver sources,
                iiif::SizePolicy size_policy, std::string public_base_url,

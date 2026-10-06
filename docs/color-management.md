@@ -90,8 +90,9 @@ opaque gray8. It deliberately does not accept RGB; the worker composes it with
 mutation. The method is selected at startup, as described below.
 
 Use `/identifier/full/max/0/bitonal.png` for **exactly two sample values**.
-The current PNG encoder writes 8-bit grayscale containing only 0 and 255;
-bitonal quality does not yet add a packed 1-bit PNG encoding optimization.
+The PNG encoder now writes packed **1-bit grayscale**, for either rendering
+method. Decoding expands bits back to exactly 0 and 255. Internal processing
+remains gray8; packing introduces no color conversion or pixel change.
 `bitonal.jpg` starts from the same binary raster, but lossy JPEG compression can
 introduce intermediate decoded gray values and edge artifacts. Prefer PNG for
 documents requiring exact black/white output. The original repository image is unchanged.
@@ -177,16 +178,17 @@ HTTP tests cover PNG/JPEG target ICC equality, source-profile precedence, unchan
 native gray/gray-alpha, authorization, failure nonpublication, cache/restart and fresh
 uncached process equality. MinIO results match local rendering byte-for-byte.
 
-Rendering recipe is now `sipi-render-v2`: native PNG gray-alpha preservation changes
-previous output layout/profile handling, and RGB-to-gray conversion is a new policy.
-Old entries remain on disk but cannot match v2 keys and are evicted normally. Metadata
-cache identity remains source-version-bound. No new CLI/env/TOML option is introduced.
+Rendering recipe is now `sipi-render-v3`: packed one-bit bitonal PNG changes encoded
+bytes. Version 2 introduced native PNG gray-alpha and RGB-to-gray conversion.
+Old entries remain on disk but cannot match v3 keys and are evicted normally. Metadata
+cache identity remains source-version-bound. Packing introduces no additional CLI/env/TOML option; the existing bitonal-method setting remains.
 
 Bitonal unit tests check the 127/128 boundary, alpha-before-threshold ordering,
 storage reuse, profile retention, idempotence and invalid inputs/budgets. HTTP tests
 derive expected binary pixels from gray delivery independently, including arbitrary
 rotation, ICC and native-gray inputs, cache hits/restart, HEAD, authorization and
 failure nonpublication; local/MinIO results must match. Bitonal already has a distinct
-cache quality key, with an additional method field for Floyd–Steinberg. No recipe increment is necessary for this addition: these requests
-previously returned 501 and existing supported qualities remain unchanged. Changing
+cache quality key, with an additional method field for Floyd–Steinberg. The initial threshold addition needed no recipe increment because those requests
+previously returned 501. Packed PNG output now requires v3, even though decoded
+pixels are unchanged. Changing
 threshold, dithering or alpha policy later requires a rendering-recipe increment.

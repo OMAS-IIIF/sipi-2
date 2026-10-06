@@ -70,13 +70,16 @@ void finish_destination(j_compress_ptr codec) noexcept {
 }
 } // namespace
 
+std::uint32_t jpeg_maximum_dimension() noexcept { return JPEG_MAX_DIMENSION; }
+std::size_t jpeg_maximum_icc_bytes() noexcept { return 255 * icc_chunk_bytes; }
+
 void write_jpeg(const RasterImage8& image, const JpegSink& sink, int quality) {
     const auto channels = image.channel_count();
     if ((image.layout != PixelLayout::rgb && image.layout != PixelLayout::gray) || !sink || quality < 1 || quality > 100 || image.width == 0 || image.height == 0 ||
         image.width > JPEG_MAX_DIMENSION || image.height > JPEG_MAX_DIMENSION ||
         static_cast<std::uint64_t>(image.width) * image.height * channels != image.pixels.size())
         throw JpegWriteError("Invalid JPEG raster, quality or sink");
-    if (image.icc_profile.size() > 255 * icc_chunk_bytes)
+    if (image.icc_profile.size() > jpeg_maximum_icc_bytes())
         throw JpegWriteError("ICC profile exceeds JPEG marker capacity");
 
     if (image.layout == PixelLayout::gray && !image.icc_profile.empty() &&

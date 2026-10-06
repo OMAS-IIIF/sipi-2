@@ -1,5 +1,8 @@
 #include "http/IiifWorker.h"
 #include "http/IiifInfo.h"
+#include "http/ImageUri.h"
+#include "http/DeliveryPolicy.h"
+#include "http/HttpProtocol.h"
 #include <spdlog/spdlog.h>
 #include <utility>
 #include "storage/LocalFileSource.h"
@@ -49,10 +52,11 @@ constexpr std::size_t encoded_limit = 64 * 1024 * 1024;
 constexpr int jpeg_quality = 90;
 
 /** Build identical fresh/hit response headers; authorization is never cached. */
-drogon::HttpResponsePtr image_response(std::string encoded, bool png) {
+drogon::HttpResponsePtr image_response(std::string encoded, bool png, const std::string& canonical) {
     auto result = drogon::HttpResponse::newHttpResponse();
     result->setContentTypeCode(png ? drogon::CT_IMAGE_PNG : drogon::CT_IMAGE_JPG);
     result->addHeader("Cache-Control", "no-store");
+    result->addHeader("Link", "<" + canonical + ">;rel=\"canonical\"");
     result->setBody(std::move(encoded));
     return result;
 }
@@ -73,7 +77,7 @@ drogon::HttpResponsePtr response(drogon::HttpStatusCode status,
 IiifWorker::IiifWorker(std::optional<preflight::LuaPreflight> policy, SourceResolver sources,
                        iiif::SizePolicy size_policy, std::string public_base_url, std::optional<S3Client> s3_client,
                        std::shared_ptr<cache::ResultCache> result_cache, cache::MetadataCacheLimits metadata_limits, unsigned worker_count, BitonalMethod bitonal_method)
-    : policy_(std::move(policy)), sources_(std::move(sources)), s3_client_(std::move(s3_client)), size_policy_(size_policy),
+    : policy_(std::move(policy)), sources_(std::move(sources)), s3_client_(std::move(s3_client)), size_policy_(bounded_output_policy(size_policy)),
       public_base_url_(std::move(public_base_url)), bitonal_method_(bitonal_method), result_cache_(std::move(result_cache)),
       metadata_cache_(metadata_limits) {
     if (!worker_count || worker_count > maximum_worker_count)
@@ -131,6 +135,11 @@ void IiifWorker::run() {
             jobs_.pop_front();
         }
         auto result = resolve(job.request);
+        if (result->statusCode() == drogon::k200OK) {
+            const auto existing = result->getHeader("link");
+            result->addHeader("Link", existing.empty() ? std::string(level2_link)
+                : existing + ", " + std::string(level2_link));
+        }
         {
             std::lock_guard lock(mutex_);
             if (stopping_) return;
@@ -217,19 +226,55 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
             return response(drogon::k501NotImplemented, "source_format_not_supported",
                             "Only TIFF, JPEG 2000, JPEG and PNG sources are supported at present");
         }
+        if (!readable)
+            return response(drogon::k501NotImplemented, "source_not_deliverable",
+                            "Source layout or color encoding is not supported for delivery");
+        // Admission promises at least the default full/max rendering. This uses
+        // metadata/planning only; corruption remains detectable during actual reads.
+        const auto maximum = iiif::resolve_geometry(iiif::FullRegion{},
+            iiif::Size{false, iiif::MaxSize{}}, width, height, size_policy_);
+        if (const auto* full = std::get_if<iiif::ImageGeometry>(&maximum)) {
+            try { validate_delivery_budget(*metadata, *full, {false,0}); }
+            catch (const DeliveryLimitError&) {
+                return response(drogon::k501NotImplemented, "source_not_deliverable",
+                    "Source cannot provide full/max within current decoding budgets");
+            }
+        } else {
+            return response(drogon::k501NotImplemented, "source_not_deliverable",
+                            "Source has no deliverable maximum size");
+        }
         if (std::holds_alternative<iiif::InfoRequest>(request.query)) {
             auto document = make_info_document(resource,
                 width, height, public_base_url_);
-            if (readable) {
-                document["extraFeatures"].append("mirroring");
-                document["extraFeatures"].append("rotationBy90s");
-                document["extraFeatures"].append("rotationArbitrary");
+            document["maxWidth"] = Json::UInt(*size_policy_.max_width);
+            document["maxHeight"] = Json::UInt(*size_policy_.max_height);
+            document["maxArea"] = Json::UInt64(*size_policy_.max_area);
+            document["extraFeatures"].append("canonicalLinkHeader");
+            document["extraFeatures"].append("mirroring");
+            document["extraFeatures"].append("profileLinkHeader");
+            document["extraFeatures"].append("rotationArbitrary");
+            if (!native_gray) document["extraQualities"].append("color");
+            document["extraQualities"].append("gray");
+            document["extraQualities"].append("bitonal");
+            if (request.redirect_to_info) {
+                auto result = drogon::HttpResponse::newHttpResponse();
+                result->setStatusCode(drogon::k303SeeOther);
+                result->addHeader("Location", document["id"].asString()+"/info.json");
+                result->addHeader("Cache-Control", "no-store");
+                return result;
             }
-            if (readable) {
-                document["extraQualities"].append("gray");
-                document["extraQualities"].append("bitonal");
+            const auto type = negotiate_info_type(request.accept
+                ? std::optional<std::string_view>{*request.accept} : std::nullopt);
+            if (!type) {
+                auto result = response(drogon::k406NotAcceptable, "not_acceptable",
+                                       "Information is available as application/json or application/ld+json");
+                result->addHeader("Vary", "Accept");
+                return result;
             }
             auto result = drogon::HttpResponse::newHttpJsonResponse(document);
+            result->setContentTypeString(*type == InfoMediaType::json_ld
+                ? std::string(jsonld_content_type) : "application/json; charset=utf-8");
+            result->addHeader("Vary", "Accept");
             result->addHeader("Cache-Control", "no-store");
             return result;
         }
@@ -250,26 +295,23 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
             const auto& plan = std::get<iiif::ImageGeometry>(geometry);
             spdlog::debug("Resolved IIIF crop {},{},{},{} -> {}x{}", plan.region.x, plan.region.y,
                           plan.region.width, plan.region.height, plan.output_width, plan.output_height);
-            if ((image->format != iiif::Format::jpg && image->format != iiif::Format::png) ||
-                (image->quality != iiif::Quality::default_quality && image->quality != iiif::Quality::color &&
+            if (image->format != iiif::Format::jpg && image->format != iiif::Format::png)
+                return response(drogon::k400BadRequest, "unsupported_format",
+                                "Only JPEG and PNG output formats are supported");
+            if ((image->quality != iiif::Quality::default_quality && image->quality != iiif::Quality::color &&
                  image->quality != iiif::Quality::gray && image->quality != iiif::Quality::bitonal) ||
                 plan.output_width > plan.region.width || plan.output_height > plan.region.height)
                 return response(drogon::k501NotImplemented, "not_implemented",
                     "Only unchanged or reduced RGB/RGBA/gray JPEG/PNG output is supported");
 
-            // A ready entry cannot grant capabilities that today's renderer lacks.
-            // Check source layout before lookup, as well as IIIF operations above.
-            if (tiff_metadata && !supports_tiff_region(tiff_metadata->image))
-                throw TiffUnsupportedError("Unsupported TIFF main image layout");
-            if (j2k_metadata && !supports_j2k_pixels(*j2k_metadata))
-                throw J2kUnsupportedError("Unsupported JPEG 2000 pixel layout");
-
-            if (png_metadata && !supports_png_pixels(*png_metadata))
-                throw PngUnsupportedError("PNG color encoding requires conversion");
-
+            // Source admission above and request budgets below both precede cache
+            // lookup: a stored result cannot grant capabilities or bypass policy.
             const bool png = image->format == iiif::Format::png;
+            validate_delivery_budget(*metadata, plan, image->rotation);
             const auto dimensions = rotated_size(plan.output_width, plan.output_height, image->rotation.degrees);
             const cache::ResultMetadata output{png ? "image/png" : "image/jpeg", dimensions.width, dimensions.height};
+            const auto canonical = canonical_image_uri(*image, plan, width, height,
+                                                       size_policy_, native_gray, public_base_url_);
             std::optional<cache::CacheKey> cache_key;
             // Keep the shared mutex alive until after its lock is released, including
             // exception exits. Recheck the cache after any previous fill completes.
@@ -306,7 +348,7 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                         if (hit->bytes->read_at(0, std::as_writable_bytes(std::span{encoded})) != size)
                             throw cache::CacheError("Incomplete cached result");
                         spdlog::debug("IIIF result cache hit");
-                        return image_response(std::move(encoded), png);
+                        return image_response(std::move(encoded), png, canonical);
                     }
                     spdlog::debug("IIIF result cache miss");
                 } catch (const std::exception&) {
@@ -322,14 +364,7 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
             // and exact window then enter one shared processing/encoding pipeline.
             auto [pixels, window] = [&]() -> std::pair<RasterImage8, PixelWindow> {
                 if (tiff_metadata) {
-                    // Cached metadata is immutable. Filter a request-local planning
-                    // copy so unsupported levels never alter the shared snapshot.
-                    TiffMetadata candidates;
-                    candidates.image = tiff_metadata->image;
-                    for (const auto& level : tiff_metadata->levels)
-                        if (supports_tiff_region(level)) candidates.levels.push_back(level);
-                    // Planning only needs directories, not a second ICC-profile copy.
-                    const auto read_plan = plan_tiff_read(candidates, plan);
+                    const auto read_plan = supported_tiff_plan(*tiff_metadata, plan);
                     return {read_tiff_region(*source, read_plan.directory, read_plan.read_region),
                             {read_plan.horizontal, read_plan.vertical}};
                 }
@@ -366,7 +401,8 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                 }
                 encoded.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
             };
-            if (png) write_png(pixels, sink);
+            if (png) write_png(pixels, sink, image->quality == iiif::Quality::bitonal
+                ? PngBitDepth::one : PngBitDepth::eight);
             else {
                 pixels = composite_on_white(std::move(pixels));
                 write_jpeg(pixels, sink, jpeg_quality);
@@ -380,7 +416,7 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                     spdlog::warn("IIIF result cache publication failed; delivering uncached image");
                 }
             }
-            return image_response(std::move(encoded), png);
+            return image_response(std::move(encoded), png, canonical);
         }
         return response(drogon::k500InternalServerError, "processing_failed", "Unexpected IIIF request type");
     } catch (const preflight::PreflightError& error) {
@@ -417,6 +453,9 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
         return response(drogon::k501NotImplemented, "not_implemented", "TIFF pixel layout is not supported yet");
     } catch (const TiffReadError&) {
         return response(drogon::k500InternalServerError, "invalid_image_source", "TIFF data could not be read");
+    } catch (const DeliveryLimitError&) {
+        return response(drogon::k400BadRequest, "request_exceeds_working_limits",
+                        "Requested rendering exceeds the current processing limits");
     } catch (const ColorConversionError&) {
         return response(drogon::k500InternalServerError, "color_conversion_failed", "Image color conversion could not be completed");
     } catch (const TransformError&) {

@@ -76,7 +76,9 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                                 RepositoryEnvironment repository_environment,
                                 CacheEnvironment cache_environment,
                                 std::optional<std::string_view> env_iiif_workers,
-                                std::optional<std::string_view> env_bitonal_method) {
+                                std::optional<std::string_view> env_bitonal_method,
+                                OutputLimitEnvironment output_environment,
+                                CorsEnvironment cors_environment) {
     StartupOptions result;
     bool help = false;
     bool version = false;
@@ -89,6 +91,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     std::string log_level = "info";
     std::string bitonal_method = "threshold";
     std::string size_upscaling = "false";
+    std::string cors_origins = "*", cors_credentials = "false";
     CLI::App app{"SIPI-2 IIIF server", "sipi-2"};
     // Ordinary flags preserve our policy: validate all CLI input before help/version.
     app.set_help_flag();
@@ -132,6 +135,15 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
         return value.empty() || value.find_first_not_of("0123456789") != std::string::npos
             ? std::string{"Expected unsigned decimal integer"} : std::string{};
     }, "INTEGER");
+    auto* width_option = app.add_option("--max-width", result.config.output_limits.max_width,
+        "Output width limit (SIPI_MAX_WIDTH; default: 8192; ceiling: 32768)")
+        ->check(unsigned_decimal)->check(CLI::Range(1u, OutputLimits::axis_ceiling));
+    auto* height_option = app.add_option("--max-height", result.config.output_limits.max_height,
+        "Output height limit (SIPI_MAX_HEIGHT; default: max-width; ceiling: 32768)")
+        ->check(unsigned_decimal)->check(CLI::Range(1u, OutputLimits::axis_ceiling));
+    auto* area_option = app.add_option("--max-area", result.config.output_limits.max_area,
+        "Output pixel area limit (SIPI_MAX_AREA; default/ceiling: 8388608)")
+        ->check(unsigned_decimal)->check(CLI::Range(std::uint64_t{1}, OutputLimits::area_ceiling));
     auto* bitonal_option = app.add_option("--bitonal-method", bitonal_method,
         "Bitonal method (SIPI_BITONAL_METHOD; default: threshold)")
         ->check(CLI::IsMember({"threshold", "floyd-steinberg"}));
@@ -155,6 +167,25 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     auto* public_url_option = app.add_option("--public-base-url", public_base_url,
         "Public origin and proxy mount (SIPI_PUBLIC_BASE_URL; default: local listener)")
         ->check(CLI::Validator(validate_public_base_url, "URL"))->type_name("URL");
+    auto* origins_option = app.add_option("--cors-origins", cors_origins,
+        "CORS origins: * or comma-separated HTTP(S) origins (SIPI_CORS_ORIGINS)")
+        ->check(CLI::Validator([](const std::string& value) {
+            if (value == "*") return std::string{};
+            std::size_t begin = 0;
+            do {
+                const auto end = value.find(',', begin);
+                const auto origin = value.substr(begin, end - begin);
+                if (!validate_public_base_url(origin).empty() ||
+                    origin.find('/', origin.find("://") + 3) != std::string::npos)
+                    return std::string{"Expected * or comma-separated HTTP(S) origins without paths"};
+                if (end == std::string::npos) break;
+                begin = end + 1;
+            } while (true);
+            return std::string{};
+        }, "ORIGINS"));
+    auto* credentials_option = app.add_option("--cors-credentials", cors_credentials,
+        "Allow cross-origin cookies with explicit origins (SIPI_CORS_CREDENTIALS; default: false)")
+        ->check(CLI::IsMember({"true", "false"}))->type_name("BOOL");
     auto* storage_option = app.add_option("--iiif-storage", storage,
         "Default repository: local or s3 (SIPI_IIIF_STORAGE; default: local)")
         ->check(CLI::IsMember({"local", "s3"}));
@@ -294,6 +325,11 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
         load_setting(token_option, s3_environment.session_token);
         load_setting(workers_option, env_iiif_workers);
         load_setting(bitonal_option, env_bitonal_method);
+        load_setting(width_option, output_environment.width);
+        load_setting(height_option, output_environment.height);
+        load_setting(area_option, output_environment.area);
+        load_setting(origins_option, cors_environment.origins);
+        load_setting(credentials_option, cors_environment.credentials);
         if (!config_option->empty()) {
             std::ifstream input{config_path};
             if (!input) {
@@ -310,6 +346,16 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
         // the library's fixed error category, never the raw diagnostic.
         return ParseError{"Invalid startup configuration (" + error.get_name() +
                           "). Check option names, values and duplicates; use --help."};
+    }
+    result.config.cors_credentials = cors_credentials == "true";
+    if (result.config.cors_credentials && cors_origins == "*")
+        return ParseError{"cors-credentials=true requires explicit cors-origins"};
+    result.config.cors_origins.clear();
+    for (std::size_t begin = 0;;) {
+        const auto end = cors_origins.find(',', begin);
+        result.config.cors_origins.push_back(cors_origins.substr(begin, end - begin));
+        if (end == std::string::npos) break;
+        begin = end + 1;
     }
     save_repository();
     if (result.config.iiif_storage == StorageKind::s3 && !result.config.s3_bucket)

@@ -67,6 +67,9 @@ int main() {
     for (const auto* size : {"^500,", "^,400", "^500,400", "^!500,400", "^pct:50"}) {
         dimensions(resolve("full", size), 500, 400, std::string("caret without enlargement ") + size);
     }
+    dimensions(resolve("full", "max", {.max_width=8192}, 70000, 1),8192,1,"thin max retains one pixel");
+    dimensions(resolve("full", "max", {.max_area=1}, 70000, 1),1,1,"thin max area cap");
+    dimensions(resolve("full", "!100,100", {}, 70000, 1),100,1,"thin confined retains one pixel");
     const SizePolicy width_limit{.max_width = 400};
     dimensions(resolve("full", "max", width_limit), 400, 320, "maxWidth");
     dimensions(resolve("full", "max", width_limit, 800, 1000), 320, 400, "maxHeight defaults to maxWidth");

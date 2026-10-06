@@ -104,7 +104,7 @@ ctest --preset conan-debug --output-on-failure
 - `/tiled.tif/full/max/0/default.jpg`: 200 JPEG, 320 x 200.
 - `/tiled.tif/50,30,100,80/max/0/default.jpg`: 200 JPEG crop, 100 x 80.
 - `/sample.tif/info.json`: 200 information JSON, dimensions 320 x 200.
-- `/rotated.tif/info.json`: 200 information JSON, oriented dimensions 200 x 320.
+- `/rotated.tif/info.json`: 501 source_not_deliverable; the header can be read, but this orientation cannot be delivered.
 
 Automated checks include source priority, root startup failures, real symlinks and
 traversal, Lua-selected alternate dimensions, HEAD, clipping, orientation, BigTIFF,

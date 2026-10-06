@@ -34,8 +34,8 @@ end
                 info = json.loads(body)
                 assert (info['width'], info['height']) == (37, 23)
                 assert info['id'].endswith('/museum/project/' + name)
-                assert 'profile' not in info
-                assert 'rotationBy90s' in info['extraFeatures']
+                assert info['profile']=='level2'
+                assert info['profile']=='level2'
                 assert {k.lower(): v for k, v in headers.items()}['cache-control'] == 'no-store'
                 get_length = {k.lower(): v for k, v in headers.items()}['content-length']
                 status, head, body = get(port, path, 'HEAD')
@@ -83,7 +83,7 @@ end
             (images / 'replacement').replace(images / 'opaque-id')
             info = json.loads(get(port, '/opaque-id/info.json')[2])
             assert (info['width'], info['height']) == (320, 200)
-            assert 'rotationBy90s' in info['extraFeatures']
+            assert info['profile']=='level2'
             (images / 'rgb.jpg').unlink()
             assert get(port, '/rgb.jpg/info.json')[0] == 404
         assert 'IIIF metadata cache hit' in log[0]

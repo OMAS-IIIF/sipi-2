@@ -355,3 +355,27 @@ TOML > default precedence applies; help/version skip environment/file loading.
 The setting changes only `bitonal` requests, not their IIIF URL. The persistent
 cache separates methods. See [color policy](color-management.md)
 for the encoded-space algorithm, memory accounting and independent-tile limitation.
+
+
+## Output limits
+
+The three output settings are --max-width / SIPI_MAX_WIDTH / TOML max-width,
+--max-height / SIPI_MAX_HEIGHT / TOML max-height, and
+--max-area / SIPI_MAX_AREA / TOML max-area.
+Defaults: width 8192, absent height inherits the resolved width, area 8388608.
+Axes must be 1..32768 and area 1..8388608; zero/unlimited is not supported.
+They use the usual per-field precedence and appear as maxWidth/maxHeight/maxArea
+in info.json. See [output limits and resource admission](output-limits.md) for
+the shared geometry policy, rotated canvas checks and technical budget boundaries.
+
+## Browser origins and cookies
+
+| CLI / TOML key | Environment | Default |
+| --- | --- | --- |
+| cors-origins | SIPI_CORS_ORIGINS | `*` |
+| cors-credentials | SIPI_CORS_CREDENTIALS | `false` |
+
+Normal per-field priority applies: CLI > environment > TOML > default.
+Origins is a single comma-separated string of exact HTTP(S) origins, without
+spaces or paths, or the exclusive wildcard. Credentials accepts true/false and
+requires explicit origins. See [CORS contract and examples](iiif-http.md).

@@ -119,3 +119,8 @@ ctest --preset conan-debug --output-on-failure
 
 Image-dependent region/size resolution now lives separately in `IIIFGeometry.h`
 and `.cpp` in the same module. See [TIFF metadata and geometry](tiff-metadata-and-geometry.md).
+
+## HTTP base URIs
+
+The strict parser remains limited to image/info syntax. HttpProtocol separately
+classifies base URIs for authorized redirects; see [routing precedence](iiif-http.md).

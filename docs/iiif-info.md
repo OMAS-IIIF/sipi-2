@@ -1,8 +1,8 @@
 # Image information
 
 GET `/{prefix...}/{identifier}/info.json` authorizes the request, resolves the
-definitive source, reads its TIFF, JPEG 2000 or JPEG metadata, and returns status 200 with an
-`application/json` document. HEAD performs the same policy and metadata checks,
+definitive source, reads its TIFF, JPEG 2000, JPEG or PNG metadata, and returns status 200 with an
+JSON-LD document by default (JSON when selected by Accept). HEAD performs the same policy and metadata checks,
 returning the same headers without the body. All worker responses, including
 successful information documents, carry `Cache-Control: no-store`.
 
@@ -13,42 +13,43 @@ For the generated 320 x 200 test image and default listener:
   "@context": "http://iiif.io/api/image/3/context.json",
   "id": "http://127.0.0.1:8080/project/sample.tif",
   "type": "ImageService3",
+  "profile": "level2",
   "protocol": "http://iiif.io/api/image",
   "width": 320,
   "height": 200,
-  "extraFeatures": ["mirroring", "rotationBy90s", "rotationArbitrary"]
+  "maxWidth": 8192,
+  "maxHeight": 8192,
+  "maxArea": 8388608,
+  "extraFeatures": ["canonicalLinkHeader", "mirroring", "profileLinkHeader", "rotationArbitrary"],
+  "extraQualities": ["color", "gray", "bitonal"]
 }
 ```
 
-## Explicit development boundary
+See the [2026-10-06 conformance audit](iiif-conformance.md) for verified gaps and implementation order.
 
-The owner approved leaving `profile` out until pixel delivery supports a genuine
-compliance level. This document is therefore **not yet fully IIIF 3 conformant**:
-the [Image API](https://iiif.io/api/image/3.0/#52-technical-properties) requires
-`profile` to name the highest fully supported level, and even level0 needs image
-output. Add the appropriate profile when its actual requirements are implemented
-and tested, rather than declaring the eventual target now.
+## Published capabilities
 
-No `sizes`, `tiles`, `preferredFormats` or `extraFormats` are emitted yet.
-Sources with a supported pixel layout advertise
-`extraFeatures: ["mirroring", "rotationBy90s", "rotationArbitrary"]`; metadata-only layouts do not.
-See [orthogonal transforms](orthogonal-transforms.md). Pixel-readable sources advertise `extraQualities: ["gray", "bitonal"]`; RGB conversion uses
-LittleCMS and native grayscale remains unchanged (see [color management](color-management.md)). Parsing a parameter, recognizing an input codec,
-or reading a TIFF pyramid does not mean the server can render its output. In
-particular, `size-upscaling=true` does not advertise `sizeUpscaling` prematurely.
-Content negotiation/JSON-LD media type, CORS and base-URI redirects are separate
-future steps. For now the response always uses application/json, as do our other
-JSON endpoints. Supported tiled or strip-based gray/RGB/RGBA8 TIFF crops now return JPEG or PNG; unsupported
-operations/layouts return 501, except unsupported rotation angles, which return 400. Profile publication remains pending a per-resource
-compliance review: metadata-readable sources are not all pixel-deliverable yet.
-See [JPEG delivery](jpeg-delivery.md).
+Admitted resources now publish `profile: level2`. This retires the earlier,
+owner-approved omission after resource admission and required HTTP behavior were
+implemented. It is an implementation declaration, not external certification.
+The focused audit passes all 41 probes, including optional canonical links.
+See [HTTP behavior](iiif-http.md) and [audit evidence](iiif-conformance.md).
+
+Level 2 supplies JPEG/PNG, default quality, required region/size forms and quarter
+turns. Additional features are mirroring, arbitrary rotation, canonical links and profile links.
+Color sources add color/gray/bitonal qualities; native gray adds gray/bitonal.
+No sizes, tiles, preferredFormats or extraFormats are emitted. Upscaling remains
+unavailable in rendering and is not advertised, even if geometry permits it.
+Unsupported layouts and predictably unaffordable full/max sources return 501 on
+both info and images. Admission does not decode pixels or prove file integrity.
 
 ## Dimensions and source identity
 
 `src/http/IiifInfo.*` takes a decoded Resource, width/height, and the public base
 URL. It knows neither TIFF nor filesystem paths; it returns an owning JSON value.
-The worker supplies orientation-normalized display dimensions. A TIFF stored as
-320 x 200 with orientation 6 is reported as 200 x 320, matching geometry validation.
+The worker supplies dimensions only after delivery admission. Internal TIFF
+metadata retains orientation-normalized dimensions, but orientation 6 currently
+returns 501 at the public info endpoint because its pixels are unsupported.
 Classic TIFF and BigTIFF follow the same path. No pixels are decoded.
 
 Lua-selected sources determine dimensions, but never replace the public identifier
@@ -94,12 +95,13 @@ see [JPEG 2000 input](jpeg2000-input.md).
 
 JPEG headers now participate in the same information path for accepted 8-bit
 gray/RGB sources with absent/Top-left EXIF orientation. They advertise mirroring
-rotationBy90s and rotationArbitrary, plus gray and bitonal qualities for supported pixel sources.
-Other JPEG orientations are rejected, unlike the metadata-only TIFF orientation
-reporting described above. See [JPEG input](jpeg-input.md).
+and rotationArbitrary (quarter turns are included in level2), plus gray and bitonal qualities for supported pixel sources.
+Other JPEG and TIFF orientations are rejected for both public info and delivery. See [JPEG input](jpeg-input.md).
 
 
 PNG headers supply IHDR dimensions through the same metadata path. Pixel-supported
-sources advertise mirroring/rotationBy90s/rotationArbitrary, plus gray and bitonal qualities.
-Color encodings the current raster cannot preserve remain metadata-only. See
+sources advertise mirroring/rotationArbitrary (quarter turns are included in level2), plus gray and bitonal qualities.
+Color encodings the current raster cannot preserve return 501 on public info and delivery. See
 [PNG input](png-input.md) for the complete supported subset and validation boundaries.
+
+Successful info reports maxWidth/maxHeight/maxArea from the same policy used by requests; see [output limits](output-limits.md).

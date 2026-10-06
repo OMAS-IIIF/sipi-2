@@ -1,0 +1,402 @@
+{
+  "passed": 40,
+  "total": 41,
+  "checks": [
+    {
+      "check": "info.required_profile",
+      "passed": true,
+      "evidence": {
+        "@context": "http://iiif.io/api/image/3/context.json",
+        "extraFeatures": [
+          "mirroring",
+          "profileLinkHeader",
+          "rotationArbitrary"
+        ],
+        "extraQualities": [
+          "color",
+          "gray",
+          "bitonal"
+        ],
+        "height": 200,
+        "id": "http://127.0.0.1:56808/color.png",
+        "maxArea": 8388608,
+        "maxHeight": 8192,
+        "maxWidth": 8192,
+        "profile": "level2",
+        "protocol": "http://iiif.io/api/image",
+        "type": "ImageService3",
+        "width": 320
+      }
+    },
+    {
+      "check": "info.color_quality",
+      "passed": true,
+      "evidence": [
+        "color",
+        "gray",
+        "bitonal"
+      ]
+    },
+    {
+      "check": "info.png_discovery",
+      "passed": true,
+      "evidence": {
+        "profile": "level2",
+        "extraFormats": null
+      }
+    },
+    {
+      "check": "http.base_redirect",
+      "passed": true,
+      "evidence": {
+        "status": 303,
+        "location": "http://127.0.0.1:56808/project/color.png/info.json"
+      }
+    },
+    {
+      "check": "http.jsonld",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "application/ld+json;profile=\"http://iiif.io/api/image/3/context.json\""
+      }
+    },
+    {
+      "check": "http.cors:/color.png/info.json",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "allowOrigin": "*"
+      }
+    },
+    {
+      "check": "http.cors:/color.png/full/max/0/default.png",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "allowOrigin": "*"
+      }
+    },
+    {
+      "check": "http.cors:/missing.png/info.json",
+      "passed": true,
+      "evidence": {
+        "status": 404,
+        "allowOrigin": "*"
+      }
+    },
+    {
+      "check": "http.cors_preflight",
+      "passed": true,
+      "evidence": {
+        "status": 204,
+        "headers": {
+          "content-type": "text/html; charset=utf-8",
+          "server": "drogon/1.9.13",
+          "access-control-expose-headers": "Link, Location",
+          "allow": "GET, HEAD, OPTIONS",
+          "access-control-allow-origin": "*",
+          "access-control-allow-headers": "Authorization, Accept, Content-Type",
+          "access-control-allow-methods": "GET, HEAD, OPTIONS",
+          "cache-control": "no-store",
+          "date": "Tue, 06 Oct 2026 17:22:57 GMT"
+        }
+      }
+    },
+    {
+      "check": "geometry:full/max",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          320,
+          200
+        ]
+      }
+    },
+    {
+      "check": "geometry:10,20,100,80/max",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          100,
+          80
+        ]
+      }
+    },
+    {
+      "check": "geometry:pct:10,20,50,50/max",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          160,
+          100
+        ]
+      }
+    },
+    {
+      "check": "geometry:square/max",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          200,
+          200
+        ]
+      }
+    },
+    {
+      "check": "geometry:full/160,",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          160,
+          100
+        ]
+      }
+    },
+    {
+      "check": "geometry:full/,100",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          160,
+          100
+        ]
+      }
+    },
+    {
+      "check": "geometry:full/pct:50",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          160,
+          100
+        ]
+      }
+    },
+    {
+      "check": "geometry:full/!100,100",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          100,
+          63
+        ]
+      }
+    },
+    {
+      "check": "geometry:full/100,100",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          100,
+          100
+        ]
+      }
+    },
+    {
+      "check": "geometry:300,190,100,100/max",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          20,
+          10
+        ]
+      }
+    },
+    {
+      "check": "rotation:90",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          200,
+          320
+        ]
+      }
+    },
+    {
+      "check": "rotation:180",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          320,
+          200
+        ]
+      }
+    },
+    {
+      "check": "rotation:270",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          200,
+          320
+        ]
+      }
+    },
+    {
+      "check": "rotation:!0",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "dimensions": [
+          320,
+          200
+        ]
+      }
+    },
+    {
+      "check": "delivery:default.jpg",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/jpeg"
+      }
+    },
+    {
+      "check": "delivery:default.png",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/png"
+      }
+    },
+    {
+      "check": "delivery:color.jpg",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/jpeg"
+      }
+    },
+    {
+      "check": "delivery:color.png",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/png"
+      }
+    },
+    {
+      "check": "delivery:gray.jpg",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/jpeg"
+      }
+    },
+    {
+      "check": "delivery:gray.png",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/png"
+      }
+    },
+    {
+      "check": "delivery:bitonal.jpg",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/jpeg"
+      }
+    },
+    {
+      "check": "delivery:bitonal.png",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "contentType": "image/png"
+      }
+    },
+    {
+      "check": "http.head",
+      "passed": true,
+      "evidence": {
+        "status": 200,
+        "bytes": 0
+      }
+    },
+    {
+      "check": "optional.link:profile",
+      "passed": true,
+      "evidence": "<http://iiif.io/api/image/3/level2.json>;rel=\"profile\""
+    },
+    {
+      "check": "optional.link:canonical",
+      "passed": false,
+      "evidence": "<http://iiif.io/api/image/3/level2.json>;rel=\"profile\""
+    },
+    {
+      "check": "error.unsupported_format",
+      "passed": true,
+      "evidence": {
+        "status": 400,
+        "recommended": 400
+      }
+    },
+    {
+      "check": "error.unsupported_upscaling",
+      "passed": true,
+      "evidence": {
+        "status": 501
+      }
+    },
+    {
+      "check": "error.outside_region",
+      "passed": true,
+      "evidence": {
+        "status": 400
+      }
+    },
+    {
+      "check": "identity.prefix",
+      "passed": true,
+      "evidence": {
+        "status": 200
+      }
+    },
+    {
+      "check": "source.unsupported_png_precision",
+      "passed": true,
+      "evidence": {
+        "status": 501
+      }
+    },
+    {
+      "check": "source.metadata_only",
+      "passed": true,
+      "evidence": {
+        "infoStatus": 501,
+        "imageStatus": 501,
+        "document": {
+          "error": "source_not_deliverable",
+          "message": "Source layout or color encoding is not supported for delivery"
+        }
+      }
+    },
+    {
+      "check": "limits.wide_jpeg",
+      "passed": true,
+      "evidence": {
+        "infoStatus": 200,
+        "width": 70000,
+        "maxWidth": 8192,
+        "imageStatus": 200,
+        "error": null
+      }
+    }
+  ]
+}

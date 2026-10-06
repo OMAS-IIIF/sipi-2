@@ -55,6 +55,7 @@ def main():
                     expected=bytes(0 if v<128 else 255 for v in values)
                     response=get(port,base+'bitonal.png')
                     assert response[0]==200
+                    assert response[2][24:26]==bytes([1,0])
                     bw=decode_png(response[2])
                     assert bw[:4]==(w,h,expected,profile),(name,angle)
                     assert get(port,base+'bitonal.png')[2]==response[2]

@@ -66,8 +66,8 @@ end
                 info = json.loads(body)
                 assert (info['width'],info['height']) == (3,2)
                 assert info['id'].endswith('/museum/project/'+name)
-                assert 'profile' not in info
-                assert 'rotationBy90s' in info['extraFeatures']
+                assert info['profile']=='level2'
+                assert info['profile']=='level2'
                 headers = {k.lower():v for k,v in headers.items()}
                 assert headers['cache-control'] == 'no-store'
                 status, head, body = get(port,path,'HEAD')

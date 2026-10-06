@@ -166,7 +166,7 @@ end
                     """Check HTTP status/content type before returning parsed JSON."""
                     status, headers, body = request(path, method)
                     assert status == expected_status, (path, method, status, body[:300])
-                    assert "application/json" in headers.get("content-type", ""), headers
+                    assert any(t in headers.get("content-type", "") for t in ("application/json", "application/ld+json")), headers
                     return headers, json.loads(body)
 
                 _, health = json_request("/health", 200)
@@ -187,8 +187,8 @@ end
                     _, info = json_request('/museum/'+name+'/info.json', 200)
                     assert (info['width'], info['height']) == (37, 23)
                     assert info['id'].endswith('/museum/'+name)
-                    assert 'profile' not in info
-                    assert info.get('extraQualities', []) == ['gray', 'bitonal']
+                    assert info['profile']=='level2'
+                    assert info.get('extraQualities', []) == (['gray', 'bitonal'] if name=='source.j2k' else ['color','gray','bitonal'])
                     status, _, data = request('/'+name+'/info.json', method='HEAD')
                     assert status == 200 and not data
                     assert request('/'+name+'/full/max/0/default.jpg')[0] == 200
@@ -215,7 +215,7 @@ end
                 assert request('/corrupt-tile.jp2/0,0,5,5/max/0/default.png')[0] == 200
                 assert request('/corrupt-tile.jp2/full/max/0/default.png')[0] == 500
                 for name in ('sixteen.jp2','rgb-unknown.j2k'):
-                    assert request('/'+name+'/info.json')[0] == 200
+                    assert request('/'+name+'/info.json')[0] == 501
                     assert request('/'+name+'/full/max/0/default.png')[0] == 501
 
                 # Public identity is independent of filesystem selection, Host and proxy headers.
@@ -228,7 +228,6 @@ end
                     ("/a+b/info.json", "/a%2Bb", (320, 200)),
                     ("/caf%C3%A9.tif/info.json", "/caf%C3%A9.tif", (320, 200)),
                     ("/source%20with%20spaces.tif/info.json?token=secret", "/source%20with%20spaces.tif", (320, 200)),
-                    ("/rotated.tif/info.json", "/rotated.tif", (200, 320)),
                     ("/large.tif/info.json", "/large.tif", (1000, 800)),
                     ("/inside-link/info.json", "/inside-link", (320, 200)),
                 ):
@@ -236,9 +235,10 @@ end
                     assert document == {
                         "@context": "http://iiif.io/api/image/3/context.json",
                         "id": public_base + service_path,
-                        "type": "ImageService3", "protocol": "http://iiif.io/api/image",
+                        "type": "ImageService3", "profile": "level2", "protocol": "http://iiif.io/api/image",
                         "width": dimensions[0], "height": dimensions[1],
-                        **({"extraFeatures": ["mirroring", "rotationBy90s", "rotationArbitrary"], "extraQualities": ["gray", "bitonal"]}
+                        "maxWidth": 8192, "maxHeight": 8192, "maxArea": 8388608,
+                        **({"extraFeatures": ["canonicalLinkHeader", "mirroring", "profileLinkHeader", "rotationArbitrary"], "extraQualities": ["color", "gray", "bitonal"]}
                            if service_path != "/rotated.tif" else {}),
                     }, (path, document)
                     assert headers.get("cache-control") == "no-store"
@@ -395,8 +395,8 @@ end
                                for v in (*[((x*7+y*11)%256+c*31)%256 for c in range(3)],((x+y)%3)*127))
                 assert (w,h,pixels)==(19,8,expected)
                 for suffix in ("full/max/0/default.tif",):
-                    _, body = json_request("/tiled.tif/" + suffix, 501)
-                    assert body["error"] == "not_implemented", body
+                    _, body = json_request("/tiled.tif/" + suffix, 400)
+                    assert body["error"] == "unsupported_format", body
                 _, body = json_request("/broken-tile.tif/full/max/0/default.jpg", 500)
                 assert body["error"] == "invalid_image_source"
                 # A bad tile outside the requested crop is never decoded.
@@ -406,7 +406,7 @@ end
                     assert request("/jpeg-alias/full/max/0/default.jpg")[0] == 200
 
                 invalid = {
-                    "/": "path", "/helloworld": "path", "/missing.html": "path", "/health/": "path",
+                    "/": "path", "/health/": "path",
                     "/id/no-region/max/0/default.jpg": "region",
                     "/id/full/0,/0/default.jpg": "size",
                     "/id/full/max/361/default.jpg": "rotation",
@@ -427,13 +427,13 @@ end
 
                 for path in ("/health", "/hello", "/hello/id/full/max/0/default.jpg",
                              "/id/full/max/0/default.jpg", "/id/info.json", "/missing"):
-                    for method in ("POST", "PUT", "DELETE", "PATCH", "OPTIONS"):
+                    for method in ("POST", "PUT", "DELETE", "PATCH"):
                         headers, body = json_request(path, 405, method)
-                        assert headers.get("allow") == "GET, HEAD", headers
+                        assert headers.get("allow") == "GET, HEAD, OPTIONS", headers
                         assert body["error"] == "method_not_allowed", body
                 for path, expected_status in (("/hello", 200), ("/health", 200),
                                                ("/id/full/max/0/default.jpg", 200),
-                                               ("/id/info.json", 200), ("/invalid", 400)):
+                                               ("/id/info.json", 200), ("/id/no-region/max/0/default.jpg", 400)):
                     status, _, body = request(path, "HEAD")
                     assert status == expected_status and not body, (path, status, body)
                 # Both default mapping and Lua-selected paths feed actual header dimensions.
@@ -442,8 +442,8 @@ end
                     ("/sample.tif/full/321,/0/default.jpg", 400, "invalid_iiif_geometry"),
                     ("/sample.tif/full/^640,/0/default.jpg", 501, "not_implemented" if upscaling else "upscaling_disabled"),
                     ("/sample.tif/pct:100,0,10,10/max/0/default.jpg", 400, "invalid_iiif_geometry"),
-                    ("/rotated.tif/210,0,1,1/max/0/default.jpg", 400, "invalid_iiif_geometry"),
-                    ("/rotated.tif/0,210,1,1/max/0/default.jpg", 501, "not_implemented"),
+                    ("/rotated.tif/210,0,1,1/max/0/default.jpg", 501, "source_not_deliverable"),
+                    ("/rotated.tif/0,210,1,1/max/0/default.jpg", 501, "source_not_deliverable"),
                     ("/sample.tif/full/900,/0/default.jpg", 400, "invalid_iiif_geometry"),
                     ("/broken.tif/info.json", 500, "invalid_image_source"),
                     ("/other.png/info.json", 500, "invalid_image_source"),

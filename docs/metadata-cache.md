@@ -52,8 +52,9 @@ A list holds entries in most-recently-used order. Lookups scan at most the confi
 entry count (256 by default); a hit splices the existing node to the front. Admission
 evicts from the back until both budgets fit. This keeps one ownership structure
 without a duplicate hash index for a small bounded cache. Successful header reads
-are valid independently of pixel-decoder support; such metadata is useful for
-info.json even when an image operation will return 501.
+are valid independently of pixel-decoder support; cached metadata can also drive
+a deterministic source-admission rejection. Public info and image endpoints now
+both check delivery eligibility after the metadata lookup.
 
 Published values must be immutable, including through other aliases. The worker
 constructs `shared_ptr<const ImageMetadata>` directly. Retained snapshots survive

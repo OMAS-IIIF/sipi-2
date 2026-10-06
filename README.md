@@ -215,10 +215,13 @@ The result describes the authorized source (320 x 200 here), preserving `project
 in the public service id. Configure `public-base-url = "https://images.example.org"`
 behind Caddy. CLI and SIPI_PUBLIC_BASE_URL overrides work as for other settings.
 
-**Development boundary agreed with the owner:** `profile` is omitted until real
-image output satisfies a compliance level. The document is not yet fully IIIF 3
-conformant. No unimplemented formats or rendering features are advertised.
-See [the info.json contract](docs/iiif-info.md).
+Admitted resources publish `profile: level2`. Base URIs redirect after authorization;
+info supports JSON/JSON-LD negotiation. CORS defaults to public wildcard access,
+with configurable explicit origins and cookie support. See [HTTP policy](docs/iiif-http.md).
+External-validator and deployed-browser checks remain outstanding.
+See [the info.json contract](docs/iiif-info.md). Image responses include a
+[canonical URL](docs/canonical-uri.md) in the Link header, alongside the profile
+link, while delivering pixels directly (also on cache hits and HEAD).
 
 ## First JPEG delivery
 
@@ -356,7 +359,7 @@ only for this conversion; native grayscale keeps its values/profile. See
 
 IIIF `bitonal` now builds on that grayscale conversion: composite transparency on
 white, then threshold at 128 without dithering. PNG contains exact black/white
-samples (currently 8-bit storage); JPEG compression may introduce gray artifacts.
+samples in packed 1-bit grayscale storage; JPEG compression may introduce gray artifacts.
 See [the bitonal policy](docs/color-management.md#bitonal-quality).
 
 
@@ -364,3 +367,10 @@ Optional `--bitonal-method=floyd-steinberg` enables serpentine error diffusion;
 `SIPI_BITONAL_METHOD` and TOML `bitonal-method` use the usual precedence.
 Threshold remains the default. See [color management](docs/color-management.md)
 for the important limitation when rendering separate IIIF tiles.
+
+
+Public output bounds are configured with --max-width, --max-height and --max-area
+(or SIPI_MAX_WIDTH/HEIGHT/AREA and corresponding TOML keys). Defaults: 8192 per
+axis, 8388608 pixels; absent height inherits width. The same limits appear in
+info.json and are enforced before cache lookup. Unsupported or predictably
+unaffordable sources fail admission consistently. See [output policy](docs/output-limits.md).

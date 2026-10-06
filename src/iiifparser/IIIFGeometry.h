@@ -37,7 +37,8 @@ using GeometryResult = std::variant<ImageGeometry, GeometryError>;
 /** Resolve parsed region/size against nonzero, orientation-normalized dimensions.
  * Pure and thread-safe; no I/O, no mutation of input. Regions clip at image edges.
  * Percentage regions use floor for origins and ceil for extents; output sizes
- * use nearest integer (ties up); dimensions rounding to zero are rejected.
+ * use nearest integer (ties up); adaptive max/fit retain at least one pixel
+ * per axis and reapply area limits. Explicit dimensions rounding to zero fail.
  * Invalid manually constructed values also return an error. ^max requires a
  * configured finite size limit, since an unlimited maximum cannot be computed.
  * Success confirms geometry only, not image decodability or output codec support.

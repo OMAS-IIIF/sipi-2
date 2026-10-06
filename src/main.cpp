@@ -70,8 +70,15 @@ int main(int argc, char* argv[]) {
     if (const char* value = std::getenv("SIPI_IIIF_WORKERS")) env_iiif_workers = value;
     std::optional<std::string_view> env_bitonal_method;
     if (const char* value = std::getenv("SIPI_BITONAL_METHOD")) env_bitonal_method = value;
+    sipi::OutputLimitEnvironment output_environment;
+    if (const char* value = std::getenv("SIPI_MAX_WIDTH")) output_environment.width = value;
+    if (const char* value = std::getenv("SIPI_MAX_HEIGHT")) output_environment.height = value;
+    if (const char* value = std::getenv("SIPI_MAX_AREA")) output_environment.area = value;
+    sipi::CorsEnvironment cors_environment;
+    if (const char* value = std::getenv("SIPI_CORS_ORIGINS")) cors_environment.origins = value;
+    if (const char* value = std::getenv("SIPI_CORS_CREDENTIALS")) cors_environment.credentials = value;
     const auto parsed = sipi::load_startup_options(arguments, env_log_level, env_port,
-        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment, env_iiif_workers, env_bitonal_method);
+        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment, env_iiif_workers, env_bitonal_method, output_environment, cors_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&parsed)) {
         std::cerr << "Configuration error: " << error->message << '\n';
         return 2;

@@ -11,6 +11,13 @@ port = 8080
 # Permit actual IIIF enlargement when the request explicitly uses ^.
 size-upscaling = false
 
+# Shared JPEG/PNG output limits before rotation; source dimensions stay unchanged.
+# Axes: 1..32768. Area: 1..8388608 pixels. No unlimited value.
+max-width = 8192
+# Omit max-height to inherit the effective max-width (including CLI/env overrides).
+# max-height = 8192
+max-area = 8388608
+
 # Bitonal output: threshold or floyd-steinberg (per-request diffusion; tile patterns may differ).
 bitonal-method = "threshold"
 
@@ -55,3 +62,9 @@ bitonal-method = "threshold"
 # Optional override: 1..32 processing workers. If omitted, detected CPUs capped at 4.
 # More workers multiply per-request memory; this is not an RSS budget.
 # iiif-workers = 4
+
+# Public CORS by default. Cookie-based cross-origin viewers require explicit origins.
+cors-origins = "*"
+cors-credentials = false
+# Example: cors-origins = "https://viewer.example,https://catalog.example"
+# Then set cors-credentials = true. See docs/iiif-http.md.

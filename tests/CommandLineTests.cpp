@@ -36,6 +36,11 @@ struct Case {
     unsigned workers = sipi::http::default_worker_count();
     std::optional<std::string_view> bitonal_environment = std::nullopt;
     sipi::BitonalMethod bitonal_method = sipi::BitonalMethod::threshold;
+    sipi::OutputLimitEnvironment output_environment = {};
+    sipi::OutputLimits output_limits = {};
+    sipi::CorsEnvironment cors_environment = {};
+    std::vector<std::string> cors_origins{"*"};
+    bool cors_credentials = false;
 };
 
 /** Check either a complete typed result or a nonempty diagnostic. */
@@ -58,7 +63,7 @@ bool check(const Case& test) {
     std::optional<std::string_view> url_environment;
     if (test.url_environment) url_environment = *test.url_environment;
     const auto result = sipi::load_startup_options(arguments, environment, port_environment,
-        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment, test.workers_environment, test.bitonal_environment);
+        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment, test.workers_environment, test.bitonal_environment, test.output_environment, test.cors_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&result)) {
         if (test.error && !error->message.empty()) {
             return true;
@@ -68,6 +73,11 @@ bool check(const Case& test) {
     }
     const auto& options = std::get<sipi::StartupOptions>(result);
     const bool matches = !test.error && options.command == test.command &&
+                         options.config.cors_origins == test.cors_origins &&
+                         options.config.cors_credentials == test.cors_credentials &&
+                         options.config.output_limits.max_width == test.output_limits.max_width &&
+                         options.config.output_limits.max_height == test.output_limits.max_height &&
+                         options.config.output_limits.max_area == test.output_limits.max_area &&
                          options.config.iiif_workers == test.workers &&
                          options.config.bitonal_method == test.bitonal_method &&
                          options.config.log_level == test.level && options.config.port == test.port &&
@@ -397,6 +407,54 @@ int main(int argc, char* argv[]) {
     bitonal_case({"--config",file("invalid-bitonal.toml")}, {}, threshold, true);
     bitonal_case({"--bitonal-method=threshold","--bitonal-method=floyd-steinberg"}, {}, threshold, true);
     bitonal_case({"--help","--bitonal-method=bad"}, {}, threshold, true);
+    const auto output_case = [&](std::vector<std::string> args,
+                                  sipi::OutputLimitEnvironment env, sipi::OutputLimits expected,
+                                  bool error=false, Command command=Command::run) {
+        Case test{"output limit configuration",std::move(args)};
+        test.output_environment=env; test.output_limits=expected;
+        test.error=error; test.command=command; cases.push_back(std::move(test));
+    };
+    output_case({"--config",file("output-limits.toml")},{},{1000,800,500000});
+    output_case({"--config",file("output-limits.toml")},{"2000","900","600000"},{2000,900,600000});
+    output_case({"--config",file("output-limits.toml"),"--max-width=3000"},
+                {"2000","900","600000"},{3000,900,600000});
+    output_case({"--max-width=10"},{"bad",{},{}},{10,0,8388608});
+    output_case({"--help"},{"bad","bad","bad"},{},false,Command::help);
+    output_case({"--version"},{"bad","bad","bad"},{},false,Command::version);
+    for (const char* invalid : {"0","-1","+1","1.5","","999999999999999999999"}) {
+        output_case({"--max-width",invalid},{},{},true);
+        output_case({"--max-height",invalid},{},{},true);
+        output_case({"--max-area",invalid},{},{},true);
+        output_case({}, {invalid,{},{}},{},true);
+        output_case({}, {{},invalid,{}},{},true);
+        output_case({}, {{},{},invalid},{},true);
+    }
+    output_case({"--max-width=32769"},{},{},true);
+    output_case({"--max-height=32769"},{},{},true);
+    output_case({"--max-area=8388609"},{},{},true);
+    output_case({"--max-width=1","--max-width=2"},{},{},true);
+    output_case({"--config",file("invalid-output-limits.toml")},{},{},true);
+    output_case({"--help","--max-area=0"},{},{},true);
+    const auto cors_case = [&](std::vector<std::string> args, sipi::CorsEnvironment env,
+                               std::vector<std::string> origins, bool credentials, bool error=false) {
+        Case test{"CORS configuration", std::move(args)};
+        test.cors_environment=env; test.cors_origins=std::move(origins);
+        test.cors_credentials=credentials; test.error=error; cases.push_back(std::move(test));
+    };
+    cors_case({"--config",file("cors.toml")},{},{"https://viewer.example","https://other.example"},true);
+    cors_case({"--config",file("cors.toml")},{"https://env.example","false"},{"https://env.example"},false);
+    cors_case({"--config",file("cors.toml"),"--cors-origins=*","--cors-credentials=false"},
+              {"https://env.example","true"},{"*"},false);
+    cors_case({"--cors-credentials=true"},{},{},false,true);
+    cors_case({}, {"*","true"},{},false,true);
+    for (const char* invalid : {"", "null", "https://*.example", "https://host/path",
+            "https://host/", "https://user@host", "https://host,", "*,https://host",
+            "https://host?x", "https://host, https://other", "https://host:0"}) {
+        cors_case({"--cors-origins",invalid},{},{},false,true);
+        cors_case({}, {invalid,{}},{},false,true);
+    }
+    cors_case({"--cors-origins=http://[::1]:8080"},{},{"http://[::1]:8080"},false);
+    cors_case({"--cors-credentials=yes"},{},{},false,true);
     int failures = 0;
     for (const auto& test : cases) {
         failures += !check(test);
