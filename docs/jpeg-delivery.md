@@ -18,7 +18,7 @@ remain separate steps. Metadata reading still supports more layouts than pixel d
 All existing region forms (full, square, pixel and percentage) work through the
 geometry resolver, including clipping at image edges. The resolved output size
 may equal or reduce the crop dimensions on each axis. Reductions use
-[area-weighted stored-channel averaging](area-resize.md); enlargement is not implemented. Horizontal mirroring and clockwise 0/90/180/270/360-degree rotations are
+[area-weighted stored-channel averaging](area-resize.md); [enlargement](upscaling.md) uses bilinear interpolation when enabled. Horizontal mirroring and clockwise 0/90/180/270/360-degree rotations are
 applied after reduction, without interpolation. Other valid angles use
 [bilinear rotation](arbitrary-rotation.md) with transparent borders composited onto
 white for JPEG. See also [orthogonal transforms](orthogonal-transforms.md). JPEG with default

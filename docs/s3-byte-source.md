@@ -125,3 +125,80 @@ Typed local/S3 selection and preflight are integrated; authorization precedes
 source opening. The opt-in `s3-http` suite compares local/S3 JPEG bodies, checks
 info/HEAD, prefix mapping and mixed Lua sources. Next, measure and improve request
 counts with bounded buffering; keep result caching separate.
+
+## Bounded small-read buffering
+
+Each newly opened `S3ByteSource` owns a small-read LRU tied to its captured
+ETag/VersionId and size. Reads whose EOF-clipped length is at most **4 KiB** use
+aligned 4 KiB pages; a read crossing a page boundary fetches at most two pages.
+Only complete, validated pages are admitted. The final page is clipped at the
+captured EOF. At most **16 pages (64 KiB payload)** are retained, plus one incoming
+page during a fill; list/vector/mutex/shared-ownership overhead is additional.
+Page payload is allocated only when used, not on HEAD or a result-cache hit.
+These fixed implementation bounds do not introduce new configuration options.
+
+Larger reads bypass the LRU, preserving exact ranges and the existing 1 MiB
+maximum per GET; they neither populate nor consume small-read pages. This avoids
+turning large JPEG2000 reads into many small requests. A per-source mutex protects
+small reads, including a miss/fill, so concurrent misses for the same page issue
+one GET. Large reads release that mutex before network I/O and remain concurrent.
+Copies of one source share the same pinned state/cache; independent openings never
+share it. Destruction must still not race reads.
+
+HEAD runs on **every new source opening**. Every actual GET retains the existing
+If-Match and optional VersionId checks and validates Content-Range, length and
+received bytes before admission. A page hit serves bytes already obtained from
+that opened version; it does not perform another remote freshness check. Thus a
+replacement/deletion during an ongoing read can remain unobserved until a miss
+or a new opening, while all returned cached bytes still belong to the captured
+snapshot. Once a remote version/change error is observed, later nonempty reads
+on that source fail, including hits; the cached pages are cleared. Concurrent
+reads already in flight may complete with bytes from the captured version.
+
+Transient I/O or malformed-range failures do not admit partial pages and may be
+retried by a later explicit read. Automatic SDK retries remain disabled. A read
+spanning pages can have written earlier bytes when a later page fails; callers
+must discard the entire destination after an exception, as required by ByteSource.
+This buffer never crosses HTTP-request/source lifetimes or changes result-cache
+identity/rendering recipes. Newly requested images/masks still resolve and open
+the current source before higher-level cache lookup.
+
+The [measured comparison](benchmarks/2026-10-08-s3-buffer.md) records I/O counts,
+extra payload and throughput against the previous Release binary. Debug traces
+still report actual SDK operations only, not cache hits or logical read_at calls.
+
+## Opt-in I/O diagnostics
+
+At `--log-level=debug`, each actual SDK HEAD/Range GET records one `S3 io` line:
+
+```text
+S3 io op=GET source=7 object_bytes=12345 offset=4096 requested=1024 received=1024 elapsed_us=850 accepted=1
+```
+
+`source` is an anonymous process-local number assigned when an object is opened
+while debug is enabled. It correlates that HEAD with GETs from the same opened
+source; it is not a persistent cache identity. Enable debug before opening sources
+for complete correlation. Logs never include bucket/key, endpoint, ETag, version
+ID, credentials or response body. Do not interpret the numeric ID across restarts.
+
+`requested` is the bounded Range length; `received` is the number of bytes written
+into the response buffer, including partial/error replies. It excludes HTTP/TLS
+headers, TCP overhead and data rejected by the bounded stream, so it is **not wire
+traffic**. HEAD has zero requested/received body bytes. `object_bytes` is the
+captured object length, or zero when HEAD cannot validate it. `accepted` is one
+only after the existing response/version/range checks pass. Failures are logged
+during exception unwinding and still follow the existing error policy.
+
+`elapsed_us` uses the steady clock around the synchronous SDK call and subsequent
+response validation/metadata handling. It includes SDK signing/pool/network/server
+work and scheduling, not just network transit; request construction precedes it
+and its own log write follows it. Concurrent operation durations overlap and must
+not be summed as wall time. Diagnostics catch their own logging exceptions.
+When debug is off, no operation clock reads or formatted trace messages occur;
+only the level check and small stack bookkeeping remain. The diagnostic itself changes no retry,
+conditional-request or source-freshness behavior. Small-read buffering is described
+separately above.
+
+Use [the S3 I/O profiling workload](benchmarks.md#s3-operation-profiling) to group
+counts, sizes, durations and overlaps. Debug logging changes timing/throughput;
+these traces are not comparable with logging-disabled throughput benchmarks.

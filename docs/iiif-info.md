@@ -21,7 +21,8 @@ For the generated 320 x 200 test image and default listener:
   "maxHeight": 8192,
   "maxArea": 8388608,
   "extraFeatures": ["canonicalLinkHeader", "mirroring", "profileLinkHeader", "rotationArbitrary"],
-  "extraQualities": ["color", "gray", "bitonal"]
+  "extraQualities": ["color", "gray", "bitonal"],
+  "extraFormats": ["webp"]
 }
 ```
 
@@ -38,8 +39,10 @@ See [HTTP behavior](iiif-http.md) and [audit evidence](iiif-conformance.md).
 Level 2 supplies JPEG/PNG, default quality, required region/size forms and quarter
 turns. Additional features are mirroring, arbitrary rotation, canonical links and profile links.
 Color sources add color/gray/bitonal qualities; native gray adds gray/bitonal.
-No sizes, tiles, preferredFormats or extraFormats are emitted. Upscaling remains
-unavailable in rendering and is not advertised, even if geometry permits it.
+WebP output is advertised as extraFormats: ["webp"]. No sizes, tiles or
+preferredFormats are emitted. sizeUpscaling is
+advertised only when size-upscaling=true; [actual enlargement](upscaling.md) then
+uses bilinear interpolation within the same output limits.
 Unsupported layouts and predictably unaffordable full/max sources return 501 on
 both info and images. Admission does not decode pixels or prove file integrity.
 
@@ -105,3 +108,7 @@ Color encodings the current raster cannot preserve return 501 on public info and
 [PNG input](png-input.md) for the complete supported subset and validation boundaries.
 
 Successful info reports maxWidth/maxHeight/maxArea from the same policy used by requests; see [output limits](output-limits.md).
+
+## Restricted public coordinates
+
+A Lua resolution policy makes width/height describe the complete reduced public raster. Global maxWidth/maxHeight/maxArea remain separate output limits. Canonical/base identities retain the requested service prefix. See [restricted resolution](restricted-resolution.md).

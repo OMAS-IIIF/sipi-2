@@ -94,14 +94,14 @@ class RssSampler:
 
 
 @contextlib.contextmanager
-def server(binary, images, directory, workers, cache):
+def server(binary, images, directory, workers, cache, extra=(), log_level="warn"):
     """Run only our child; retain its log and require clean shutdown."""
     directory.mkdir()
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
     args = [str(binary), '--port', str(port), '--iiif-root', str(images),
-            '--iiif-workers', str(workers), '--log-level', 'warn']
+            '--iiif-workers', str(workers), '--log-level', log_level, *extra]
     if cache:
         args += ['--cache-dir', str(directory / 'cache'), '--cache-max-bytes', '536870912']
     env = {k: v for k, v in os.environ.items() if not k.startswith('SIPI_')}

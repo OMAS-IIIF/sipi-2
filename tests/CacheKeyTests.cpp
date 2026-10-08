@@ -113,23 +113,48 @@ recipe:14:sipi-render-v3
             [](auto& v){v.quality=iiif::Quality::gray;}, [](auto& v){v.quality=iiif::Quality::bitonal;},
             [](auto& v){v.encoding=JpegEncoding{91};}, [](auto& v){v.encoding=PngEncoding{};},
             [](auto& v){v.recipe="sipi-render-v2-linear-light";},
-            [](auto& v){v.watermark=SourceInfo{"local:watermark","w1",99};}
+            [](auto& v){v.watermark=WatermarkIdentity{SourceInfo{"local:watermark","w1",99},0.5,0.25,{255,255,255}};}
         };
         for (const auto& change : changes) {
             auto value=base(); change(value); const CacheKey key(value);
             require(key!=original && key.digest()!=original.digest(),"output-affecting change separates keys");
         }
         auto marked=base(); marked.variant="restricted:watermark-center";
-        marked.watermark=SourceInfo{"local:watermark","w1",99};
+        marked.watermark=WatermarkIdentity{SourceInfo{"local:watermark","w1",99},0.5,0.25,{255,255,255}};
         const CacheKey watermark_key(marked);
         for (const auto& change : std::vector<std::function<void(RenderIdentity&)>>{
-                [](auto& v){v.watermark->identity="local:other-watermark";},
-                [](auto& v){v.watermark->version="w2";}, [](auto& v){++v.watermark->size;},
+                [](auto& v){v.watermark->source.identity="local:other-watermark";},
+                [](auto& v){v.watermark->source.version="w2";}, [](auto& v){++v.watermark->source.size;},
+                [](auto& v){v.watermark->width_fraction=0.6;},
+                [](auto& v){v.watermark->opacity=0.5;}, [](auto& v){v.watermark->color[0]=0;},
                 [](auto& v){v.variant="restricted:watermark-corner";}, [](auto& v){v.watermark.reset();}}) {
             auto value=marked; change(value);
             require(CacheKey(value)!=watermark_key,"watermark identity/version/placement/presence separate results");
         }
 
+        for (const double invalid : {0.0, -0.5, 1.01, std::numeric_limits<double>::quiet_NaN(),
+                                     std::numeric_limits<double>::infinity()}) {
+            auto value=marked; value.watermark->width_fraction=invalid;
+            bool caught=false;
+            try { (void)CacheKey(value); } catch (const std::invalid_argument&) { caught=true; }
+            require(caught,"invalid watermark width is rejected");
+            if (invalid == 0) continue; // Opacity zero is valid, width zero is not.
+            value=marked; value.watermark->opacity=invalid; caught=false;
+            try { (void)CacheKey(value); } catch (const std::invalid_argument&) { caught=true; }
+            require(caught,"invalid watermark opacity is rejected");
+        }
+        auto zero=marked; zero.watermark->opacity=0;
+        auto negative=zero; negative.watermark->opacity=-0.0;
+        require(CacheKey(zero)==CacheKey(negative),"watermark signed zero normalized");
+
+        auto webp=base(); webp.encoding=WebpEncoding{false,85};
+        require(CacheKey(webp)!=original,"WebP/JPEG separation");
+        auto alternate=webp; alternate.encoding=WebpEncoding{true,85};
+        require(CacheKey(webp)!=CacheKey(alternate),"WebP lossless separation");
+        alternate.encoding=WebpEncoding{false,86};
+        require(CacheKey(webp)!=CacheKey(alternate),"WebP quality separation");
+        alternate.encoding=PngEncoding{};
+        require(CacheKey(webp)!=CacheKey(alternate),"WebP/PNG separation");
         auto left=base(),right=base();
         left.source.identity="a:b"; left.source.version="c";
         right.source.identity="a"; right.source.version="b:c";
@@ -162,9 +187,11 @@ recipe:14:sipi-render-v3
             [](auto& v){v.rotation.degrees=std::numeric_limits<double>::quiet_NaN();},
             [](auto& v){v.quality=static_cast<iiif::Quality>(99);},
             [](auto& v){v.input_layout=static_cast<PixelLayout>(99);},
+            [](auto& v){v.encoding=WebpEncoding{false,0};},
+            [](auto& v){v.encoding=WebpEncoding{true,101};},
             [](auto& v){v.encoding=JpegEncoding{0};}, [](auto& v){v.encoding=JpegEncoding{101};},
-            [](auto& v){v.watermark=SourceInfo{"","v1",1};},
-            [](auto& v){v.watermark=SourceInfo{"id","",1};}, [](auto& v){v.watermark=SourceInfo{"id","v1",0};}
+            [](auto& v){v.watermark=WatermarkIdentity{SourceInfo{"","v1",1},0.5,0.25,{255,255,255}};},
+            [](auto& v){v.watermark=WatermarkIdentity{SourceInfo{"id","",1},0.5,0.25,{255,255,255}};}, [](auto& v){v.watermark=WatermarkIdentity{SourceInfo{"id","v1",0},0.5,0.25,{255,255,255}};}
         };
         for (const auto& change:invalid) {
             auto value=base(); change(value); bool caught=false;

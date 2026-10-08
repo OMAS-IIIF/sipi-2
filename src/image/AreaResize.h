@@ -35,4 +35,17 @@ class ResizeError : public std::runtime_error { public: using std::runtime_error
 [[nodiscard]] RasterImage8 downsample_area(RasterImage8 image, const PixelWindow& window,
     std::uint32_t width, std::uint32_t height,
     std::size_t max_working_bytes = 256 * 1024 * 1024);
+/** Resize a window with area filtering on shrinking axes and linear interpolation
+ * on enlarged axes (bilinear when both grow). Pixel centers use the half-pixel
+ * convention; edge samples clamp to the crop's enclosing pixels. Mixed-axis
+ * resizing retains area antialiasing on the shrinking axis without an intermediate
+ * raster. Alpha is weighted before color interpolation; filtering stays in stored
+ * channel values. ICC/sRGB declarations and layout are preserved.
+ * Pure downscaling delegates to downsample_area unchanged. Same ownership and
+ * source + output + ICC budget, checked before allocation; no contribution tables.
+ * This function performs no IIIF permission checks; those belong to SizePolicy.
+ */
+[[nodiscard]] RasterImage8 resize_image(RasterImage8 image, const PixelWindow& window,
+    std::uint32_t width, std::uint32_t height,
+    std::size_t max_working_bytes = 256 * 1024 * 1024);
 } // namespace sipi

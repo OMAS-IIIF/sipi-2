@@ -1,6 +1,7 @@
 #include "imgformats/J2kReadPlan.h"
 #include "storage/LocalFileSource.h"
 #include "image/AreaResize.h"
+#include "image/Watermark.h"
 #include <filesystem>
 #include <iostream>
 #include <future>
@@ -38,6 +39,7 @@ int main(int argc,char** argv) {
                 const auto h = static_cast<unsigned>(ceil_div(m.origin_y+m.height,step)-ceil_div(m.origin_y,step));
                 const auto full_plan = sipi::plan_j2k_read(m,{{0,0,m.width,m.height},w,h});
                 require(full_plan.reduction == plan.reduction,"reference resolution");
+                require(plan.level_width == w && plan.level_height == h,"planned full level dimensions");
                 auto full = sipi::read_j2k_region(source,m,full_plan);
                 auto crop = sipi::read_j2k_region(source,m,plan);
                 for (unsigned y=0;y<crop.height;++y)
@@ -46,6 +48,16 @@ int main(int argc,char** argv) {
                             require(crop.pixels[(y*crop.width+x)*crop.channel_count()+c] ==
                                 full.pixels[((y+plan.reduced_region.y)*w+x+plan.reduced_region.x)*full.channel_count()+c],
                                 "selective reduced decode differs from full resolution reference");
+                // The same globally anchored mask must survive independent
+                // Grok window decoding and the final fractional resampling.
+                sipi::RasterImage8 mask{3,2,{0,255,80,255,20,160},{},sipi::PixelLayout::gray};
+                const auto mark = sipi::prepare_watermark(std::move(mask),m.width,m.height,0.65);
+                const std::vector<std::uint8_t> color(full.channel_count(),255);
+                full = sipi::apply_watermark(std::move(full),mark,color,0.6,
+                    sipi::WatermarkGrid{w,h});
+                crop = sipi::apply_watermark(std::move(crop),mark,color,0.6,
+                    sipi::WatermarkGrid{plan.level_width,plan.level_height,
+                        plan.reduced_region.x,plan.reduced_region.y});
                 sipi::PixelWindow exact{
                     {std::uint64_t{region.x}*w,std::uint64_t{region.width}*w,m.width},
                     {std::uint64_t{region.y}*h,std::uint64_t{region.height}*h,m.height}};

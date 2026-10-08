@@ -77,6 +77,9 @@ int main(int argc, char** argv) {
         fixture::alpha_tiff(directory/"alpha-unspecified.tif", EXTRASAMPLE_UNSPECIFIED);
         fixture::alpha_tiff(directory/"alpha-invalid.tif", EXTRASAMPLE_ASSOCALPHA, false, false, true);
         fixture::pyramid(directory/"pyramid.tif", true, true);
+        // Untagged pyramid for real color transforms; the preservation fixture above
+        // deliberately carries an ICC header without usable transform tags.
+        fixture::pyramid(directory/"watermark-pyramid.tif", true, true, false, false, false);
         fixture::pyramid(directory/"pyramid-stripped.tif", false, false, true);
         {
             std::unique_ptr<TIFF, decltype(&TIFFClose)> flat(

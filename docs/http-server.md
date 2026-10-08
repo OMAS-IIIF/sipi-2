@@ -198,3 +198,23 @@ malformed data returns 500. See [PNG input](png-input.md).
 
 Arbitrary angles expand the canvas with transparent borders (white for JPEG),
 using alpha-weighted bilinear interpolation. See [rotation](arbitrary-rotation.md).
+
+### Watermark delivery
+
+A Lua-selected single-color PNG coverage mask is resolved locally or from S3,
+validated before any result-cache hit, and applied on the actual TIFF/J2K decoder
+grid (or full PNG/JPEG raster) before resizing and other IIIF transforms. Cache keys
+include mask version, placement, opacity and color. Missing/invalid required masks
+return `500 / watermark_failed`, including info/base and HEAD; there is no unmarked
+fallback. Public dimensions and canonical service identity stay unchanged and
+responses remain no-store. See [watermarks](watermarks.md) and the
+[preflight contract](preflight.md#single-color-watermark-decision).
+
+## Restricted public delivery
+
+Lua `resolution` creates a complete reduced public raster before IIIF operations.
+Info/geometry/canonical coordinates use the public canvas. The source cache is
+a bounded pool-wide LRU configured with `variant-cache-max-entries/max-bytes`;
+result cache entries remain persistent and separate from originals. See
+[restricted resolution](restricted-resolution.md) for stable Lua prefixes,
+source invalidation, budgets and examples.

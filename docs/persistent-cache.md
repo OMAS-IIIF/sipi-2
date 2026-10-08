@@ -6,7 +6,7 @@ bytes** and output metadata. It has no knowledge of Lua, HTTP, image decoders or
 source authorization. Source metadata reuse is provided by a separate [in-memory cache](metadata-cache.md).
 
 The executable initializes the configured store and shares ownership with the IIIF
-worker. JPEG/PNG image requests now use authorized lookup/fill for both local and
+worker. JPEG/PNG/WebP image requests now use authorized lookup/fill for both local and
 S3-backed TIFF/JPEG 2000 sources. A hit skips pixel decoding, resizing and encoding;
 source opening/version checks still run, while unchanged headers can come from the metadata cache. Browser/proxy responses
 retain `Cache-Control: no-store`; server-side reuse is independent of that policy.
@@ -74,7 +74,7 @@ if (auto hit = cache.get(key)) {
 `encoded_bytes` is a borrowed `span<const byte>` valid throughout `put`. Only the
 completed output is accepted; there is no second in-memory copy or retained span.
 The caller must supply metadata matching the bytes and key. The store accepts
-JPEG/PNG media types and positive dimensions/byte counts; it does not decode or
+JPEG/PNG/WebP media types and positive dimensions/byte counts; it does not decode or
 validate image content. It does not yet provide an incremental encoder sink.
 
 `get` returns `nullopt` for absent/missing/wrong-size files. A hit owns a read-only
@@ -213,3 +213,13 @@ SQLite API references: [opening connections](https://www.sqlite.org/c3ref/open.h
 For [orthogonal transforms](orthogonal-transforms.md), indexed width/height
 describe the final encoded image (swapped for 90/270 degrees). Capability checks
 precede lookup; cached output never enables unsupported angles.
+
+WebP result files use image/webp; the existing SQLite schema is unchanged.
+Encoder mode/quality and color recipe are part of the key; see [WebP](webp-delivery.md).
+
+Required watermark masks are opened and validated before result lookup, even on
+HEAD and after restart. Mask version and all selected watermark parameters separate
+encoded entries; failure never falls back to an unmarked entry. An independent bounded
+[mask memory cache](watermarks.md#decoded-mask-memory-cache) reuses decoded samples
+after current source opening/version checks. Its limits and lifecycle are separate
+from persistent encoded results.

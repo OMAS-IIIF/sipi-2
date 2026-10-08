@@ -28,17 +28,21 @@ void validate_source(const SourceInfo& source) {
         throw std::invalid_argument("Cache identity requires a nonempty version-bound source");
 }
 
-std::string angle(double degrees) {
+std::string binary64(double value) {
     static_assert(sizeof(double) == sizeof(std::uint64_t) && std::numeric_limits<double>::is_iec559);
-    if (!std::isfinite(degrees) || degrees < 0 || degrees > 360)
-        throw std::invalid_argument("Invalid cache rotation");
     // Both +0 and -0 compare equal; canonicalize before preserving exact bits.
-    if (degrees == 0 || degrees == 360) degrees = 0;
-    const auto bits = std::bit_cast<std::uint64_t>(degrees);
+    if (value == 0) value = 0;
+    const auto bits = std::bit_cast<std::uint64_t>(value);
     constexpr std::string_view digits = "0123456789abcdef";
     std::string result(16, '0');
     for (unsigned i=0; i<16; ++i) result[i] = digits[(bits >> (60-4*i)) & 15];
     return result;
+}
+
+std::string angle(double degrees) {
+    if (!std::isfinite(degrees) || degrees < 0 || degrees > 360)
+        throw std::invalid_argument("Invalid cache rotation");
+    return binary64(degrees == 360 ? 0 : degrees);
 }
 
 std::string_view effective_quality(iiif::Quality quality, PixelLayout layout) {
@@ -55,7 +59,13 @@ std::string_view effective_quality(iiif::Quality quality, PixelLayout layout) {
 
 std::string serialize(const RenderIdentity& value) {
     validate_source(value.source);
-    if (value.watermark) validate_source(*value.watermark);
+    if (value.watermark) {
+        validate_source(value.watermark->source);
+        if (!std::isfinite(value.watermark->width_fraction) || value.watermark->width_fraction <= 0 ||
+            value.watermark->width_fraction > 1 || !std::isfinite(value.watermark->opacity) ||
+            value.watermark->opacity < 0 || value.watermark->opacity > 1)
+            throw std::invalid_argument("Invalid watermark cache settings");
+    }
     if (value.variant.empty() || value.recipe.empty())
         throw std::invalid_argument("Cache variant and rendering recipe must be explicit");
     if (value.bitonal_method != BitonalMethod::threshold &&
@@ -73,9 +83,14 @@ std::string serialize(const RenderIdentity& value) {
     field(result,"variant",value.variant);
     number(result,"watermark.present",value.watermark.has_value());
     if (value.watermark) {
-        field(result,"watermark.identity",value.watermark->identity);
-        field(result,"watermark.version",value.watermark->version);
-        number(result,"watermark.bytes",value.watermark->size);
+        field(result,"watermark.identity",value.watermark->source.identity);
+        field(result,"watermark.version",value.watermark->source.version);
+        number(result,"watermark.bytes",value.watermark->source.size);
+        field(result,"watermark.width.binary64",binary64(value.watermark->width_fraction));
+        field(result,"watermark.opacity.binary64",binary64(value.watermark->opacity));
+        for (unsigned i=0;i<3;++i)
+            number(result,std::string("watermark.srgb.")+decimal(i),value.watermark->color[i]);
+        field(result,"watermark.recipe","center-fit-direct-area-linear-srgb-bpc-v1");
     }
     number(result,"crop.x",crop.x); number(result,"crop.y",crop.y);
     number(result,"crop.width",crop.width); number(result,"crop.height",crop.height);
@@ -89,6 +104,13 @@ std::string serialize(const RenderIdentity& value) {
             throw std::invalid_argument("Invalid cache JPEG encoder quality");
         field(result,"encoding","jpeg");
         number(result,"jpeg.quality",static_cast<unsigned>(jpeg->quality));
+    } else if (const auto* webp = std::get_if<WebpEncoding>(&value.encoding)) {
+        if (webp->quality < 1 || webp->quality > 100)
+            throw std::invalid_argument("Invalid cache WebP quality");
+        field(result,"encoding","webp");
+        number(result,"webp.lossless",webp->lossless);
+        number(result,"webp.quality",static_cast<unsigned>(webp->quality));
+        field(result,"webp.recipe","libwebp-1.6.0-method4-exact-gray-srgb-v1");
     } else {
         field(result,"encoding","png");
     }

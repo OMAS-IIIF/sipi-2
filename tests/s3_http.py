@@ -12,6 +12,8 @@ import sys
 import tempfile
 import time
 import uuid
+from watermark_preflight_http import mask
+from png_check import decode_png
 
 exe, fixtures, jpeg_fixtures, png_fixtures = map(lambda p: Path(p).resolve(), sys.argv[1:])
 bucket = 'sipi-http-' + uuid.uuid4().hex
@@ -43,7 +45,7 @@ def server(args, variables=None):
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
     with tempfile.TemporaryFile() as log:
-        process = subprocess.Popen([str(exe), '--port', str(port), *args], env={**env, **(variables or {})}, stdout=log, stderr=log)
+        process = subprocess.Popen([str(exe), '--port', str(port), '--size-upscaling=true', *args], env={**env, **(variables or {})}, stdout=log, stderr=log)
         try:
             for _ in range(100):
                 if process.poll() is not None:
@@ -75,6 +77,61 @@ try:
     for name in ('rgb.png', 'icc.png', 'rgba.png', 'adam7-large.png', 'srgb.png', 'srgb-gray.png', 'sixteen.png', 'bad-crc.png'):
         s3('PUT', name, png_fixtures / name)
     with tempfile.TemporaryDirectory() as directory:
+        mask_file=Path(directory,'mask.png')
+        mask_file.write_bytes(mask(255))
+        s3('PUT','watermark.png',mask_file)
+        watermark_policy=Path(directory,'watermark.lua')
+        watermark_policy.write_text("""function preflight(r)
+          local result={decision='allow',source={type='s3',key='rgb.png'}}
+          if r.identifier~='plain' then
+            result.watermark={source={type='s3',key='watermark.png'},
+              width_fraction=0.5,opacity=1,color={255,255,255}}
+          end
+          return result
+        end""")
+        with server(backend+['--preflight-script',str(watermark_policy),
+                             '--cache-dir',str(Path(directory,'watermark-cache'))]) as marked:
+            url='/marked/full/max/0/default.png'
+            plain=get(marked,'/plain/full/max/0/default.png')
+            first=get(marked,url)
+            assert first[0]==200 and plain[0]==200 and first[2]!=plain[2]
+            w,h,pixels,*_=decode_png(first[2])
+            center=((h//2)*w+w//2)*3
+            assert pixels[center:center+3]==bytes([255]*3)
+            assert get(marked,url)[2]==first[2]
+            mask_file.write_bytes(mask(0)); s3('PUT','watermark.png',mask_file)
+            assert get(marked,url)[2]==plain[2]
+            s3('DELETE','watermark.png')
+            assert get(marked,url)[0]==500
+            assert get(marked,'/marked/info.json')[0]==500
+        restricted=Path(directory,'restricted.lua')
+        restricted.write_text("""function preflight(r)
+          if r.prefix[1]~='public' then return {decision='deny'} end
+          return {decision='allow',resolution={max_width=20,max_height=20}}
+        end""")
+        paths=['/'+name+'/full/max/0/default.png' for name in ('tiled.tif','pyramid.tif','source.jp2','offset.jp2')]
+        args=['--preflight-script',str(restricted)]
+        with server(['--iiif-root',str(fixtures),*args]) as local:
+            references=[get(local,'/public'+path) for path in paths]
+            assert all(r[0]==200 for r in references)
+        with server([*backend,'--iiif-storage=s3',*args,
+                     '--cache-dir',str(Path(directory,'restricted-cache'))]) as remote:
+            for path,reference in zip(paths,references):
+                for _ in range(2):
+                    actual=get(remote,'/public'+path)
+                    assert actual[0]==200 and actual[2]==reference[2]
+                w,h,pixels,*_=decode_png(reference[2])
+                assert w<=20 and h<=20
+                part=get(remote,'/public'+path.replace('/full/max/','/1,1,3,2/max/'))
+                assert part[0]==200
+                assert decode_png(part[2])[2]==b''.join(pixels[(y*w+1)*3:(y*w+4)*3] for y in (1,2))
+            assert get(remote,paths[0])[0]==403
+            # A warm reduced source/result must not survive a changed S3 validator.
+            s3('PUT','tiled.tif',fixtures/'gray.tif')
+            changed=get(remote,'/public'+paths[0]); assert changed[0]==200 and changed[2]!=references[0][2]
+            s3('DELETE','tiled.tif')
+            assert get(remote,'/public'+paths[0])[0]==404
+            s3('PUT','tiled.tif',fixtures/'tiled.tif')
         policy = Path(directory, 'policy.lua')
         # Lua performs the project-specific prefix mapping explicitly.
         policy.write_text('''function preflight(request)
@@ -101,29 +158,37 @@ try:
             alpha_path = '/alpha-pyramid.tif/3,1,29,17/14,8/0/default.'
             expected_rotated_alpha = get(local,alpha_path.replace('/0/','/!270/')+'png')
             assert expected_rotated_alpha[0] == 200
-            expected_alpha = {fmt:get(local,alpha_path+fmt) for fmt in ('png','jpg')}
+            expected_alpha = {fmt:get(local,alpha_path+fmt) for fmt in ('png','jpg','webp')}
             assert all(r[0]==200 for r in expected_alpha.values())
             strip_paths = ['/gray-pyramid.tif/3,1,31,21/15,10/0/default.'+fmt for fmt in ('png','jpg')]
-            strip_paths += ['/strip-rgba.tif/3,4,19,8/7,3/0/default.'+fmt for fmt in ('png','jpg')]
+            # Header-only ICC fixture has no transform tags: never silently drop it for WebP.
+            assert get(local,'/gray-pyramid.tif/full/max/0/default.webp')[0]==500
+            strip_paths += ['/strip-rgba.tif/3,4,19,8/7,3/0/default.'+fmt for fmt in ('png','jpg','webp')]
             j2k_paths = ['/'+name+'/1,1,35,21/7,4/0/default.'+fmt
-                         for name in ('source.jp2','source.j2k','offset.jp2') for fmt in ('png','jpg')]
+                         for name in ('source.jp2','source.j2k','offset.jp2') for fmt in ('png','jpg','webp')]
             j2k_paths += [path.replace('/0/', '/!90/') for path in j2k_paths]
             j2k_paths += [path.replace('/0/', '/!37.5/') for path in j2k_paths if '/0/' in path]
+            j2k_paths += ['/'+name+'/1,1,10,10/^20,15/0/default.png'
+                          for name in ('source.jp2','source.j2k','offset.jp2')]
+            strip_paths += ['/'+name+'/1,1,10,10/^20,5/0/default.png'
+                            for name in ('tiled.tif','pyramid.tif','alpha-pyramid.tif','gray-pyramid.tif','strip-rgba.tif')]
             expected_j2k = {path:get(local,path) for path in j2k_paths}
             assert all(r[0]==200 for r in expected_j2k.values())
             expected_strips = {path:get(local,path) for path in strip_paths}
             assert all(r[0]==200 for r in expected_strips.values())
         jpeg_paths = ['/'+name+'/3,4,20,12/10,6/!90/default.'+fmt
-                      for name in ('rgb.jpg','icc.jpg') for fmt in ('jpg','png')]
+                      for name in ('rgb.jpg','icc.jpg') for fmt in ('jpg','png','webp')]
+        jpeg_paths += ['/rgb.jpg/3,4,10,10/^20,15/0/default.png']
         with server(['--iiif-root', str(jpeg_fixtures)]) as local:
             jpeg_reference = {path:get(local,path) for path in jpeg_paths}
             assert all(result[0] == 200 for result in jpeg_reference.values())
         png_paths = ['/'+name+'/full/2,1/!37.5/default.'+fmt
-                     for name in ('rgb.png','icc.png','rgba.png','adam7-large.png','srgb.png','srgb-gray.png') for fmt in ('png','jpg')]
+                     for name in ('rgb.png','icc.png','rgba.png','adam7-large.png','srgb.png','srgb-gray.png') for fmt in ('png','jpg','webp')]
         png_paths += [path.replace('default.',quality+'.') for path in png_paths if 'icc.png' not in path for quality in ('gray','bitonal')]
+        png_paths += ['/'+name+'/full/^10,10/0/default.png' for name in ('rgb.png','rgba.png','srgb-gray.png')]
         with server(['--iiif-root', str(png_fixtures)]) as local:
             png_reference = {path:get(local,path) for path in png_paths}
-            assert all(result[0] == 200 for result in png_reference.values())
+            assert all(result[0] == 200 for result in png_reference.values()), [(path,r[0],r[2]) for path,r in png_reference.items() if r[0]!=200]
         cache = Path(directory, 'cache')
         with server(['--iiif-workers=4', '--preflight-script', str(policy), '--cache-dir', str(cache)], {
             'SIPI_IIIF_STORAGE': 's3', 'SIPI_S3_BUCKET': bucket, 'SIPI_S3_REGION': 'us-east-1',
@@ -137,6 +202,7 @@ try:
                 assert info['profile']=='level2'
                 assert get(remote, '/' + name + '/info.json', 'HEAD')[0] == 200
                 assert get(remote, '/' + name + '/full/max/0/default.png')[0] == 200
+            assert get(remote,'/gray-pyramid.tif/full/max/0/default.webp')[0]==500
             assert get(remote, '/sixteen.png/info.json')[0] == 501
             assert get(remote, '/bad-crc.png/info.json')[0] == 500
             for path, reference in {**jpeg_reference, **png_reference}.items():
@@ -178,7 +244,7 @@ try:
             for _ in range(2):
                 actual = get(remote,alpha_path.replace('/0/','/!270/')+'png')
                 assert actual[0] == 200 and actual[2] == expected_rotated_alpha[2]
-            for fmt in ('png','jpg'):
+            for fmt in ('png','jpg','webp'):
                 actual = get(remote,alpha_path+fmt)
                 assert actual[0] == 200 and actual[2] == expected_alpha[fmt][2]
             for path in strip_paths:
@@ -216,6 +282,7 @@ try:
         with server(offline + ['--iiif-storage=s3', '--preflight-script', str(policy)]) as denied:
             assert get(denied, '/deny/info.json')[0] == 403
 finally:
+    s3('DELETE','watermark.png')
     for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif', 'alpha-pyramid.tif', 'gray-pyramid.tif', 'strip-rgba.tif', 'source.jp2', 'source.j2k', 'offset.jp2'):
         s3('DELETE', key)
     for name in ('rgb.jpg', 'icc.jpg', 'orientation.jpg', 'broken.jpg'):

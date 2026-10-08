@@ -280,7 +280,7 @@ struct ResultCache::Impl {
             metadata.media_type = query.bytes(2);
             const auto w = query.number(3), h = query.number(4);
             if (!w || !h || w > UINT32_MAX || h > UINT32_MAX ||
-                (metadata.media_type != "image/jpeg" && metadata.media_type != "image/png"))
+                (metadata.media_type != "image/jpeg" && metadata.media_type != "image/png" && metadata.media_type != "image/webp"))
                 throw CacheError("Invalid cached output metadata");
             metadata.width = static_cast<std::uint32_t>(w);
             metadata.height = static_cast<std::uint32_t>(h);
@@ -326,7 +326,7 @@ void ResultCache::flush_accesses() {
 }
 bool ResultCache::put(const CacheKey& key, const ResultMetadata& metadata, std::span<const std::byte> bytes) {
     if (bytes.empty() || !metadata.width || !metadata.height ||
-        (metadata.media_type != "image/jpeg" && metadata.media_type != "image/png"))
+        (metadata.media_type != "image/jpeg" && metadata.media_type != "image/png" && metadata.media_type != "image/webp"))
         throw CacheError("Invalid encoded cache result");
     const std::lock_guard guard(impl_->mutex);
     auto& state = *impl_;

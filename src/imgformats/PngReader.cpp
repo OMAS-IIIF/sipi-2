@@ -128,6 +128,13 @@ PngMetadata extract_metadata(const Decoder* state) {
     return result;
 }
 
+void require_mask_metadata(png_structp codec, png_infop info) {
+    if (png_get_valid(codec, info, PNG_INFO_tRNS | PNG_INFO_iCCP | PNG_INFO_sRGB |
+                     PNG_INFO_gAMA | PNG_INFO_cHRM | PNG_INFO_eXIf |
+                     PNG_INFO_cICP | PNG_INFO_cLLI | PNG_INFO_mDCV))
+        throw PngUnsupportedError("PNG coverage mask must not declare transparency, color encoding or orientation");
+}
+
 void decode_pixels(Decoder& state, const PngMetadata& metadata) {
     if (setjmp(png_jmpbuf(state.codec))) {
         if (state.failure) std::rethrow_exception(state.failure);
@@ -187,6 +194,26 @@ RasterImage8 read_png_image(const ByteSource& source, const PngMetadata& metadat
         std::move(actual.icc_profile), layout, actual.srgb_intent};
     state->remaining = max_read_bytes - static_cast<std::size_t>(state->offset);
     decode_pixels(*state, metadata);
+    return std::move(state->image);
+}
+
+RasterImage8 read_png_mask(const ByteSource& source, std::size_t max_decoded_bytes,
+                          std::size_t max_read_bytes) {
+    const auto state = std::make_unique<Decoder>(source,
+        std::min(max_read_bytes, std::size_t{16 * 1024 * 1024}));
+    read_header(*state);
+    if (png_get_color_type(state->codec, state->info) != PNG_COLOR_TYPE_GRAY)
+        throw PngUnsupportedError("PNG coverage mask requires grayscale without alpha or palette");
+    require_mask_metadata(state->codec,state->info);
+    const auto metadata = extract_metadata(state.get());
+    const auto pixels = std::uint64_t(metadata.width)*metadata.height;
+    if (pixels > max_decoded_bytes)
+        throw PngReadError("PNG coverage mask exceeds decoded memory limit");
+    state->image = {metadata.width,metadata.height,
+        std::vector<std::uint8_t>(static_cast<std::size_t>(pixels)),{},PixelLayout::gray};
+    state->remaining = max_read_bytes-static_cast<std::size_t>(state->offset);
+    decode_pixels(*state,metadata);
+    require_mask_metadata(state->codec,state->end);
     return std::move(state->image);
 }
 } // namespace sipi

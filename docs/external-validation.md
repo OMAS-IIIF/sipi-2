@@ -1,5 +1,62 @@
 # External IIIF Image API validation
 
+## Feature-freeze validation — 2026-10-08
+
+The unchanged consortium validator at commit
+`f05e365a1cb28f8707cbd50466a86d8f611d1ab8` passed against the current Release binary:
+
+| Service | Level 2 | Selected optional tests | Failures |
+| --- | --- | --- | --- |
+| Original 1000 × 1000 reference | 31 | 8 | 0 |
+| Restricted public 1000 × 1000 canvas from a 2000 × 2000 source | 31 | 8 | 0 |
+
+**78 upstream tests passed.** [Evidence](audits/2026-10-08-external-validator.json)
+retains commands, summaries, full upstream output, both policies, source/binary
+hashes, Python versions and server logs. The upstream checkout remains clean.
+No server implementation or upstream assertion was changed for these runs.
+
+The validator hard-codes a 1000 × 1000 reference pattern. For the restricted test,
+the runner creates a 2000 × 2000 source by duplicating each official reference
+pixel into a 2 × 2 block (Pillow nearest-neighbor). SIPI must reduce it to a public
+1000 × 1000 image. Before validation, Pillow verifies that the public raster's
+RGBA pixels exactly equal the untouched official reference. An unprefixed original
+alias must return 403. All requests with the public prefix, including nested public
+prefixes used by malformed-identifier probes, receive the same restriction.
+Unknown allowed public resources therefore reach source lookup and return 404.
+This is an isolated test policy; no deployed authorization policy was changed.
+
+### Validator limitations and diagnostic evidence
+
+The [initial diagnostic run](audits/2026-10-08-external-validator-diagnostics.json)
+records three failures with explained causes:
+
+- The upstream `format_webp` test failed on both services because it compares
+  `img[8:12]` (Python 3 bytes) with `"WEBP"` (text). That comparison is always false.
+  It is excluded from the passing upstream selection, not patched or reported as
+  an upstream pass. The runner independently verifies HTTP 200, `image/webp`,
+  RIFF/WEBP signatures, full Pillow decoding and 1000 × 1000 dimensions for both
+  services. These extra checks passed and are separately recorded.
+- The first public test policy rejected every nested prefix with 403. Upstream's
+  `id_error_escapedslash` expects 404 for its unknown `/public/a/b/...` resource.
+  The final isolated policy permits nested public prefixes **with the same
+  resolution restriction**, while still denying nonpublic aliases. The unchanged
+  level-2 suite then passes. A policy denial is not converted into a server 404.
+
+The eight upstream optional tests cover canonical/profile links, mirroring,
+mirroring plus 180° rotation, arbitrary full/region rotation, gray and bitonal.
+Upscaling is not enabled in these runs; it remains covered by project tests.
+The pinned upstream `size_up` also has fixed sizing assumptions, so this result
+must not be presented as external coverage of that feature. Watermarks, S3,
+credentialed CORS and real proxy/viewer deployments likewise need their separate
+regression/integration checks. This is external validation, not formal certification.
+
+Temporary listeners, repositories and caches were stopped/removed after the runs.
+Feature freeze remains active. Next: consolidate documentation/support matrices,
+finish the color-management handbook and prepare the release.
+
+## Earlier baseline — 2026-10-06
+
+
 On 2026-10-06 SIPI-2 passed the unmodified [IIIF consortium image-validator](https://github.com/IIIF/image-validator)
 at commit f05e365a1cb28f8707cbd50466a86d8f611d1ab8:
 
@@ -13,7 +70,7 @@ output, validator commit, Python dependencies, source-image SHA-256, server-bina
 SHA-256 and temporary server logs. No application code or validator assertions
 were changed to obtain this result.
 
-## Method and scope
+## Earlier baseline method and scope
 
 The upstream command-line validator ran in an isolated Python environment against
 a temporary loopback listener with the official, unmodified 1000 by 1000 PNG
@@ -50,10 +107,12 @@ git clone https://github.com/IIIF/image-validator.git build/external-image-valid
 git -C build/external-image-validator checkout f05e365a1cb28f8707cbd50466a86d8f611d1ab8
 python3 -m venv build/iiif-validator-venv
 build/iiif-validator-venv/bin/pip install ./build/external-image-validator
-python3 tests/external_iiif_validator.py build/Debug/sipi-2 build/external-image-validator build/iiif-validator-venv/bin/python build/external-validation.json
+python3 tests/external_iiif_validator.py build/release/sipi-2 build/external-image-validator build/iiif-validator-venv/bin/python build/external-validation.json
 ```
 
-Reuse existing checkout/venv instead of cloning them again. The runner requires a
+The current runner checks both original and genuinely reduced public services,
+plus the independent WebP checks described above. Reuse existing checkout/venv
+instead of cloning them again. The runner requires a
 clean upstream checkout, records installed versions and fails on upstream test
 failures or missing test execution. It is opt-in, outside the offline CTest suite;
 it does not fetch or install dependencies itself. To reproduce the dependency set

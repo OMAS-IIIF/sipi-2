@@ -117,11 +117,15 @@ int main(int argc, char** argv) {
         expect(sipi::ByteSourceErrorCode::not_found, [&] { sipi::S3ByteSource missing(client, plain.name, "absent"); });
         plain.put(key, "replacement");
         expect(sipi::ByteSourceErrorCode::changed, [&] { read(source, 0, 16); });
+        expect(sipi::ByteSourceErrorCode::changed, [&] { read(source, data.size()-5, 5); }); // Warm page poisoned too.
         const sipi::S3ByteSource replaced(client, plain.name, key);
         check(read(replaced, 0, 100) == "replacement", "New open sees replacement");
         check(source.info().version != replaced.info().version, "Version fingerprints differ");
+        const sipi::S3ByteSource unopened_page(client, plain.name, key);
         plain.erase(key);
-        expect(sipi::ByteSourceErrorCode::changed, [&] { read(replaced, 0, 4); });
+        check(read(replaced, 0, 4)=="repl", "Cached bytes preserve opened snapshot after deletion");
+        expect(sipi::ByteSourceErrorCode::changed, [&] { read(unopened_page, 0, 4); });
+        expect(sipi::ByteSourceErrorCode::not_found, [&] { sipi::S3ByteSource missing(client,plain.name,key); });
 
         versioned.put("image", "original");
         const sipi::S3ByteSource pinned(client, versioned.name, "image");

@@ -1,0 +1,17 @@
+**
+!Dockerfile
+!CMakeLists.txt
+!conanfile.txt
+!conan.lock
+!conan/
+!conan/**
+!src/
+!src/**
+!benchmarks/
+!benchmarks/**
+!examples/
+!examples/oldap/
+!examples/oldap/preflight.lua
+!examples/oldap/docker-entrypoint.sh
+!docker/
+!docker/conan-profile

@@ -1,0 +1,1567 @@
+{
+  "complete": true,
+  "utc_started": "2026-10-07T23:27:31Z",
+  "server_sha256": "42a7a623b7a2f869b3950dbe851bc52ec3c15143c8fc86785dede53f8bf917a0",
+  "runner_sha256": "c98c125c121c739d27a727778ebffbc4cc24c7411242c90b798cb39e3802cb77",
+  "clients": 8,
+  "workers": 4,
+  "repetitions": 3,
+  "mask_sha256": "7fb0fa6ecaf047c92e3a306212fc01e8ed9f64cccd3a70f2fe24ed8da55f741a",
+  "sources": {
+    "master.tif": {
+      "bytes": 34303492,
+      "sha256": "69524963fadeeb34998daca15ed0f839c157fd4e4a07eb8c9449063dae3147db"
+    },
+    "master.jp2": {
+      "bytes": 35332421,
+      "sha256": "7e1ab7d3d2c964e2de91c6e1976ae3727be675e50d2c7f2d266dc9a5fbd5479a"
+    }
+  },
+  "minio_cleanup": "Owned temporary objects and bucket deleted",
+  "trials": [
+    {
+      "source": "master.tif",
+      "mode": "result-hit",
+      "repetition": 1,
+      "http": {
+        "elapsed_seconds": 0.14382416699663736,
+        "requests": 512,
+        "requests_per_second": 3559.9024189861684,
+        "p50_ms": 2.1253959857858717,
+        "p95_ms": 3.010915999766439,
+        "bytes": 11017120
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 256.664,
+          "p50_ms": 0.4785,
+          "p95_ms": 0.636,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 246.749,
+          "p50_ms": 0.468,
+          "p95_ms": 0.621,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        }
+      ]
+    },
+    {
+      "source": "master.jp2",
+      "mode": "mask-on",
+      "repetition": 1,
+      "http": {
+        "elapsed_seconds": 2.0472157090262044,
+        "requests": 128,
+        "requests_per_second": 62.52394383046501,
+        "p50_ms": 122.17260400939267,
+        "p95_ms": 156.09820900135674,
+        "bytes": 3103696
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 98.055,
+          "p50_ms": 0.65,
+          "p95_ms": 1.356,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 1280,
+          "requested_bytes": 332741332,
+          "received_bytes": 332741332,
+          "elapsed_ms": 2648.267,
+          "p50_ms": 1.1165,
+          "p95_ms": 6.888,
+          "median_requested_bytes": 65536.0,
+          "at_most_1k": 4,
+          "at_most_4k": 4
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 89.145,
+          "p50_ms": 0.565,
+          "p95_ms": 1.241,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 4,
+          "requested_bytes": 13276,
+          "received_bytes": 13276,
+          "elapsed_ms": 2.2030000000000003,
+          "p50_ms": 0.549,
+          "p95_ms": 0.587,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 4
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 332741332,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 81900,
+          "hypothetical_4k_bytes": 335447316
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 4,
+          "unique_read_bytes": 13276,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 4,
+          "hypothetical_4k_bytes": 13276
+        }
+      ]
+    },
+    {
+      "source": "master.tif",
+      "mode": "mask-off",
+      "repetition": 1,
+      "http": {
+        "elapsed_seconds": 0.5757583329977933,
+        "requests": 128,
+        "requests_per_second": 222.31549708285434,
+        "p50_ms": 33.1849795038579,
+        "p95_ms": 45.003917010035366,
+        "bytes": 2754280
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 67.707,
+          "p50_ms": 0.4635,
+          "p95_ms": 1.011,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 2432,
+          "requested_bytes": 13283598,
+          "received_bytes": 13283598,
+          "elapsed_ms": 1797.597,
+          "p50_ms": 0.66,
+          "p95_ms": 1.182,
+          "median_requested_bytes": 6.0,
+          "at_most_1k": 2304,
+          "at_most_4k": 2304
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 59.257,
+          "p50_ms": 0.4285,
+          "p95_ms": 0.662,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 128,
+          "requested_bytes": 424832,
+          "received_bytes": 424832,
+          "elapsed_ms": 63.672,
+          "p50_ms": 0.478,
+          "p95_ms": 0.674,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 128
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 13140238,
+          "repeated_read_bytes": 143360,
+          "hypothetical_4k_pages": 3891,
+          "hypothetical_4k_bytes": 15905024
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 424832,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 128,
+          "hypothetical_4k_bytes": 424832
+        }
+      ]
+    },
+    {
+      "source": "master.jp2",
+      "mode": "mask-off",
+      "repetition": 1,
+      "http": {
+        "elapsed_seconds": 2.0566237079910934,
+        "requests": 128,
+        "requests_per_second": 62.23792884553985,
+        "p50_ms": 120.52670850243885,
+        "p95_ms": 168.67275000549853,
+        "bytes": 3103696
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 100.319,
+          "p50_ms": 0.6375,
+          "p95_ms": 1.566,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 1280,
+          "requested_bytes": 332741332,
+          "received_bytes": 332741332,
+          "elapsed_ms": 2539.832,
+          "p50_ms": 1.0779999999999998,
+          "p95_ms": 6.124,
+          "median_requested_bytes": 65536.0,
+          "at_most_1k": 4,
+          "at_most_4k": 4
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 91.051,
+          "p50_ms": 0.5215000000000001,
+          "p95_ms": 1.438,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 128,
+          "requested_bytes": 424832,
+          "received_bytes": 424832,
+          "elapsed_ms": 89.299,
+          "p50_ms": 0.574,
+          "p95_ms": 1.216,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 128
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 332741332,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 81900,
+          "hypothetical_4k_bytes": 335447316
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 424832,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 128,
+          "hypothetical_4k_bytes": 424832
+        }
+      ]
+    },
+    {
+      "source": "master.tif",
+      "mode": "mask-on",
+      "repetition": 1,
+      "http": {
+        "elapsed_seconds": 0.5529814580222592,
+        "requests": 128,
+        "requests_per_second": 231.47249901975485,
+        "p50_ms": 33.937083499040455,
+        "p95_ms": 41.70787500333972,
+        "bytes": 2754280
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 71.234,
+          "p50_ms": 0.4865,
+          "p95_ms": 1.133,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 2432,
+          "requested_bytes": 13283598,
+          "received_bytes": 13283598,
+          "elapsed_ms": 1824.708,
+          "p50_ms": 0.669,
+          "p95_ms": 1.179,
+          "median_requested_bytes": 6.0,
+          "at_most_1k": 2304,
+          "at_most_4k": 2304
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 61.546,
+          "p50_ms": 0.4365,
+          "p95_ms": 0.707,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 4,
+          "requested_bytes": 13276,
+          "received_bytes": 13276,
+          "elapsed_ms": 2.814,
+          "p50_ms": 0.6885,
+          "p95_ms": 0.801,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 4
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 13140238,
+          "repeated_read_bytes": 143360,
+          "hypothetical_4k_pages": 3891,
+          "hypothetical_4k_bytes": 15905024
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 4,
+          "unique_read_bytes": 13276,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 4,
+          "hypothetical_4k_bytes": 13276
+        }
+      ]
+    },
+    {
+      "source": "master.jp2",
+      "mode": "result-hit",
+      "repetition": 1,
+      "http": {
+        "elapsed_seconds": 0.13884124998003244,
+        "requests": 512,
+        "requests_per_second": 3687.6648695804283,
+        "p50_ms": 2.0336244924692437,
+        "p95_ms": 2.7318329957779497,
+        "bytes": 12414784
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 247.243,
+          "p50_ms": 0.461,
+          "p95_ms": 0.636,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 239.14,
+          "p50_ms": 0.4505,
+          "p95_ms": 0.618,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        }
+      ]
+    },
+    {
+      "source": "master.jp2",
+      "mode": "mask-on",
+      "repetition": 2,
+      "http": {
+        "elapsed_seconds": 2.0489929580071475,
+        "requests": 128,
+        "requests_per_second": 62.46971201135455,
+        "p50_ms": 120.67643701448105,
+        "p95_ms": 170.66091697779484,
+        "bytes": 3103696
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 101.794,
+          "p50_ms": 0.5994999999999999,
+          "p95_ms": 1.749,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 1280,
+          "requested_bytes": 332741332,
+          "received_bytes": 332741332,
+          "elapsed_ms": 2617.039,
+          "p50_ms": 1.105,
+          "p95_ms": 7.071,
+          "median_requested_bytes": 65536.0,
+          "at_most_1k": 4,
+          "at_most_4k": 4
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 90.565,
+          "p50_ms": 0.521,
+          "p95_ms": 1.567,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 4,
+          "requested_bytes": 13276,
+          "received_bytes": 13276,
+          "elapsed_ms": 2.27,
+          "p50_ms": 0.577,
+          "p95_ms": 0.599,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 4
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 332741332,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 81900,
+          "hypothetical_4k_bytes": 335447316
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 4,
+          "unique_read_bytes": 13276,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 4,
+          "hypothetical_4k_bytes": 13276
+        }
+      ]
+    },
+    {
+      "source": "master.tif",
+      "mode": "result-hit",
+      "repetition": 2,
+      "http": {
+        "elapsed_seconds": 0.1364254170039203,
+        "requests": 512,
+        "requests_per_second": 3752.966355127852,
+        "p50_ms": 1.9685419974848628,
+        "p95_ms": 2.901041996665299,
+        "bytes": 11017120
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 239.549,
+          "p50_ms": 0.4465,
+          "p95_ms": 0.634,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 231.191,
+          "p50_ms": 0.431,
+          "p95_ms": 0.594,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        }
+      ]
+    },
+    {
+      "source": "master.jp2",
+      "mode": "result-hit",
+      "repetition": 2,
+      "http": {
+        "elapsed_seconds": 0.22855804199934937,
+        "requests": 512,
+        "requests_per_second": 2240.1311960900393,
+        "p50_ms": 2.885083493310958,
+        "p95_ms": 7.808416994521394,
+        "bytes": 12414784
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 350.445,
+          "p50_ms": 0.632,
+          "p95_ms": 1.112,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 350.918,
+          "p50_ms": 0.618,
+          "p95_ms": 1.253,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        }
+      ]
+    },
+    {
+      "source": "master.jp2",
+      "mode": "mask-off",
+      "repetition": 2,
+      "http": {
+        "elapsed_seconds": 2.434856125008082,
+        "requests": 128,
+        "requests_per_second": 52.56984126714063,
+        "p50_ms": 147.41537501686253,
+        "p95_ms": 183.40554099995643,
+        "bytes": 3103696
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 131.957,
+          "p50_ms": 0.9005000000000001,
+          "p95_ms": 1.958,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 1280,
+          "requested_bytes": 332741332,
+          "received_bytes": 332741332,
+          "elapsed_ms": 3513.205,
+          "p50_ms": 1.525,
+          "p95_ms": 9.36,
+          "median_requested_bytes": 65536.0,
+          "at_most_1k": 4,
+          "at_most_4k": 4
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 119.318,
+          "p50_ms": 0.792,
+          "p95_ms": 1.79,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 128,
+          "requested_bytes": 424832,
+          "received_bytes": 424832,
+          "elapsed_ms": 131.327,
+          "p50_ms": 0.859,
+          "p95_ms": 2.147,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 128
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 332741332,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 81900,
+          "hypothetical_4k_bytes": 335447316
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 424832,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 128,
+          "hypothetical_4k_bytes": 424832
+        }
+      ]
+    },
+    {
+      "source": "master.tif",
+      "mode": "mask-on",
+      "repetition": 2,
+      "http": {
+        "elapsed_seconds": 0.5892285000008997,
+        "requests": 128,
+        "requests_per_second": 217.2332125818839,
+        "p50_ms": 39.08035399217624,
+        "p95_ms": 43.008208012906834,
+        "bytes": 2754280
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 78.45,
+          "p50_ms": 0.5305,
+          "p95_ms": 1.159,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 2432,
+          "requested_bytes": 13283598,
+          "received_bytes": 13283598,
+          "elapsed_ms": 1948.784,
+          "p50_ms": 0.702,
+          "p95_ms": 1.352,
+          "median_requested_bytes": 6.0,
+          "at_most_1k": 2304,
+          "at_most_4k": 2304
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 67.118,
+          "p50_ms": 0.49,
+          "p95_ms": 0.769,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 4,
+          "requested_bytes": 13276,
+          "received_bytes": 13276,
+          "elapsed_ms": 2.464,
+          "p50_ms": 0.606,
+          "p95_ms": 0.671,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 4
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 13140238,
+          "repeated_read_bytes": 143360,
+          "hypothetical_4k_pages": 3891,
+          "hypothetical_4k_bytes": 15905024
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 4,
+          "unique_read_bytes": 13276,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 4,
+          "hypothetical_4k_bytes": 13276
+        }
+      ]
+    },
+    {
+      "source": "master.tif",
+      "mode": "mask-off",
+      "repetition": 2,
+      "http": {
+        "elapsed_seconds": 0.6113137080101296,
+        "requests": 128,
+        "requests_per_second": 209.3851296360575,
+        "p50_ms": 34.4606875005411,
+        "p95_ms": 67.80387499020435,
+        "bytes": 2754280
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 70.529,
+          "p50_ms": 0.489,
+          "p95_ms": 1.025,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 2432,
+          "requested_bytes": 13283598,
+          "received_bytes": 13283598,
+          "elapsed_ms": 1809.963,
+          "p50_ms": 0.6705000000000001,
+          "p95_ms": 1.115,
+          "median_requested_bytes": 6.0,
+          "at_most_1k": 2304,
+          "at_most_4k": 2304
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 64.845,
+          "p50_ms": 0.438,
+          "p95_ms": 0.969,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 128,
+          "requested_bytes": 424832,
+          "received_bytes": 424832,
+          "elapsed_ms": 70.751,
+          "p50_ms": 0.505,
+          "p95_ms": 0.778,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 128
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 13140238,
+          "repeated_read_bytes": 143360,
+          "hypothetical_4k_pages": 3891,
+          "hypothetical_4k_bytes": 15905024
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 424832,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 128,
+          "hypothetical_4k_bytes": 424832
+        }
+      ]
+    },
+    {
+      "source": "master.tif",
+      "mode": "mask-off",
+      "repetition": 3,
+      "http": {
+        "elapsed_seconds": 0.5684690420166589,
+        "requests": 128,
+        "requests_per_second": 225.16617535744183,
+        "p50_ms": 33.4739170211833,
+        "p95_ms": 42.905167007120326,
+        "bytes": 2754280
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 70.826,
+          "p50_ms": 0.48,
+          "p95_ms": 0.936,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 2432,
+          "requested_bytes": 13283598,
+          "received_bytes": 13283598,
+          "elapsed_ms": 1769.407,
+          "p50_ms": 0.6555,
+          "p95_ms": 1.128,
+          "median_requested_bytes": 6.0,
+          "at_most_1k": 2304,
+          "at_most_4k": 2304
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 67.79,
+          "p50_ms": 0.454,
+          "p95_ms": 0.95,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 128,
+          "requested_bytes": 424832,
+          "received_bytes": 424832,
+          "elapsed_ms": 72.343,
+          "p50_ms": 0.5,
+          "p95_ms": 0.872,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 128
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 13140238,
+          "repeated_read_bytes": 143360,
+          "hypothetical_4k_pages": 3891,
+          "hypothetical_4k_bytes": 15905024
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 424832,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 128,
+          "hypothetical_4k_bytes": 424832
+        }
+      ]
+    },
+    {
+      "source": "master.jp2",
+      "mode": "result-hit",
+      "repetition": 3,
+      "http": {
+        "elapsed_seconds": 0.1386116670037154,
+        "requests": 512,
+        "requests_per_second": 3693.7727614680234,
+        "p50_ms": 2.019042003666982,
+        "p95_ms": 2.986959007102996,
+        "bytes": 12414784
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 243.985,
+          "p50_ms": 0.4555,
+          "p95_ms": 0.622,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 242.629,
+          "p50_ms": 0.449,
+          "p95_ms": 0.644,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        }
+      ]
+    },
+    {
+      "source": "master.tif",
+      "mode": "mask-on",
+      "repetition": 3,
+      "http": {
+        "elapsed_seconds": 0.5468913330114447,
+        "requests": 128,
+        "requests_per_second": 234.05015269701005,
+        "p50_ms": 32.97456249129027,
+        "p95_ms": 42.09537501446903,
+        "bytes": 2754280
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 66.845,
+          "p50_ms": 0.4715,
+          "p95_ms": 0.953,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 2432,
+          "requested_bytes": 13283598,
+          "received_bytes": 13283598,
+          "elapsed_ms": 1789.568,
+          "p50_ms": 0.657,
+          "p95_ms": 1.17,
+          "median_requested_bytes": 6.0,
+          "at_most_1k": 2304,
+          "at_most_4k": 2304
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 60.28,
+          "p50_ms": 0.4285,
+          "p95_ms": 0.695,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 4,
+          "requested_bytes": 13276,
+          "received_bytes": 13276,
+          "elapsed_ms": 2.435,
+          "p50_ms": 0.6335,
+          "p95_ms": 0.666,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 4
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 13140238,
+          "repeated_read_bytes": 143360,
+          "hypothetical_4k_pages": 3891,
+          "hypothetical_4k_bytes": 15905024
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 4,
+          "unique_read_bytes": 13276,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 4,
+          "hypothetical_4k_bytes": 13276
+        }
+      ]
+    },
+    {
+      "source": "master.jp2",
+      "mode": "mask-on",
+      "repetition": 3,
+      "http": {
+        "elapsed_seconds": 2.0390369999804534,
+        "requests": 128,
+        "requests_per_second": 62.77473140567191,
+        "p50_ms": 119.89939599880017,
+        "p95_ms": 171.2534999824129,
+        "bytes": 3103696
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 97.87,
+          "p50_ms": 0.6885,
+          "p95_ms": 1.268,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 1280,
+          "requested_bytes": 332741332,
+          "received_bytes": 332741332,
+          "elapsed_ms": 2509.227,
+          "p50_ms": 1.083,
+          "p95_ms": 6.195,
+          "median_requested_bytes": 65536.0,
+          "at_most_1k": 4,
+          "at_most_4k": 4
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 85.782,
+          "p50_ms": 0.5609999999999999,
+          "p95_ms": 1.079,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 4,
+          "requested_bytes": 13276,
+          "received_bytes": 13276,
+          "elapsed_ms": 2.15,
+          "p50_ms": 0.558,
+          "p95_ms": 0.567,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 4
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 332741332,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 81900,
+          "hypothetical_4k_bytes": 335447316
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 4,
+          "unique_read_bytes": 13276,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 4,
+          "hypothetical_4k_bytes": 13276
+        }
+      ]
+    },
+    {
+      "source": "master.tif",
+      "mode": "result-hit",
+      "repetition": 3,
+      "http": {
+        "elapsed_seconds": 0.13527108301059343,
+        "requests": 512,
+        "requests_per_second": 3784.9922437591777,
+        "p50_ms": 2.010708485613577,
+        "p95_ms": 2.5979169877246022,
+        "bytes": 11017120
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 238.34,
+          "p50_ms": 0.452,
+          "p95_ms": 0.591,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 512,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 228.818,
+          "p50_ms": 0.437,
+          "p95_ms": 0.574,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 0,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "median_requested_bytes": null,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 0,
+          "unique_read_bytes": 0,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 0,
+          "hypothetical_4k_bytes": 0
+        }
+      ]
+    },
+    {
+      "source": "master.jp2",
+      "mode": "mask-off",
+      "repetition": 3,
+      "http": {
+        "elapsed_seconds": 2.022558416996617,
+        "requests": 128,
+        "requests_per_second": 63.28618195862676,
+        "p50_ms": 119.70668750291225,
+        "p95_ms": 158.39475000393577,
+        "bytes": 3103696
+      },
+      "groups": [
+        {
+          "role": "image",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 96.868,
+          "p50_ms": 0.601,
+          "p95_ms": 1.472,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "image",
+          "operation": "GET",
+          "count": 1280,
+          "requested_bytes": 332741332,
+          "received_bytes": 332741332,
+          "elapsed_ms": 2428.239,
+          "p50_ms": 1.0939999999999999,
+          "p95_ms": 5.719,
+          "median_requested_bytes": 65536.0,
+          "at_most_1k": 4,
+          "at_most_4k": 4
+        },
+        {
+          "role": "mask",
+          "operation": "HEAD",
+          "count": 128,
+          "requested_bytes": 0,
+          "received_bytes": 0,
+          "elapsed_ms": 85.667,
+          "p50_ms": 0.4995,
+          "p95_ms": 1.504,
+          "median_requested_bytes": 0.0,
+          "at_most_1k": 0,
+          "at_most_4k": 0
+        },
+        {
+          "role": "mask",
+          "operation": "GET",
+          "count": 128,
+          "requested_bytes": 424832,
+          "received_bytes": 424832,
+          "elapsed_ms": 90.94500000000001,
+          "p50_ms": 0.562,
+          "p95_ms": 1.384,
+          "median_requested_bytes": 3319.0,
+          "at_most_1k": 0,
+          "at_most_4k": 128
+        }
+      ],
+      "within_source": [
+        {
+          "role": "image",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 332741332,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 81900,
+          "hypothetical_4k_bytes": 335447316
+        },
+        {
+          "role": "mask",
+          "opened_sources_with_get": 128,
+          "unique_read_bytes": 424832,
+          "repeated_read_bytes": 0,
+          "hypothetical_4k_pages": 128,
+          "hypothetical_4k_bytes": 424832
+        }
+      ]
+    }
+  ],
+  "small_read_page_model": {
+    "master.tif": {
+      "actual_gets": 2432,
+      "modeled_gets": 768,
+      "actual_payload": 13283598,
+      "modeled_payload": 15397518
+    },
+    "master.jp2": {
+      "actual_gets": 1280,
+      "modeled_gets": 1280,
+      "actual_payload": 332741332,
+      "modeled_payload": 332742624
+    }
+  }
+}

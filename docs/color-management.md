@@ -192,3 +192,28 @@ cache quality key, with an additional method field for Floyd–Steinberg. The in
 previously returned 501. Packed PNG output now requires v3, even though decoded
 pixels are unchanged. Changing
 threshold, dithering or alpha policy later requires a rendering-recipe increment.
+
+## WebP RGB representation
+
+WebP preserves RGB ICC and assigns the embedded RGB profile for explicit sRGB.
+Its lack of native grayscale requires GRAY ICC sources to be converted to RGB
+sRGB using LittleCMS (relative colorimetric, BPC), with alpha unchanged. Explicit
+gray sRGB uses its declared curve; untagged gray is assumed Gamma 2.2 D50 for this
+conversion. Unusable profiles fail, never fall back. This WebP-specific conversion
+does not change native gray PNG/JPEG behavior. See [full policy](webp-delivery.md).
+
+## Watermark foundation
+
+The standalone watermark compositor accepts coverage plus a single color already
+encoded for the destination raster. `watermark_color` now converts a configured
+sRGB8 triplet into this encoding with LittleCMS: embedded matching RGB/GRAY ICC
+first, explicit sRGB (including its gray transfer curve) next, otherwise assumed
+sRGB for untagged RGB or Gray Gamma 2.2/D50 for untagged gray. These assumptions
+apply only to the color swatch; no profile is assigned to the image. Invalid or
+unusable ICC profiles fail without fallback. Relative colorimetry and black-point
+compensation match the existing conversion policy. Only one color is transformed;
+existing image pixels/alpha/profile remain unchanged by the conversion function.
+The compositor then blends stored samples and preserves the destination profile.
+This is not linear-light blending. Later IIIF gray/bitonal operations must act on
+the already composited image. HTTP delivery does not call these functions yet.
+See [watermark contract and delivery](watermarks.md).

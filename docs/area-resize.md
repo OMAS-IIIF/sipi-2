@@ -57,11 +57,10 @@ encodes JPEG or PNG. The same processing works with local and S3 ByteSources:
 /tiled.tif/full/1,1/0/default.jpg
 ```
 
-Only reductions or unchanged dimensions are rendered. Enlargement remains 501
-(not_implemented when policy permits it, upscaling_disabled when policy rejects
-it); mixed shrink/enlarge requests are also unsupported. Rotation/mirroring and
-other output qualities/formats retain existing restrictions. HEAD follows the
-same processing path as GET. Resize failures map to generic 500 processing_failed.
+The HTTP pipeline now uses resize_image: reductions delegate to downsample_area,
+while enabled enlargement uses linear interpolation on growing axes. See
+[upscaling](upscaling.md) for mixed-axis, alpha and policy semantics. HEAD follows
+the same processing path as GET. Resize failures map to generic 500 processing_failed.
 
 The TIFF reader selects crop-intersecting tiles from the smallest supported
 pyramid level sufficient for both output axes. If none qualifies, it uses the

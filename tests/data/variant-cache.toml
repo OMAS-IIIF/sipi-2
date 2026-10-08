@@ -1,0 +1,2 @@
+variant-cache-max-entries = 12
+variant-cache-max-bytes = 4096

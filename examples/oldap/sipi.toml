@@ -1,0 +1,21 @@
+# Paths are relative to the process working directory; run from the sipi-2 root.
+preflight-script = "examples/oldap/preflight.lua"
+iiif-storage = "local"
+iiif-root = "/srv/oldap/images"
+
+# Required explicit decision: 1 matches the existing Cantaloupe delegate;
+# 2 requires DATA_VIEW. This example does not implement reduced resolution.
+preflight-config = ["jwt_issuer=https://oldap.org", "jwt_audience=oldap-api-media", "minimum_permission=1"]
+
+# Add optional assignments to the array above, or use the corresponding env vars:
+# api_url=https://oldap-api.example.org  (enable anonymous fallback)
+# unknown_user=unknown
+# anonymous_permission_ttl=600         (seconds, 0 disables; maximum 3600)
+# ca_file=/run/certificates/oldap-ca.pem
+# media_cookie=oldap_media             (media capability, NOT access/refresh token)
+# The reserved unknown user is passwordless; other accounts require unknown_password.
+
+# Alternatively set SIPI_PREFLIGHT_SECRETS_MEDIA_JWT_KEY in the environment.
+preflight-secret-file = ["media_jwt_key=/run/secrets/oldap_media_jwt_key"]
+# For anonymous lookup add "unknown_password=/run/secrets/oldap_unknown_password"
+# to that array, or set SIPI_PREFLIGHT_SECRETS_UNKNOWN_PASSWORD.

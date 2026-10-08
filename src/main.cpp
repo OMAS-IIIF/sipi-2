@@ -9,6 +9,9 @@
 #include <iostream>
 #include <vector>
 
+// POSIX process environment; snapshot selected names before starting any threads.
+extern char** environ;
+
 namespace {
 
 /** Map application log severity to spdlog without relying on enum numeric values. */
@@ -66,6 +69,10 @@ int main(int argc, char* argv[]) {
     if (const char* value = std::getenv("SIPI_CACHE_TARGET_PERCENT")) cache_environment.target_percent = value;
     if (const char* value = std::getenv("SIPI_METADATA_CACHE_MAX_ENTRIES")) cache_environment.metadata_max_entries = value;
     if (const char* value = std::getenv("SIPI_METADATA_CACHE_MAX_BYTES")) cache_environment.metadata_max_bytes = value;
+    if (const char* value = std::getenv("SIPI_MASK_CACHE_MAX_ENTRIES")) cache_environment.mask_max_entries = value;
+    if (const char* value = std::getenv("SIPI_MASK_CACHE_MAX_BYTES")) cache_environment.mask_max_bytes = value;
+    if (const char* value = std::getenv("SIPI_VARIANT_CACHE_MAX_ENTRIES")) cache_environment.variant_max_entries = value;
+    if (const char* value = std::getenv("SIPI_VARIANT_CACHE_MAX_BYTES")) cache_environment.variant_max_bytes = value;
     std::optional<std::string_view> env_iiif_workers;
     if (const char* value = std::getenv("SIPI_IIIF_WORKERS")) env_iiif_workers = value;
     std::optional<std::string_view> env_bitonal_method;
@@ -77,8 +84,17 @@ int main(int argc, char* argv[]) {
     sipi::CorsEnvironment cors_environment;
     if (const char* value = std::getenv("SIPI_CORS_ORIGINS")) cors_environment.origins = value;
     if (const char* value = std::getenv("SIPI_CORS_CREDENTIALS")) cors_environment.credentials = value;
+    std::vector<std::string_view> preflight_environment;
+    for (char** entry = environ; entry && *entry; ++entry) {
+        const std::string_view text(*entry);
+        if (text.starts_with("SIPI_PREFLIGHT_CONFIG_") || text.starts_with("SIPI_PREFLIGHT_SECRETS_") ||
+            text.starts_with("SIPI_PREFLIGHT_SECRET_FILES_"))
+            preflight_environment.push_back(text);
+    }
+    std::optional<std::string_view> env_listen_address;
+    if (const char* value = std::getenv("SIPI_LISTEN_ADDRESS")) env_listen_address = value;
     const auto parsed = sipi::load_startup_options(arguments, env_log_level, env_port,
-        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment, env_iiif_workers, env_bitonal_method, output_environment, cors_environment);
+        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment, env_iiif_workers, env_bitonal_method, output_environment, cors_environment, preflight_environment, env_listen_address);
     if (const auto* error = std::get_if<sipi::ParseError>(&parsed)) {
         std::cerr << "Configuration error: " << error->message << '\n';
         return 2;
@@ -97,10 +113,18 @@ int main(int argc, char* argv[]) {
     std::optional<sipi::preflight::LuaPreflight> preflight;
     if (options.config.preflight_script) {
         try {
-            preflight.emplace(*options.config.preflight_script);
+            auto script_config = sipi::preflight::resolve_script_config(options.config.preflight_settings);
+            preflight.emplace(*options.config.preflight_script, std::move(script_config));
             preflight->validate();
+        } catch (const sipi::preflight::ScriptConfigError& error) {
+            // This exception contains only fixed diagnostics, never paths/values.
+            std::cerr << "Preflight configuration error: " << error.what() << '\n';
+            return 2;
         } catch (const sipi::preflight::PreflightError& error) {
-            std::cerr << "Preflight startup error: " << error.what() << '\n';
+            // Lua diagnostics can include secrets via error(), assert() or source
+            // snippets. Keep server logs value-free, as in the request worker.
+            std::cerr << "Preflight startup error: category " << static_cast<int>(error.code())
+                      << "; check script syntax, configuration and entry point\n";
             return 2;
         }
         spdlog::info("Preflight script validated");

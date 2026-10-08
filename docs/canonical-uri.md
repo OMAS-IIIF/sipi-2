@@ -31,8 +31,8 @@ The implementation follows [Image API 3 canonical syntax](https://iiif.io/api/im
 - Compare the actual pre-rotation output size with max resolved on that crop under
   the same policy. Equal dimensions become max, even when limits reduce the source.
   Other sizes use explicit width,height. Upscaled geometry uses ^max when it
-  matches the configured enlarged maximum, otherwise ^width,height. This pure
-  syntax support does not enable upscaling in the renderer.
+  matches the configured enlarged maximum, otherwise ^width,height. Actual enlargement requires the
+  [upscaling configuration](upscaling.md) to be enabled.
 - Preserve mirroring, normalize 360 to 0, and serialize angles as shortest
   round-tripping fixed decimals without exponent notation or locale dependence.
 - Color is the current default rendering, so color becomes default. Gray on a
@@ -61,8 +61,11 @@ recipe or SQLite schema change is needed; encoded pixels are unchanged.
 Canonical identity does not grant access and is not an immutable version URL.
 Following the link still runs preflight, metadata/version checks and current limits.
 Changing source content or policy can change the result; Cache-Control: no-store
-continues to apply. Future watermarked or restricted virtual sources must supply
-their effective public identity, dimensions and rendering-quality semantics here.
+continues to apply. Single-color watermarks retain the same public identity because
+they do not change dimensions or coordinates; policy and current mask validation
+still run when following the link. Their encoded cache identity includes the full
+watermark policy and source version. Future resolution-restricted virtual sources
+still need effective public identity, dimensions and rendering-quality semantics.
 
 ## Verification
 
@@ -73,3 +76,7 @@ HTTP tests follow canonical links and compare encoded bytes, including repeated
 requests/cache hits, aliases, prefixes, configured origins, HEAD, limits and gray.
 The focused conformance audit now passes 41/41 probes, including canonical links;
 this is not external certification or a substitute for deployed browser testing.
+
+Base-URI redirects to `info.json` preserve validated query parameters (including
+query credentials) in `Location`; these are not part of the canonical image URI
+or the information-document `id`. See [preflight.md](preflight.md#query-parameters-and-request-context).

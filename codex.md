@@ -1,5 +1,39 @@
 # SIPI-2 project context
 
+## Current milestone: delivery feature freeze (2026-10-08)
+
+The agreed reduced public image feature is implemented. Lua Allow::resolution has
+required positive uint32 max_width/max_height. Stable public/original URLs are
+chosen and protected in Lua; C++ remains project-neutral. Metadata/info/geometry
+use the fitted public canvas, independent of global output limits. The worker
+materializes one complete reduced source via existing TIFF/J2K level selection or
+JPEG/PNG reads before watermark/crop/resize/rotation/quality. VariantCache retains
+immutable reduced rasters (16 entries/64 MiB by default, CLI/env/TOML configurable);
+resident data regenerates after restart. Persistent encoded results have separate
+restricted identities and still survive restart. Every hit follows authorization
+and a fresh source open/version check. See docs/restricted-resolution.md and
+examples/restricted-resolution.lua. Key changes: preflight/LuaPreflight.*,
+http/IiifWorker.*, http/DeliveryPolicy.*, cache/VariantCache.*.
+
+External feature-freeze validation passed on 2026-10-08: 31 level-2 plus eight
+selected optional upstream tests on each original/restricted service (78/78);
+independent WebP signature/full decoding also passed. The unmodified pinned
+validator has a Python-3 WebP bytes/text bug, documented with initial diagnostics
+in docs/external-validation.md. No server code changed for validation.
+
+Feature freeze is now the roadmap: fix correctness/security issues, consolidate
+historical documentation/support matrices,
+finish the color-management handbook and prepare the first release. Do not resume
+new formats, upload or speculative performance work without explicit direction.
+Older chronological sections below describe development history and may contain
+superseded next steps; this milestone takes precedence.
+
+
+- Watermark foundation (2026-10-08): image/Watermark.* prepares a centered, proportionally fitted gray8 coverage mask and composites one destination-encoded color with opacity over full rasters or native-grid crops. Pure owning C++ functions, straight alpha, explicit budgets; HTTP/Lua delivery is active. Reduced-grid mapping clips rational canvas edges and samples the original small mask directly (area reduction/linear enlargement), without full-resolution expansion, with crop consistency tests; J2kReadPlan exposes full selected-level dimensions. PngReader::read_png_mask now loads untagged 1/2/4/8-bit gray coverage PNGs (including Adam7) through ByteSource with 16 MiB input/pixel defaults; alpha, palette and color declarations are explicitly rejected. WatermarkColor converts a single sRGB swatch into the destination ICC/encoding using LittleCMS, with existing untagged RGB/gray assumptions and no image retagging. Typed Allow::watermark now accepts required local/S3 source, width_fraction, opacity and sRGB8 color; malformed fields fail the Lua contract. IiifWorker resolves local/S3 masks, validates them before info/base/HEAD and result hits, and applies them on the selected decoder grid before resize/transforms/quality. Missing/invalid masks fail closed with 500. WatermarkIdentity binds source version, width, opacity, color and recipe into a separate result variant; unmarked serialization is unchanged. Coordinates/service identity remain unchanged, responses no-store. MaskCache now retains shared immutable coverage by freshly opened source identity/version/size, default 64 entries/32 MiB, configurable via mask-cache-max-entries/max-bytes with usual precedence; either zero disables. PreparedWatermark shares pixels without copies. I/O/decode stays outside the cache mutex; concurrent cold misses may decode independently. Resident budgets exclude active evicted snapshots/native scratch. HTTP tests prove reuse without result caching, disablement and local/S3 replacement/deletion. Release tile benchmarks now cover local/MinIO, TIFF/JP2, both caches on/off and three repetitions: 427,008 byte-verified responses. Long result-hit phases show roughly 39–41% local and 68–79% MinIO throughput gains from mask caching on synthetic inputs; no cloud-capacity claim. See docs/benchmarks/2026-10-08-watermarks.md. S3 debug diagnostics and Release I/O profiling now show 19 GETs/TIFF tile (18 ≤1 KiB; median 6 B), versus larger JP2 reads. Warm results retain exactly two HEADs and no GET. S3ByteSource now retains up to 16 aligned 4 KiB pages per opened source for small reads; larger reads bypass. Copies share the pinned LRU, small fills serialize, changed-source errors poison retained pages. New openings still HEAD; cached snapshot bytes need no GET until a miss. Actual TIFF GETs fell 19→6 with ~16% extra payload, rendering improved 2.31x over MinIO. Paired JP2 rendering measured ~2.7% lower (cause not isolated); further optimization is deferred under the delivery feature freeze. See docs/benchmarks/2026-10-08-s3-buffer.md and docs/s3-byte-source.md for exact snapshot semantics, limits and tests. See docs/watermarks.md.
+
+Security maintenance: see [dependency update procedure](docs/dependency-updates.md)
+for version/lock updates, validation, cache compatibility and deployment.
+
 ## Purpose and repository state
 
 SIPI-2 is a new high-performance, versatile IIIF server. It will selectively reuse
@@ -7,7 +41,7 @@ understood, useful code and regression fixtures from the sibling `../cserve`
 repository. The repository now runs a minimal Drogon HTTP server after resolving
 CLI/environment/TOML configuration. GET /hello returns HTML, and /hello/...
 echoes the backend URL with HTML escaping. Port defaults to 8080 and is configurable
-through --port, SIPI_PORT, or TOML. The listener binds only to 127.0.0.1. The initial executable ran successfully in CLion
+through --port, SIPI_PORT, or TOML. The listener defaults to 127.0.0.1; listen-address is configurable for containers. The initial executable ran successfully in CLion
 according to the owner. A standalone IIIF Image API 3 syntax parser now produces
 owning typed image/info requests. The HTTP catch-all maps invalid syntax to 400 JSON and applies configured
 preflight to valid requests, returning information JSON or JPEG/PNG for supported tiled or strip-based gray/RGB/RGBA8 TIFF crops; exact /health returns liveness/version JSON. Area-weighted reduction, horizontal mirroring and exact clockwise quarter turns
@@ -187,19 +221,11 @@ info.json reports reduced dimensions. Give public and original variants separate
 stable service identities; the original remains protected. Per-response size
 limits alone do not prevent reconstruction from original-resolution crops.
 
-Initially generate the complete reduced source on demand, using available pyramid
-or resolution levels, and cache it for reuse. All crops use the same reduced raster.
-Detail limits, optional upscaling, and final output-size limits are separate policies.
-Authorize before cache lookup. Internal cache identity includes source version,
-effective variant and output-affecting settings, not just the canonical URL.
-Cache publication requires successful complete encoding; seek-based encoders need
-bounded buffering or temporary storage. None of this is integrated into HTTP yet.
-
-See [the delivery architecture](docs/iiif-delivery-architecture.md) for processing
-order, examples, proposed building blocks, and open decisions. Next architectural
-steps are defining restricted variants and extending the minimal preflight contract.
-Lua evaluation is implemented independently and called by the HTTP adapter. Variant URL conventions,
-derivative storage/invalidation, and precise output-limit policy remain open.
+Implemented through `Allow::resolution`; see the current milestone and
+[restricted resolution](docs/restricted-resolution.md) for rounding, distinct Lua
+service prefixes, in-memory derivative reuse, persistent result identity and
+source-version invalidation. All crops use the same reduced raster. Detail limits,
+optional upscaling and final output-size limits remain separate policies.
 
 ## Initial Lua preflight (2026-10-03)
 
@@ -214,8 +240,10 @@ headers. A strict plain-table result becomes Allow(optional source) or Deny;
 technical failures throw PreflightError. Unknown fields and unsupported restrictions
 fail explicitly. Paths are not resolved or opened here. A limited standard-library
 subset is available; execution remains trusted-code, not a sandbox. Per-state
-16 MiB Lua memory and one-million-instruction budgets apply. JWT/JSON/network
-host APIs remain pending. Default repository mapping now uses iiif-root.
+16 MiB Lua memory and one-million-instruction budgets apply. JSON encode/decode is implemented in `src/preflight/LuaJson.*`; see
+`docs/lua-json.md` for null/container identity, strict mapping and bounded native
+conversion. Generic HTTP(S) is implemented in `HttpClient.*`/`LuaHttp.*` with per-evaluation
+budgets; `Jwt.*`/`LuaJwt.*` supply generic HS256/RS256 signing and verification. Default repository mapping now uses iiif-root.
 
 ## TIFF metadata / geometry decisions (2026-10-03)
 
@@ -607,8 +635,7 @@ current_render_recipe in CacheKey.h versions all fixed pixel/color/encoder
 semantics; bump for output-affecting algorithm/codec changes. JPEG quality is
 explicit, with no independent cache default. Future configurable color/encoder
 settings need actual fields. Effective variant MUST reflect actual restrictions;
-watermark placement/opacity belongs there while watermark source/version is
-separate. Restrictions are not implemented by this module. Authorization,
+watermark parameters and source/version are explicit fields of WatermarkIdentity. Restrictions are not implemented by this module. Authorization,
 geometry and capability checks still precede EVERY lookup. Storage and HTTP
 integration are now implemented below. See docs/cache-key.md.
 
@@ -1056,3 +1083,172 @@ Validator checkout/venv live under ignored build; Homebrew libmagic is a test
 dependency. Upstream random/shallow optional checks complement project tests.
 Remaining interoperability work: actual browser/viewer, Caddy/TLS and cookies;
 this successful external validation is not formal certification.
+
+## Configurable bilinear upscaling (2026-10-06)
+
+Actual enlargement now follows existing size-upscaling policy (default false)
+and IIIF ^ syntax; info advertises sizeUpscaling only when enabled. resize_image
+in image/AreaResize.* delegates pure reduction unchanged, adds linear growth per
+axis with area filtering for mixed shrink/grow, alpha-weighted stored-channel
+colors and constant filter state. Existing planners use full resolution for growth;
+all input formats/local/S3 share the processing path. Limits, authorization and
+budget checks remain before encoded-cache access. No recipe bump: previous
+successful reductions are unchanged; no enlarged successes existed. See
+docs/upscaling.md. Tests cover pixels/alpha, mixed axes, metadata/budgets, HTTP
+forms/canonical/cache/restart/limits and four-format local/MinIO parity. Next
+requested feature is WebP output, to be handled in a subsequent step.
+
+## WebP output (2026-10-06)
+
+libwebp/1.6.0 is added to Conan/lock without changing existing pins. WebpWriter is
+a per-call RAII buffered encoder/muxer, preserving alpha/RGB ICC and converting
+GRAY ICC or explicit sRGB gray to RGB sRGB; untagged gray assumes Gamma2.2 D50.
+Color HTTP output uses lossy quality85/method4; gray/bitonal lossless quality85,
+exact1, no codec threads. Embedded profiles are shared in colorprofiles target
+with JPEG. Info extraFormats announces webp. Format-specific 16383 axis limits
+are checked before cache; JPEG/PNG policy is unchanged. WebpEncoding fields and
+codec/color recipe isolate cache entries; media whitelist expanded without schema
+or global recipe change. See docs/webp-delivery.md for budgets/color/build details.
+52 Debug suites pass, including local/MinIO parity, pixel/ICC/alpha/RIFF checks,
+cache restart and HEAD/canonical/policy checks; focused sanitizers pass. WebP input,
+encoder configuration and actual browser/Caddy integration remain separate work.
+
+## Generic Lua capabilities (2026-10-06)
+
+Keep native Lua helpers independent of OLDAP and other deployments; project policy,
+API routes, claim meanings and source mapping belong in scripts. `sipi.json`
+provides strict JSON encode/decode, null sentinel and explicit empty containers,
+using existing JsonCpp with protected Lua/C++ allocation boundaries. Fixed byte,
+node and depth limits supplement the per-state Lua budget. Generic HTTP(S) now
+uses the existing libcurl dependency, with explicit headers/body, verified TLS,
+no redirects/proxies/ambient credentials, four calls and a ten-second aggregate
+deadline per evaluation. Sessions reuse connections within an evaluation and
+remain isolated across Lua states. Network calls are disabled during initialization
+and teardown. See `docs/lua-http.md`. JWT helpers are implemented as described
+below. Script configuration/secrets are implemented below; request-context additions are implemented below. Shared token reuse needs a
+separate bounded lifetime/concurrency contract because Lua states remain isolated.
+Always conclude implementation steps by naming the next proposed small step.
+
+## Generic JWT helpers (2026-10-06)
+
+Pinned jwt-cpp/0.7.2 reuses OpenSSL/JsonCpp; existing dependency pins are unchanged.
+`Jwt.*` owns native HS256/RS256 signing/verification; `LuaJwt.*` exposes sign/verify
+with explicit algorithm/key, strict options and a shared 32-operation/state budget.
+Verification returns claims only after signature, mandatory-by-default expiry,
+nbf/iat, optional issuer/type and explicit audience policy checks. An aud claim
+cannot be ignored by omitting the audience option. No unverified decode, automatic
+key discovery, JWE or revocation/cache behavior. HS256 secrets >=32 bytes; RSA
+2048..8192 bits, private PEM for sign/public PEM for verify. Strict 16 KiB tokens,
+int64 integer seconds, bounded leeway and exact expiration equality; no chrono
+conversion of untrusted timestamps. Shared LuaJson parsing/conversion avoids
+value-mapping drift; adapted jwt-cpp traits preserve int64 beyond 2038.
+See docs/lua-jwt.md for supported subsets, errors, key ownership and limits.
+Independent Python/OpenSSL vectors and output verification complement Lua tests.
+Operator-selected configuration/secrets are implemented below. Query/context additions are implemented below. Next: a separate application example script.
+
+## Script configuration and secret snapshots (2026-10-06)
+
+`ScriptConfig.*` separates pure CLI/env/TOML per-name resolution from selected
+regular-secret-file reads at startup. Dedicated scriptconfig target has no Lua/HTTP
+or codec dependency. CLI flags preflight-config/preflight-secret/preflight-secret-file
+are repeatable name=value/path; TOML uses arrays. Distinct environment namespaces
+SIPI_PREFLIGHT_CONFIG_*, SIPI_PREFLIGHT_SECRETS_* and SIPI_PREFLIGHT_SECRET_FILES_*
+normalize suffixes to lowercase. Lua receives only explicit strings/secret bytes
+in fresh sipi.config/sipi.secrets tables before initialization; no process-wide
+getenv/filesystem capability. Same-source duplicates fail, selected higher entries
+win individually, and overridden files are never read. Empty maps are defaults;
+settings without a preflight script fail startup (help/version skip cross-check/I/O).
+Limits: 64 combined entries, 16 KiB/value, 256 KiB total, 4096-byte file paths.
+Regular-file descriptor checks reject directories/FIFOs; preserve exact binary
+bytes/newlines. Restart reconstructs snapshots. Server startup now suppresses raw
+Lua diagnostics, matching runtime logging, because script errors can contain keys.
+See docs/lua-configuration.md and tests/preflight/ScriptConfigTests.cpp plus
+script_config_http.py for precedence, isolation, file and end-to-end redaction tests.
+Query parameters and explicit request kind/method are implemented below. Next:
+application example policy using the generic JSON/HTTP/JWT/configuration helpers.
+
+## Preflight request context (2026-10-06)
+
+Lua receives query name-to-array values (case-sensitive, decode once, preserve
+repeats), explicit route kind image/info/base, and original GET/HEAD method. The
+HTTP boundary parses raw queries with bounded size/count and fixed diagnostics;
+never use Drogon's flattened parameters for authorization. Empty values remain
+present; malformed escapes, controls and empty names/components fail before policy
+or cache. Native request data remains owned across worker dispatch. The base 303
+preserves the validated raw query; canonical links, info id and cache keys remain
+credential-free. Every follow-up request and cache hit still runs policy. No native
+OLDAP-specific token priority or permissions. See docs/preflight.md and
+tests/preflight_context_http.py. Next: compose a deployment policy example,
+including explicit token/cookie/header priority, JWT resource binding and REST
+fallback with the generic helpers; restrictions remain a separate feature.
+
+## OLDAP deployment example (2026-10-06)
+
+examples/oldap/preflight.lua and sipi.toml compose generic APIs without C++ OLDAP
+logic. Query > Bearer > explicitly named media cookie; invalid supplied credentials
+never fall back. Verify media HS256/issuer/audience/expiry, mandatory id binding,
+optional matching assetId and numeric permission. Explicit minimum_permission
+setting chooses the access threshold (1 preserves the Ruby rule, 2 requires view).
+Optional anonymous login then mediaobject lookup uses two bounded HTTP calls per
+request, never forwards browser credentials and never caches authorization.
+Relative path/id/derived/filename mapping rejects invalid components and ambiguous
+arrays; native root containment still applies. All IIIF kinds/GET/HEAD share policy.
+Tests use independent tokens and a local API, not live OLDAP. See
+docs/oldap-preflight.md for migration differences and configuration. Next: decide
+permission-1 semantics and validate against an actual OLDAP deployment; then design
+bounded shared anonymous-login token reuse to avoid logging in for every tile.
+
+## Docker/OLDAP local trial (2026-10-07)
+
+Dockerfile builds Linux Release with Conan 2.33.0/C++20 on Ubuntu 24.04, then copies
+the executable and Conan shared libraries into a non-root runtime. Library lock
+adds Linux-specific libuuid/s2n without changing existing pins. docker/conan-profile
+uses Ubuntu's exact Autotools versions via platform_tool_requires and a derived
+build lock. BuildKit caches dependencies. Numeric listen-address is configurable
+CLI > SIPI_LISTEN_ADDRESS > TOML > 127.0.0.1; existing port configuration is separate.
+Image environment opts into 0.0.0.0; canonical URL origin remains explicit.
+Sibling oldap-mediaserver/docker-compose.sipi-test.yml replaces only imageserver
+with port 8182 and read-only images plus a separate cache volume. Existing Caddy
+retains /iiif/3, so public-base-url must contain only the public origin. OLDAP
+entrypoint translates dedicated media credentials; anonymous lookup is opt-in and
+uses the passwordless unknown pseudo-user, or an explicit password for another account. Base Compose/production remain Cantaloupe for rollback.
+See docs/docker.md and sibling docs/sipi-test.md; execution evidence is in CODEX_LOG.md.
+
+## Anonymous OLDAP activation (2026-10-07)
+
+Live API inspection confirms /admin/auth/unknown is a passwordless pseudo-login;
+the earlier example's mandatory-password assumption was incorrect. Lua sends an
+empty password only for this reserved account when no secret is supplied; other
+configured accounts still require a nonempty secret. Prefer login.accessToken,
+with legacy login.token fallback. The wrapper omits empty legacy password secrets.
+The local Compose .env now opts into anonymous lookup, tested through Caddy against
+UtCbbUM5Po4g (2400x1200), including the original ^500 JPEG URL, info, HEAD, warm cache
+and invalid-token denial. Every anonymous request checks permission; login-token reuse is now implemented
+as described below. Ruby's old delegate cached its unknown login token for a fixed
+600 seconds.
+
+## Generic Lua shared value cache (2026-10-07)
+
+Each LuaPreflight snapshot owns a shared C++ SharedCache; copies retain it, new
+snapshots/restarts do not. LuaCache exposes get/get_or_load and revision-conditional
+invalidate, with JSON-compatible owned copies. Bounds: 256 entries/4 MiB resident
+key+JSON bytes, 64 KiB/value, 256-byte keys, 0..3600s TTL (zero shares only the current load), 64 calls/state and a shared
+5s wait deadline. Monotonic TTL starts before loading; LRU evicts completed entries
+only. One load per key; loader failure wakes waiters, nested loaders forbidden,
+no mutex across Lua/HTTP. Protected conversion preserves longjmp/RAII boundaries;
+operations disabled outside preflight. No OLDAP code in C++.
+OLDAP Lua policy caches login using expiresIn minus 5s (max600s), and successful
+anonymous per-image decisions using anonymous_permission_ttl (default600, 0 disables,
+max3600). Hits never slide expiry. Denials/errors are not retained; expired grants
+never survive API failure. Login loads precede permission loads to avoid nested
+cache operations; transient 401 results allow revision-safe renewal outside loaders.
+Supplied JWTs bypass anonymous grants. Restart clears all grants; no admin purge
+endpoint exists. Permission changes can take the configured TTL to take effect. See docs/lua-cache.md and tests/preflight/SharedCacheTests.cpp.
+Real OpenSeadragon captures and warmed URL replays are recorded in
+docs/benchmarks/2026-10-07-oldap-viewer.md (reproduce with benchmarks/oldap_viewer.py).
+Before permission reuse: local sequential medians anonymous24.34 ms, media token
+1.73 ms, direct permission API20.53 ms. After enabling the600s Lua permission cache,
+a shorter replay measured anonymous1.38 ms. Next: consider a deliberately
+authorized invalidation mechanism if immediate revocation is required; current
+policy accepts up to the configured TTL. Live API call counts were not instrumented
+by these measurements; fixture tests prove one lookup per concurrent cache miss.

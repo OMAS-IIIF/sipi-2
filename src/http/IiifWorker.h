@@ -5,6 +5,8 @@
 #include "image/Bitonal.h"
 #include "cache/ResultCache.h"
 #include "cache/MetadataCache.h"
+#include "cache/MaskCache.h"
+#include "cache/VariantCache.h"
 #include "image/SourceResolver.h"
 #include "storage/S3ByteSource.h"
 #include "iiifparser/IIIFGeometry.h"
@@ -19,7 +21,7 @@
 
 namespace sipi::http {
 
-/** A bounded worker pool for IIIF policy, source resolution, metadata, geometry and JPEG/PNG delivery.
+/** A bounded worker pool for IIIF policy, source resolution, metadata, geometry and JPEG/PNG/WebP delivery.
  * Owns the script snapshot; jobs own all request values and their completion.
  * Completion runs on a worker, using Drogon's thread-safe response callback.
  * stop() rejects new work, discards queued jobs and joins all active jobs. Call
@@ -38,11 +40,19 @@ public:
         std::map<std::string, std::string> cookies{};
         std::optional<std::string> accept = std::nullopt;
         bool redirect_to_info = false; // Info authorization/admission, then base-URI 303.
+        preflight::QueryParameters query_parameters{};
+        preflight::RequestMethod method = preflight::RequestMethod::get;
+        // Validated raw query, used only to preserve credentials on the base redirect.
+        std::string redirect_query{};
     };
     /** Take ownership of policy/source settings and start the pool.
      * public_base_url must be validated configuration without a trailing slash;
      * it supplies information-document identities, never filesystem locations.
-     * metadata_limits bounds one shared cache; either zero disables retention.
+     * metadata_limits and mask_limits bound separate pool-wide caches; either
+     * zero limit disables retention. Mask I/O/decode occurs outside its mutex;
+     * concurrent cold misses may decode independently. variant_limits bounds
+     * complete immutable public rasters; same-variant materialization is serialized
+     * through the shared fill registry, without I/O under the LRU mutex.
      * size_policy is bounded by the buffered renderer's public defaults/ceilings;
      * the same policy is advertised and enforced, with source admission on full/max.
      * worker_count must be 1..32. Construction joins started threads if startup fails. */
@@ -52,7 +62,9 @@ public:
                std::shared_ptr<cache::ResultCache> result_cache = nullptr,
                cache::MetadataCacheLimits metadata_limits = {},
                unsigned worker_count = default_worker_count(),
-               BitonalMethod bitonal_method = BitonalMethod::threshold);
+               BitonalMethod bitonal_method = BitonalMethod::threshold,
+               cache::MaskCacheLimits mask_limits = {},
+               cache::VariantCacheLimits variant_limits = {});
     ~IiifWorker();
     IiifWorker(const IiifWorker&) = delete;
     IiifWorker& operator=(const IiifWorker&) = delete;
@@ -77,6 +89,10 @@ private:
     std::shared_ptr<cache::ResultCache> result_cache_;
     cache::MetadataCache metadata_cache_; // Protected by metadata_mutex_; no I/O under this lock.
     std::mutex metadata_mutex_;
+    cache::MaskCache mask_cache_; // Protected by mask_mutex_; decoding stays outside the lock.
+    std::mutex mask_mutex_;
+    cache::VariantCache variant_cache_; // Complete immutable reduced sources, before overlays.
+    std::mutex variant_mutex_;
     // Only live fills/waiters are retained. Full serialized identities avoid hash collisions.
     std::mutex fills_mutex_;
     std::map<std::string, std::weak_ptr<std::mutex>> fills_;

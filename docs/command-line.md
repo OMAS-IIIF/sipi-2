@@ -53,11 +53,15 @@ Duplicate scalar options/flags and conflicting help/version actions are errors.
 CLI11's standard `--` end-of-options marker is accepted; positional tokens after
 it remain errors. Flag value overrides such as `--help=false` are rejected.
 
-The supported file schema has nineteen root keys: `log-level`, `port`, `size-upscaling`,
-`preflight-script`, `iiif-root`, `public-base-url`, `s3-access-key`, `s3-secret-key`,
+The supported file schema includes these root keys: `log-level`, `port`, `size-upscaling`,
+`preflight-script`, `preflight-config`, `preflight-secret`, `preflight-secret-file`, `iiif-root`, `public-base-url`, `s3-access-key`, `s3-secret-key`,
 `s3-session-token`, `iiif-storage`, `s3-bucket`, `s3-region`, `s3-endpoint`,
 `s3-path-style`, `cache-dir`, `cache-max-bytes`, and `cache-target-percent`,
-`metadata-cache-max-entries`, and `metadata-cache-max-bytes`. Unknown keys
+`metadata-cache-max-entries`, `metadata-cache-max-bytes`,
+`mask-cache-max-entries`, `mask-cache-max-bytes`,
+`variant-cache-max-entries`, `variant-cache-max-bytes`, `iiif-workers`,
+`bitonal-method`, `max-width`, `max-height`, `max-area`, `cors-origins`, and
+`cors-credentials`. Unknown keys
 and startup actions in the file are rejected. CLI11's built-in TOML-style reader
 is used directly; this is not a promise of full TOML grammar validation (including
 all malformed syntax or duplicate-key checks). Revisit the parser if the schema
@@ -106,10 +110,9 @@ The previous hand-written parser was reviewed successfully before replacement.
 Future configuration fields belong in `ServerConfig` and must have explicit
 validation and precedence tests. No generic configuration registry is needed.
 
-Size upscaling is consumed by the geometry API. HTTP JPEG/PNG delivery supports
-unchanged dimensions and area-weighted reductions; enlargement rendering remains
-unimplemented even when permitted by policy. See
-[TIFF metadata and geometry](tiff-metadata-and-geometry.md).
+Size upscaling controls geometry admission and actual bilinear enlargement.
+It defaults to false; enabled requests must still use ^ and respect output limits.
+See [upscaling](upscaling.md) for examples, mixed-axis filtering and advertisement.
 
 ## Preflight startup initialization
 
@@ -122,7 +125,7 @@ After configuration/help/version handling, main loads a configured script once a
 calls `LuaPreflight::validate()` before opening the listener. Validation compiles
 and executes top-level initialization, then checks that `preflight` is a function;
 it does not call the request function. Unreadable files, syntax errors, initialization
-errors, or a missing function print a diagnostic to stderr and exit 2, including
+errors, or a missing function print a value-free error category to stderr and exit 2, including
 when logging is off. There is no fallback to running without the configured script.
 Help/version skip script I/O but still reject invalid CLI path syntax.
 
@@ -332,6 +335,42 @@ resolved value through the server into its single worker. A limit does not eager
 allocate that amount of memory. Tests verify precedence and runtime zero/one-entry
 behavior, including environment wiring and CLI re-enablement.
 
+## Watermark mask cache limits
+
+| CLI / TOML key | Environment | Default |
+| --- | --- | --- |
+| `mask-cache-max-entries` | `SIPI_MASK_CACHE_MAX_ENTRIES` | `64` |
+| `mask-cache-max-bytes` | `SIPI_MASK_CACHE_MAX_BYTES` | `33554432` (32 MiB) |
+
+Both follow **CLI > environment > TOML > default**, independently of metadata and
+persistent result caches. The unsigned-decimal validation, help/version and zero
+rules match the metadata cache above: either zero disables retention, not delivery.
+`MaskCacheLimits` is the single source of defaults. Limits apply pool-wide to
+resident immutable coverage masks and accounted storage; allocator overhead and
+active requests retaining evicted masks are additional. They do not reserve memory.
+Every request still opens/version-checks the mask source. See
+[mask cache behavior](watermarks.md#decoded-mask-memory-cache).
+
+```toml
+mask-cache-max-entries = 64
+mask-cache-max-bytes = 33554432
+```
+
+## Reduced public raster cache limits
+
+| CLI / TOML key | Environment | Default |
+| --- | --- | --- |
+| `variant-cache-max-entries` | `SIPI_VARIANT_CACHE_MAX_ENTRIES` | `16` |
+| `variant-cache-max-bytes` | `SIPI_VARIANT_CACHE_MAX_BYTES` | `67108864` (64 MiB) |
+
+Both follow CLI > environment > TOML > default. Either zero disables retention,
+not the public resolution restriction. `VariantCacheLimits` provides defaults.
+The pool-wide LRU retains complete immutable reduced rasters, before watermarks.
+Resident accounting excludes allocator/control-block overhead and active references
+after eviction. There is no eager allocation or persistence of these rasters;
+the existing encoded result cache is unchanged. See
+[restricted public resolution](restricted-resolution.md).
+
 ## IIIF worker concurrency
 
 | CLI / TOML key | Environment | Default | Valid values |
@@ -379,3 +418,32 @@ Normal per-field priority applies: CLI > environment > TOML > default.
 Origins is a single comma-separated string of exact HTTP(S) origins, without
 spaces or paths, or the exclusive wildcard. Credentials accepts true/false and
 requires explicit origins. See [CORS contract and examples](iiif-http.md).
+
+## Explicit Lua configuration and secrets
+
+| CLI (repeatable) | Environment | TOML root key |
+| --- | --- | --- |
+| `--preflight-config name=value` | `SIPI_PREFLIGHT_CONFIG_NAME` | `preflight-config = ["name=value"]` |
+| `--preflight-secret name=value` | `SIPI_PREFLIGHT_SECRETS_NAME` | `preflight-secret = ["name=value"]` |
+| `--preflight-secret-file name=path` | `SIPI_PREFLIGHT_SECRET_FILES_NAME` | `preflight-secret-file = ["name=path"]` |
+
+Lua sees strings in `sipi.config` and bytes in `sipi.secrets`, available already at
+initialization. Defaults are empty maps. Names are lower-case identifiers; environment
+suffixes normalize to lower case. Priority applies **per name**, including across
+literal/file secret sources; other lower-priority entries survive. Same-source
+name duplicates/collisions fail. Settings require a preflight script (except
+help/version); selected files are read only at startup. Only explicitly prefixed
+environment variables are exposed, never the whole process environment.
+
+See [the full contract](lua-configuration.md) for examples, source/size limits,
+help behavior, exact file bytes, secret handling, snapshot lifetime and diagnostics.
+
+## Listener address
+
+`--listen-address`, `SIPI_LISTEN_ADDRESS`, or TOML `listen-address` selects a numeric
+IPv4/IPv6 bind address (no hostname, brackets, port or zone suffix). Default:
+`127.0.0.1`. Precedence remains CLI > environment > TOML > default, independently
+of `--port` / `SIPI_PORT` / TOML `port` (default 8080). Containers typically use
+`0.0.0.0`; do not publish their port directly when Caddy is the intended ingress.
+The bind address does not determine canonical URLs: configure `public-base-url`
+separately. Docker's image default sets SIPI_LISTEN_ADDRESS=0.0.0.0.

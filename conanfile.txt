@@ -5,9 +5,11 @@ drogon/1.9.13
 libtiff/4.7.2
 libjpeg/9f
 libpng/1.6.58
+libwebp/1.6.0
 lcms/2.19.1
 grok/20.4.15
 lua/5.4.8
+jwt-cpp/0.7.2
 aws-sdk-cpp/1.11.692
 openssl/3.6.5
 sqlite3/3.53.4

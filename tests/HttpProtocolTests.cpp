@@ -5,6 +5,32 @@ namespace {
 using namespace sipi::http;
 void check(bool ok, const char* message) { if (!ok) throw std::runtime_error(message); }
 void run() {
+    const auto parsed = std::get<QueryParameters>(parse_query_parameters(
+        "token=first&%74oken=second&space=a+b&plus=%2B&once=%252F&flag&empty=&x=a=b%26c;d"));
+    check(parsed.at("token") == std::vector<std::string>{"first", "second"}, "duplicate decoded names");
+    check(parsed.at("space")[0] == "a b" && parsed.at("plus")[0] == "+", "query plus decoding");
+    check(parsed.at("once")[0] == "%2F", "decode exactly once");
+    check(parsed.at("flag")[0].empty() && parsed.at("empty")[0].empty(), "present empty values");
+    check(parsed.at("x")[0] == "a=b&c;d", "split before decode, only ampersand separator");
+    check(std::get<QueryParameters>(parse_query_parameters("")).empty(), "absent query");
+    for (const auto raw : {"=x", "&x=y", "x=y&", "x=y&&z=w", "x=%", "x=%0", "x=%GG",
+                           "x=%00", "x=%0d", "x=%0A", "x=%7F", "x=#fragment", "x=\n"}) {
+        check(parse_query_parameters(raw) == std::variant<QueryParameters, QueryError>{QueryError::malformed},
+              "malformed query rejected");
+    }
+    check(std::get<QueryParameters>(parse_query_parameters("x=%23")).at("x")[0] == "#", "encoded hash allowed");
+    for (const auto& raw : {std::string(257, 'n') + "=x", "x=" + std::string(16385, 'v'),
+                            std::string(32769, 'x')}) {
+        check(parse_query_parameters(raw) == std::variant<QueryParameters, QueryError>{QueryError::limit},
+              "query byte limits");
+    }
+    check(std::holds_alternative<QueryParameters>(parse_query_parameters(std::string(256, 'n') + "=" +
+                                                                  std::string(16384, 'v'))), "exact byte limits");
+    std::string pairs = "x=1";
+    for (int i = 1; i < 128; ++i) pairs += "&x=1";
+    check(std::get<QueryParameters>(parse_query_parameters(pairs)).at("x").size() == 128, "exact pair limit");
+    check(parse_query_parameters(pairs + "&x=1") == std::variant<QueryParameters, QueryError>{QueryError::limit},
+          "pair limit includes repeated names");
     using enum InfoMediaType;
     check(negotiate_info_type({})==json_ld,"absent Accept");
     check(negotiate_info_type("application/json")==json,"JSON");

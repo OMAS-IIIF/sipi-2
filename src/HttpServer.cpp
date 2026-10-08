@@ -105,6 +105,15 @@ void iiif_request(const drogon::HttpRequestPtr& request,
         callback(response);
         return;
     }
+    auto parameters = http::parse_query_parameters(request->query());
+    if (const auto* error = std::get_if<http::QueryError>(&parameters)) {
+        auto response = json_error(static_cast<drogon::HttpStatusCode>(
+                                       *error == http::QueryError::limit ? 414 : 400),
+                                   "invalid_query", "Invalid or oversized query parameters");
+        response->addHeader("Cache-Control", "no-store");
+        callback(response);
+        return;
+    }
     if (const auto* image = std::get_if<iiif::ImageRequest>(&result)) {
         spdlog::debug("Parsed IIIF image: identifier='{}', prefix_segments={}, "
                       "rotation={}, mirrored={}, allow_upscaling={}",
@@ -130,6 +139,11 @@ void iiif_request(const drogon::HttpRequestPtr& request,
     http::IiifWorker::Request input{std::move(query), header("authorization"), header("cookie")};
     input.accept = header("accept");
     input.redirect_to_info = routed.redirect_to_info;
+    input.query_parameters = std::get<http::QueryParameters>(std::move(parameters));
+    // Drogon routes HEAD through GET but retains the original method in isHead().
+    input.method = request->isHead()
+        ? preflight::RequestMethod::head : preflight::RequestMethod::get;
+    if (routed.redirect_to_info) input.redirect_query = request->query();
     for (const auto& [name, value] : request->cookies()) input.cookies.emplace(name, value);
     if (!worker->submit(std::move(input), complete)) {
         auto response = json_error(drogon::k503ServiceUnavailable, "iiif_busy",
@@ -200,10 +214,10 @@ void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPre
     const auto public_base_url = config.public_base_url.value_or("http://127.0.0.1:" + std::to_string(config.port));
     std::optional<S3Client> s3_client;
     if (config.s3_bucket) s3_client.emplace(config.s3);
-    auto worker = std::make_shared<http::IiifWorker>(std::move(policy), std::move(sources), size_policy, public_base_url, std::move(s3_client), std::move(result_cache), config.metadata_cache_limits, config.iiif_workers, config.bitonal_method);
+    auto worker = std::make_shared<http::IiifWorker>(std::move(policy), std::move(sources), size_policy, public_base_url, std::move(s3_client), std::move(result_cache), config.metadata_cache_limits, config.iiif_workers, config.bitonal_method, config.mask_cache_limits, config.variant_cache_limits);
     const auto port = config.port;
     auto& app = drogon::app();
-    app.addListener("127.0.0.1", port);
+    app.addListener(config.listen_address, port);
     app.setThreadNum(1);
     app.setFileTypes({});
     app.registerPreSendingAdvice([origins = config.cors_origins,
@@ -230,8 +244,8 @@ void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPre
         std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
         iiif_request(request, std::move(callback), worker);
     }, {drogon::Get});
-    app.registerBeginningAdvice([port] {
-        spdlog::info("SIPI-2 listening on http://127.0.0.1:{}", port);
+    app.registerBeginningAdvice([port, address = config.listen_address] {
+        spdlog::info("SIPI-2 listening on {} port {}", address, port);
     });
     app.run();
     worker->stop();

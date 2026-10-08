@@ -8,6 +8,11 @@ results; there is no CPU affinity, turbo control or filesystem-cache flushing.
 
 Recorded run: [2026-10-05 local measurements](benchmarks/2026-10-05-local.md).
 
+For a real OpenSeadragon trace through Caddy and the OLDAP Lua policy, see
+[2026-10-07 viewer and authorization measurements](benchmarks/2026-10-07-oldap-viewer.md).
+That separate workload compares anonymous permission lookups with media-token
+validation using the existing local deployment and warmed image URLs.
+
 ## Release build and fixtures
 
 From the repository root on the current macOS development setup:
@@ -119,3 +124,124 @@ Drogon's recipe. No suppressions or changes to upstream source are used.
 This instruments the application and HTTP/event-loop libraries, not every native
 dependency. A clean run covers the exercised paths, not all possible interleavings,
 codec internals or future functionality. Sanitized binaries are never timed.
+
+## Watermarked tiles: local storage and MinIO
+
+`benchmarks/watermark_load.py` reuses the persistent-client workload and byte
+verification above. It compares mask-cache on/off and encoded-result-cache on/off,
+for both master formats and both backends, with deterministic shuffled order.
+Use the current Release build and the same generated fixtures; start the local
+MinIO service before running:
+
+```sh
+python3 benchmarks/watermark_load.py --server build/release/sipi-2 \
+  --images build/benchmark-images --output build/watermark-benchmark-results \
+  --repetitions 3 --warm-rounds 4 --clients 8 --workers 4
+```
+
+For warm encoded-result hits, use longer phases to reduce startup/sampling noise:
+
+```sh
+python3 benchmarks/watermark_load.py --server build/release/sipi-2 \
+  --images build/benchmark-images --output build/watermark-cache-hit-results \
+  --repetitions 3 --warm-rounds 128 --clients 8 --workers 4 --result-cache-only
+```
+
+This focused mode measures the same sources/backends and both mask-cache settings,
+with the encoded-result cache enabled throughout. Keep its results separate from
+the shorter all-mode run; do not pool quantiles across different workload lengths.
+
+The output directory must be new. The runner generates an untagged gray8
+1024x512 synthetic coverage emblem (512 KiB decoded), selects white at 25% opacity
+and 50% full-image width, and records source/mask/binary/runner SHA-256s. The
+emblem is a benchmark fixture, not a production logo. All requests deliver 256px
+JPEG tiles; the test does not measure PNG/WebP encoding or arbitrary rotation.
+
+MinIO is deliberately fixed to `http://127.0.0.1:9000`. Both image and mask live
+in a new UUID-named bucket for S3 trials. The repository's local test credentials
+are defaults; override them with `SIPI_BENCH_S3_ACCESS_KEY` and
+`SIPI_BENCH_S3_SECRET_KEY` if needed. Credentials are not saved in results/logs.
+The runner removes only its three uploaded objects and its bucket in `finally`.
+Other buckets and running application servers are untouched. Setup/upload and
+cleanup are outside timings.
+
+Each trial starts a new server. A synthetic policy leaves info requests unmarked,
+so `info.json` warms image metadata without warming the mask or result caches.
+This is a benchmark-only policy, not an authorization example. The initial cold
+phase requests 128 distinct URLs; the first few concurrent requests may decode
+the mask independently before it is retained. **Cold does not mean every request
+misses the mask cache**, nor does it mean cold OS/MinIO pages. The warm phase repeats
+those URLs in the same process. With the result cache disabled it still renders
+every image; with the mask cache disabled it still decodes every mask. Enabled
+result caches must contain exactly 128 entries after each phase.
+
+One-worker local uncached marked responses are references for every measured
+response, including S3. A central tile must also differ from an unmarked reference.
+MIME, dimensions and every response checksum gate success; no throughput threshold
+is used. Results are marked complete only after all trials and MinIO cleanup pass.
+Raw per-request timings, sampled SIPI RSS, summaries and child-server logs remain
+in the ignored output directory. RSS excludes MinIO/Docker and the Python client.
+As with the local benchmark, very fast result hits can be client-limited and
+short phases may have few RSS samples. Local MinIO does not model cloud latency.
+
+Recorded run: [2026-10-08 watermark/cache measurements](benchmarks/2026-10-08-watermarks.md).
+
+## S3 operation profiling
+
+After rebuilding Release, run the local-MinIO profiling workload:
+
+```sh
+python3 benchmarks/s3_io_load.py --server build/release/sipi-2 \
+  --images build/benchmark-images --output build/s3-io-results --repetitions 3
+```
+
+It reuses the synthetic watermark, fixture images, eight persistent clients/four
+workers and owned temporary bucket from the watermark benchmark. For TIFF and JP2,
+three shuffled repeats compare mask retention off/on while rendering 128 unique
+tiles, then 512 warm result hits with both caches enabled. Metadata is warmed
+before the measured log boundary. Warming result entries is also outside that
+boundary; exact HEAD counts detect a missing/incorrect boundary. Every measured
+JPEG is verified against its one-worker local reference. Warm result hits must
+perform no S3 GETs, while both source HEADs remain mandatory.
+
+With debug I/O traces enabled, the report groups operations by fixture role using
+their distinct known lengths (no source paths in traces), records failures, byte
+counts, p50/p95 durations and overlaps within each anonymous opened source. A
+hypothetical 4 KiB page model estimates distinct pages and fetched bytes; it is
+not implemented buffering, a predicted throughput gain or a memory-budget design.
+No operation crosses objects/versions for overlap calculations. Metadata warmups,
+initial cache filling, reference generation and uploads are excluded from counts.
+
+Debug logging affects timings. SDK durations overlap across workers and include
+more than network transit; payload bytes exclude HTTP/TLS framing. Retain the
+production logging-disabled benchmarks for throughput comparisons. See
+[S3 diagnostics](s3-byte-source.md#opt-in-io-diagnostics) for exact field semantics.
+Results, per-operation records and child logs remain under the new ignored output
+directory; only the runner's UUID bucket is cleaned up.
+
+Recorded run: [2026-10-08 S3 operation analysis](benchmarks/2026-10-08-s3-io.md).
+
+## Paired S3 small-read buffer comparison
+
+Preserve the pre-change Release executable before rebuilding, then run:
+
+```sh
+python3 benchmarks/s3_io_load.py --server build/release/sipi-2 \
+  --images build/benchmark-images --output build/s3-buffer-io --repetitions 3
+python3 benchmarks/watermark_load.py --server build/release/sipi-2 \
+  --s3-baseline-server build/s3-buffer-baseline-2026-10-08/sipi-2 \
+  --images build/benchmark-images --output build/s3-buffer-throughput \
+  --repetitions 3 --warm-rounds 4 --cached-warm-rounds 64 --clients 8 --workers 4
+```
+
+The comparison option restricts the matrix to S3, both source formats and enabled
+mask retention. Baseline/current binaries and result-cache on/off cases are shuffled
+within every repetition. Both use the **same local byte reference**, source objects,
+mask and clients. Without result caching, the warm phase renders 512 tiles; with
+result caching, it serves 8,192 cached tiles to make fast phases long enough.
+Metadata alone is warmed before the first 128 distinct requests. Default logging
+is warn, with no per-operation traces; the diagnostic run is separate and must not
+run concurrently. Output never overwrites an existing directory. Binary hashes
+identify the measured versions; an old executable may still depend on its original
+Conan libraries, so this preserved binary is local test evidence, not a deployment
+artifact. See [measured results](benchmarks/2026-10-08-s3-buffer.md).

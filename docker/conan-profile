@@ -1,0 +1,14 @@
+# GCC/architecture are detected inside the fixed Ubuntu build environment.
+include(default)
+
+[settings]
+build_type=Release
+compiler.cppstd=20
+
+# Ubuntu 24.04 supplies these exact upstream tool versions. Reuse them instead of
+# building an additional Autotools toolchain from GNU mirrors for libuuid.
+[platform_tool_requires]
+m4/1.4.19
+autoconf/2.71
+automake/1.16.5
+libtool/2.4.7

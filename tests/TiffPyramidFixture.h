@@ -66,12 +66,12 @@ inline void pyramid_directory(TIFF* file, std::uint32_t width, std::uint32_t hei
 /** Odd-size classic/main-chain or BigTIFF/SubIFD pyramid; no external assets. */
 inline void pyramid(const std::filesystem::path& path, bool subifds = false,
                     bool broken_base = false, bool stripped_smallest = false,
-                    bool broken_smallest = false) {
+                    bool broken_smallest = false, bool profile = true) {
     std::unique_ptr<TIFF, decltype(&TIFFClose)> file(TIFFOpen(path.c_str(), subifds ? "w8" : "w"), TIFFClose);
     if (!file) throw std::runtime_error("Cannot create pyramid");
     std::array<std::uint64_t, 2> offsets{};
     if (subifds) TIFFSetField(file.get(), TIFFTAG_SUBIFD, 2, offsets.data());
-    pyramid_directory(file.get(), 101, 77, 0, broken_base, false, true);
+    pyramid_directory(file.get(), 101, 77, 0, broken_base, false, profile);
     pyramid_directory(file.get(), 51, 39, 1);
     pyramid_directory(file.get(), 26, 20, 2, broken_smallest, stripped_smallest);
 }

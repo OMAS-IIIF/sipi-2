@@ -63,4 +63,20 @@ struct PngMetadata {
 [[nodiscard]] RasterImage8 read_png_image(const ByteSource& source, const PngMetadata& metadata,
     std::size_t max_decoded_bytes = 256 * 1024 * 1024,
     std::size_t max_read_bytes = 256 * 1024 * 1024);
+/** Decode a watermark coverage mask in one pass through IEND. Accept only
+ * untagged gray PNG, 1/2/4/8 bits, with optional Adam7. Expand low-bit samples
+ * linearly to gray8 (0 transparent, 255 opaque), without gamma conversion.
+ * Reject alpha/tRNS, palette/RGB, ICC/sRGB/gAMA/cHRM, 16-bit, EXIF, APNG and HDR.
+ * The returned untagged gray8 raster is ready for prepare_watermark.
+ * Default limits: 16 MiB decoded mask and 16 MiB cumulative source reads (including
+ * buffering). Check pixel budget before raster allocation. Existing libpng limits
+ * still apply: dimensions <=1,000,000 and native per-chunk allocation <=16 MiB;
+ * codec scratch/ancillary metadata and allocator overhead are additional, not
+ * included in the decoded-pixel budget. No pathname reopen or full file copy.
+ * PngUnsupportedError denotes an unsupported mask; PngReadError denotes malformed
+ * data or exceeded limits. Storage errors propagate unchanged. Calls own their
+ * codec state and borrow the version-bound ByteSource only for their duration. */
+[[nodiscard]] RasterImage8 read_png_mask(const ByteSource& source,
+    std::size_t max_decoded_bytes = 16 * 1024 * 1024,
+    std::size_t max_read_bytes = 16 * 1024 * 1024);
 } // namespace sipi

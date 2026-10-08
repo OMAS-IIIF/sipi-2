@@ -50,9 +50,25 @@ TiffReadPlan supported_tiff_plan(const TiffMetadata& metadata, const iiif::Image
     return plan_tiff_read(candidates, geometry);
 }
 
+void validate_raster_delivery_budget(std::uint64_t raster, std::size_t profile,
+                                    const iiif::ImageGeometry& geometry, const iiif::Rotation& rotation) {
+    const auto output = bytes({geometry.output_width,geometry.output_height,4});
+    // Conservative even when resize is an identity; no second decoder raster.
+    fits({raster,output,profile});
+    const auto rotated = rotated_size(geometry.output_width,geometry.output_height,rotation.degrees);
+    if (rotated.width > jpeg_maximum_dimension() || rotated.height > jpeg_maximum_dimension() ||
+        std::uint64_t{rotated.width} * rotated.height > OutputLimits::area_ceiling)
+        throw DeliveryLimitError("Rotated canvas exceeds encoder/output working limit");
+    const auto transformed = bytes({rotated.width,rotated.height,4});
+    fits({output,transformed,profile});
+    // Color conversion: RGBA plus gray-alpha, source/target profiles and
+    // subsequent two-row dithering scratch. Reserve 1 MiB for our tiny target ICC.
+    fits({transformed,transformed/2,profile,1024*1024,
+          (std::uint64_t{rotated.width}+2)*2*sizeof(double)});
+}
+
 void validate_delivery_budget(const cache::ImageMetadata& metadata,
                               const iiif::ImageGeometry& geometry, const iiif::Rotation& rotation) {
-    const auto output = bytes({geometry.output_width, geometry.output_height, 4});
     std::visit([&](const auto& source) {
         using T = std::decay_t<decltype(source)>;
         std::uint64_t raster = 0;
@@ -101,18 +117,7 @@ void validate_delivery_budget(const cache::ImageMetadata& metadata,
             raster = bytes({source.width,source.height,channels});
             fits({raster,profile});
         }
-        // Conservative even when resize is an identity; no second decoder raster.
-        fits({raster,output,profile});
-        const auto rotated = rotated_size(geometry.output_width,geometry.output_height,rotation.degrees);
-        if (rotated.width > jpeg_maximum_dimension() || rotated.height > jpeg_maximum_dimension() ||
-            std::uint64_t{rotated.width} * rotated.height > OutputLimits::area_ceiling)
-            throw DeliveryLimitError("Rotated canvas exceeds encoder/output working limit");
-        const auto transformed = bytes({rotated.width,rotated.height,4});
-        fits({output,transformed,profile});
-        // Color conversion: RGBA plus gray-alpha, source/target profiles and
-        // subsequent two-row dithering scratch. Reserve 1 MiB for our tiny target ICC.
-        fits({transformed,transformed/2,profile,1024*1024,
-              (std::uint64_t{rotated.width}+2)*2*sizeof(double)});
+        validate_raster_delivery_budget(raster,profile,geometry,rotation);
     }, metadata);
 }
 } // namespace sipi::http

@@ -1,9 +1,16 @@
 #include "preflight/LuaPreflight.h"
+#include "preflight/LuaJson.h"
+#include "preflight/LuaHttp.h"
+#include "preflight/LuaJwt.h"
+#include "preflight/HttpClient.h"
+#include "preflight/LuaCache.h"
 
 #include <lua.hpp>
 
 #include <cstring>
+#include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -17,6 +24,9 @@ struct Evaluation {
     const std::string* script;
     const std::string* chunk_name;
     const Request* request;
+    HttpSession* http;
+    const ScriptConfig* config;
+    CacheSession* cache;
     ErrorCode phase = ErrorCode::script_execution;
 };
 
@@ -48,6 +58,92 @@ bool is_string(lua_State* state, int index, const char* expected) {
     return length == std::strlen(expected) && std::memcmp(value, expected, length) == 0;
 }
 
+/** Validate a required source while retaining the caller's stack. Only trivial
+ * locals may cross Lua errors under the protected call. */
+void check_source(lua_State* state, int index) {
+    const int top = lua_gettop(state);
+    int value = index;
+    if (lua_type(state,index) == LUA_TTABLE) {
+        if (lua_getmetatable(state,index)) luaL_error(state,"source must not have a metatable");
+        lua_pushnil(state);
+        while (lua_next(state,index)) {
+            if (!is_string(state,-2,"type") && !is_string(state,-2,"key"))
+                luaL_error(state,"unknown field in source");
+            lua_pop(state,1);
+        }
+        raw_field(state,index,"type");
+        if (!is_string(state,-1,"s3")) luaL_error(state,"source type must be s3");
+        lua_pop(state,1);
+        raw_field(state,index,"key");
+        value = lua_gettop(state);
+    }
+    if (lua_type(state,value) != LUA_TSTRING) luaL_error(state,"source path/key must be a string");
+    std::size_t length = 0;
+    const char* text = lua_tolstring(state,value,&length);
+    if (!length || std::memchr(text,'\0',length)) luaL_error(state,"source path/key must be nonempty without NUL bytes");
+    lua_settop(state,top);
+}
+
+/** Strict plain-table contract; all checks run beneath lua_pcall. */
+void check_resolution(lua_State* state, int index) {
+    if (lua_type(state,index) != LUA_TTABLE || lua_getmetatable(state,index))
+        luaL_error(state,"resolution must be a plain table");
+    lua_pushnil(state);
+    while (lua_next(state,index)) {
+        if (!is_string(state,-2,"max_width") && !is_string(state,-2,"max_height"))
+            luaL_error(state,"unknown field in resolution");
+        lua_pop(state,1);
+    }
+    for (const char* name : {"max_width", "max_height"}) {
+        raw_field(state,index,name);
+        if (!lua_isinteger(state,-1) || lua_tointeger(state,-1) < 1 ||
+            lua_tointeger(state,-1) > std::numeric_limits<std::uint32_t>::max())
+            luaL_error(state,"resolution axes must be positive uint32 integers");
+        lua_pop(state,1);
+    }
+}
+
+void check_watermark(lua_State* state, int index) {
+    if (lua_type(state,index) != LUA_TTABLE || lua_getmetatable(state,index))
+        luaL_error(state,"watermark must be a plain table");
+    lua_pushnil(state);
+    while (lua_next(state,index)) {
+        if (!is_string(state,-2,"source") && !is_string(state,-2,"width_fraction") &&
+            !is_string(state,-2,"opacity") && !is_string(state,-2,"color"))
+            luaL_error(state,"unknown field in watermark");
+        lua_pop(state,1);
+    }
+    raw_field(state,index,"source"); check_source(state,lua_gettop(state)); lua_pop(state,1);
+    raw_field(state,index,"width_fraction");
+    const double width = lua_tonumber(state,-1);
+    if (lua_type(state,-1) != LUA_TNUMBER || !std::isfinite(width) || width <= 0 || width > 1)
+        luaL_error(state,"watermark width_fraction must be a number in (0,1]");
+    lua_pop(state,1);
+    raw_field(state,index,"opacity");
+    const double opacity = lua_tonumber(state,-1);
+    if (lua_type(state,-1) != LUA_TNUMBER || !std::isfinite(opacity) || opacity < 0 || opacity > 1)
+        luaL_error(state,"watermark opacity must be a number in [0,1]");
+    lua_pop(state,1);
+    raw_field(state,index,"color");
+    const int color = lua_gettop(state);
+    if (lua_type(state,color) != LUA_TTABLE || lua_getmetatable(state,color))
+        luaL_error(state,"watermark color must be a plain RGB array");
+    unsigned count = 0;
+    lua_pushnil(state);
+    while (lua_next(state,color)) {
+        if (!lua_isinteger(state,-2) || lua_tointeger(state,-2)<1 || lua_tointeger(state,-2)>3 ||
+            !lua_isinteger(state,-1) || lua_tointeger(state,-1)<0 || lua_tointeger(state,-1)>255)
+            luaL_error(state,"watermark color requires three integer samples in [0,255]");
+        ++count;
+        lua_pop(state,1);
+    }
+    if (count != 3) luaL_error(state,"watermark color requires exactly three samples");
+    lua_pop(state,1);
+}
+
+
+
+
 /** Minimal standard facilities for trusted policy scripts. Deliberately omit
  * io/os/package/debug and remove base-library file loading and console output.
  * This reduces incidental side effects; it is not a security sandbox. */
@@ -68,12 +164,33 @@ void open_libraries(lua_State* state) {
     }
 }
 
+/** Fresh tables keep script mutation local to one evaluation. All allocating
+ * operations run inside the outer protected boundary; the map is borrowed. */
+void push_settings(lua_State* state, const ScriptMap& values) {
+    lua_newtable(state);
+    for (const auto& [name, value] : values) {
+        push_string(state, name);
+        push_string(state, value);
+        lua_rawset(state, -3);
+    }
+}
+
 /** Compile, execute, and validate inside one protected Lua boundary. Returns
- * two normalized values for evaluation, or none for validation (null request). */
+ * four normalized values for evaluation, or none for validation (null request). */
 int evaluate_protected(lua_State* state) {
     auto* evaluation = static_cast<Evaluation*>(lua_touserdata(state, 1));
     lua_settop(state, 0);
     open_libraries(state);
+    open_json(state);
+    open_http(state, *evaluation->http);
+    open_jwt(state);
+    open_cache(state, *evaluation->cache);
+    lua_getglobal(state, "sipi");
+    push_settings(state, evaluation->config->config);
+    lua_setfield(state, -2, "config");
+    push_settings(state, evaluation->config->secrets);
+    lua_setfield(state, -2, "secrets");
+    lua_pop(state, 1);
 
     evaluation->phase = ErrorCode::script_load;
     if (luaL_loadbufferx(state, evaluation->script->data(), evaluation->script->size(),
@@ -113,9 +230,34 @@ int evaluate_protected(lua_State* state) {
         lua_rawset(state, -3);
     }
     lua_setfield(state, -2, "cookies");
+    lua_newtable(state);
+    for (const auto& [name, values] : evaluation->request->query) {
+        push_string(state, name);
+        lua_newtable(state);
+        for (std::size_t i = 0; i < values.size(); ++i) {
+            push_string(state, values[i]);
+            lua_rawseti(state, -2, static_cast<lua_Integer>(i + 1));
+        }
+        lua_rawset(state, -3);
+    }
+    lua_setfield(state, -2, "query");
+    const char* kind = "image";
+    switch (evaluation->request->kind) {
+        case RequestKind::image: break;
+        case RequestKind::info: kind = "info"; break;
+        case RequestKind::base: kind = "base"; break;
+    }
+    lua_pushstring(state, kind);
+    lua_setfield(state, -2, "kind");
+    lua_pushstring(state, evaluation->request->method == RequestMethod::head ? "HEAD" : "GET");
+    lua_setfield(state, -2, "method");
 
     evaluation->phase = ErrorCode::script_execution;
+    evaluation->http->enable();
+    evaluation->cache->enabled = true;
     lua_call(state, 1, LUA_MULTRET);
+    evaluation->http->disable();
+    evaluation->cache->enabled = false;
     evaluation->phase = ErrorCode::contract;
     if (lua_gettop(state) != 1 || lua_type(state, 1) != LUA_TTABLE) {
         return luaL_error(state, "preflight must return exactly one table");
@@ -125,7 +267,7 @@ int evaluate_protected(lua_State* state) {
     }
     lua_pushnil(state);
     while (lua_next(state, 1)) {
-        if (!is_string(state, -2, "decision") && !is_string(state, -2, "source")) {
+        if (!is_string(state, -2, "decision") && !is_string(state, -2, "source") && !is_string(state, -2, "watermark") && !is_string(state, -2, "resolution")) {
             return luaL_error(state, "unknown field in preflight result");
         }
         lua_pop(state, 1);
@@ -139,30 +281,19 @@ int evaluate_protected(lua_State* state) {
     raw_field(state, 1, "source");
     if (!lua_isnil(state, 3)) {
         if (!allowed) return luaL_error(state, "deny must not include a source");
-        int value_index = 3;
-        if (lua_type(state, 3) == LUA_TTABLE) {
-            if (lua_getmetatable(state, 3)) return luaL_error(state, "source must not have a metatable");
-            lua_pushnil(state);
-            while (lua_next(state, 3)) {
-                if (!is_string(state, -2, "type") && !is_string(state, -2, "key"))
-                    return luaL_error(state, "unknown field in source");
-                lua_pop(state, 1);
-            }
-            raw_field(state, 3, "type");
-            if (!is_string(state, -1, "s3")) return luaL_error(state, "source type must be s3");
-            lua_pop(state, 1);
-            raw_field(state, 3, "key");
-            value_index = 4;
-        }
-        if (lua_type(state, value_index) != LUA_TSTRING)
-            return luaL_error(state, "source path/key must be a string");
-        std::size_t length = 0;
-        const char* source = lua_tolstring(state, value_index, &length);
-        if (length == 0 || std::memchr(source, '\0', length))
-            return luaL_error(state, "source path/key must be nonempty without NUL bytes");
-        if (value_index == 4) lua_pop(state, 1);
+        check_source(state,3);
     }
-    return 2;
+    raw_field(state,1,"watermark");
+    if (!lua_isnil(state,4)) {
+        if (!allowed) return luaL_error(state,"deny must not include a watermark");
+        check_watermark(state,4);
+    }
+    raw_field(state,1,"resolution");
+    if (!lua_isnil(state,5)) {
+        if (!allowed) return luaL_error(state,"deny must not include a resolution");
+        check_resolution(state,5);
+    }
+    return 4;
 }
 
 } // namespace
@@ -170,8 +301,9 @@ int evaluate_protected(lua_State* state) {
 PreflightError::PreflightError(ErrorCode code, const std::string& message)
     : std::runtime_error(message), code_(code) {}
 
-LuaPreflight::LuaPreflight(const std::filesystem::path& script_path)
-    : chunk_name_("@" + script_path.string()) {
+LuaPreflight::LuaPreflight(const std::filesystem::path& script_path, ScriptConfig config)
+    : chunk_name_("@" + script_path.string()), config_(std::move(config)), cache_(std::make_shared<SharedCache>()) {
+    validate_script_config(config_);
     std::ifstream input(script_path, std::ios::binary);
     if (!input) throw PreflightError(ErrorCode::script_file, "cannot open preflight script");
     try {
@@ -223,8 +355,10 @@ void instruction_limit(lua_State* state, lua_Debug*) {
 /** Member order keeps allocator bookkeeping alive through lua_close. */
 struct Runtime {
     Budget budget;
+    HttpSession http; // Must outlive Lua-state finalizers.
+    CacheSession cache; // Also outlives Lua finalizers.
     LuaState state{lua_newstate(allocate, &budget), &lua_close};
-    Runtime() {
+    explicit Runtime(SharedCache& shared) : cache{shared, false, false, 0, {}} {
         if (!state) throw PreflightError(ErrorCode::memory, "cannot create Lua state");
         *static_cast<Budget**>(lua_getextraspace(state.get())) = &budget;
         lua_sethook(state.get(), instruction_limit, LUA_MASKCOUNT, 1000);
@@ -233,15 +367,17 @@ struct Runtime {
 
 /** Common protected boundary for startup validation and request evaluation. */
 void execute(Runtime& runtime, const std::string& script, const std::string& chunk_name,
-             const Request* request) {
+             const Request* request, const ScriptConfig& config) {
     auto& state = runtime.state;
-    Evaluation evaluation{&script, &chunk_name, request};
+    Evaluation evaluation{&script, &chunk_name, request, &runtime.http, &config, &runtime.cache};
 
     // A zero-upvalue C function and light userdata do not allocate in Lua.
     // All allocating Lua operations happen inside the protected callback.
     lua_pushcfunction(state.get(), evaluate_protected);
     lua_pushlightuserdata(state.get(), &evaluation);
-    const int status = lua_pcall(state.get(), 1, request ? 2 : 0, 0);
+    const int status = lua_pcall(state.get(), 1, request ? 4 : 0, 0);
+    runtime.http.disable(); // Also on Lua errors; finalizers cannot initiate requests.
+    runtime.cache.enabled = false;
     if (runtime.budget.exhausted) {
         throw PreflightError(ErrorCode::instruction_limit, "preflight instruction budget exceeded");
     }
@@ -258,26 +394,58 @@ void execute(Runtime& runtime, const std::string& script, const std::string& chu
 } // namespace
 
 void LuaPreflight::validate() const {
-    Runtime runtime;
-    execute(runtime, script_, chunk_name_, nullptr);
+    Runtime runtime(*cache_);
+    execute(runtime, script_, chunk_name_, nullptr, config_);
 }
 
 Decision LuaPreflight::evaluate(const Request& request) const {
-    Runtime runtime;
-    execute(runtime, script_, chunk_name_, &request);
+    Runtime runtime(*cache_);
+    execute(runtime, script_, chunk_name_, &request, config_);
     auto& state = runtime.state;
     if (is_string(state.get(), 1, "deny")) return Deny{};
-    if (lua_isnil(state.get(), 2)) return Allow{std::nullopt};
-    std::size_t length = 0;
-    // Contract was checked inside the protected Lua call. Read existing fields
-    // without invoking metamethods; owning C++ values are constructed afterwards.
-    if (lua_type(state.get(), 2) == LUA_TTABLE) {
-        raw_field(state.get(), 2, "key");
-        const char* key = lua_tolstring(state.get(), -1, &length);
-        return Allow{S3Key{std::string(key, length)}};
+    // Contract checks ran under lua_pcall. Field names already exist; no
+    // metamethod is invoked. Construct owning native values after that boundary.
+    const auto source_at = [&](int index) -> SourceOverride {
+        std::size_t length = 0;
+        if (lua_type(state.get(),index) == LUA_TTABLE) {
+            raw_field(state.get(),index,"key");
+            const char* text = lua_tolstring(state.get(),-1,&length);
+            S3Key key{std::string(text,length)};
+            lua_pop(state.get(),1);
+            return key;
+        }
+        const char* text = lua_tolstring(state.get(),index,&length);
+        return std::filesystem::path(std::string(text,length));
+    };
+    Allow result{std::nullopt};
+    if (!lua_isnil(state.get(),2)) result.source = source_at(2);
+    if (!lua_isnil(state.get(),3)) {
+        raw_field(state.get(),3,"source");
+        auto source = source_at(lua_gettop(state.get()));
+        lua_pop(state.get(),1);
+        raw_field(state.get(),3,"width_fraction");
+        const double width = lua_tonumber(state.get(),-1); lua_pop(state.get(),1);
+        raw_field(state.get(),3,"opacity");
+        const double opacity = lua_tonumber(state.get(),-1); lua_pop(state.get(),1);
+        raw_field(state.get(),3,"color");
+        std::array<std::uint8_t,3> color{};
+        for (int i=0;i<3;++i) {
+            lua_rawgeti(state.get(),5,i+1);
+            color[i] = static_cast<std::uint8_t>(lua_tointeger(state.get(),-1));
+            lua_pop(state.get(),1);
+        }
+        result.watermark = Watermark{std::move(source),width,opacity,color};
     }
-    const char* source = lua_tolstring(state.get(), 2, &length);
-    return Allow{std::filesystem::path(std::string(source, length))};
+    lua_settop(state.get(),4);
+    if (!lua_isnil(state.get(),4)) {
+        raw_field(state.get(),4,"max_width");
+        const auto width = static_cast<std::uint32_t>(lua_tointeger(state.get(),-1));
+        lua_pop(state.get(),1);
+        raw_field(state.get(),4,"max_height");
+        const auto height = static_cast<std::uint32_t>(lua_tointeger(state.get(),-1));
+        result.resolution = ResolutionLimit{width,height};
+    }
+    return result;
 }
 
 } // namespace sipi::preflight

@@ -18,8 +18,8 @@ resolution, geometry/policy validation and renderer capability checks.
 | `geometry` | Resolved integer crop and output dimensions before mirroring/rotation. Coordinates belong to the effective image. |
 | `rotation` | Mirroring flag and clockwise angle; 360 and either signed zero normalize to 0. |
 | `quality`, `input_layout` | Resolve default/color to color for RGB/RGBA, or gray for native grayscale. Explicit gray and bitonal remain distinct operations. |
-| `encoding` | JPEG with the actual quality value (1..100), or PNG. These types also identify the output format. |
-| `watermark` | Optional definitive watermark source identity, version and byte length. |
+| `encoding` | JPEG with quality (1..100), PNG, or WebP with lossless/quality and a codec-specific recipe. These types identify the output format. |
+| `watermark` | Optional WatermarkIdentity: definitive source identity/version/length, relative width, opacity and sRGB8 color. |
 | `recipe` | Version of fixed rendering semantics and encoding/color decisions. Defaults to `current_render_recipe`. |
 
 The same source and variant can share a result for these equivalent requests on
@@ -162,3 +162,17 @@ Rendering recipe `sipi-render-v3` invalidates prior encoded results to guarantee
 one-bit `bitonal.png` on cache hits as well as misses. This intentionally versions
 the whole renderer, so other-quality entries are regenerated too. No SQLite schema
 migration or cache directory deletion is necessary; old entries age out normally.
+
+WebP output adds independent encoding fields and a codec-specific recipe; JPEG/PNG
+serialization is unchanged. See [WebP cache and color policy](webp-delivery.md).
+
+Single-color watermark delivery adds a `watermarked` variant and complete typed
+watermark parameters. Width/opacity preserve exact binary64 values (signed zero
+normalized); a fixed `center-fit-direct-area-linear-srgb-bpc-v1` subrecipe versions
+placement, sampling and color semantics. Unmarked schema-v1 serialization is
+unchanged. Both source validation and mask decoding precede lookup; see
+[watermark delivery](watermarks.md#http-delivery-and-cache-identity).
+
+## Restricted public variants
+
+Restricted results use `restricted-v1:WIDTHxHEIGHT`, covering the effective full public canvas independently of crop geometry. The source version, all output settings and optional watermark identity remain part of the key. Complete reduced rasters use a separate `restricted-source-v1` key in the memory-only VariantCache. See [restricted resolution](restricted-resolution.md).

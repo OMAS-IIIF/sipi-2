@@ -5,6 +5,7 @@
 #include "iiifparser/IIIFGeometry.h"
 #include "storage/ByteSource.h"
 #include <optional>
+#include <array>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -24,18 +25,32 @@ inline constexpr std::string_view current_render_recipe = "sipi-render-v3";
 struct JpegEncoding { int quality; };
 /** Fixed PNG parameters belong to the rendering recipe until configurable. */
 struct PngEncoding {};
-using Encoding = std::variant<JpegEncoding, PngEncoding>;
+/** WebP quality controls lossy fidelity or lossless effort; fixed method/exact
+ * and color preparation version are serialized separately for this codec. */
+struct WebpEncoding { bool lossless; int quality; };
+using Encoding = std::variant<JpegEncoding, PngEncoding, WebpEncoding>;
+
+/** Output-affecting centered single-color watermark policy, including the opened
+ * mask version. The fixed placement/filter/color rules are versioned in serialization. */
+struct WatermarkIdentity {
+    SourceInfo source;
+    double width_fraction;
+    double opacity;
+    std::array<std::uint8_t,3> color;
+};
 
 /** Owning identity of one authorized rendering result, BEFORE cache lookup.
  * source comes from the opened, version-bound ByteSource. geometry is already
  * resolved and policy-validated in the effective image's coordinates, before
  * mirroring/rotation. input_layout is the decoded layout before quality changes.
  *
- * variant is REQUIRED: use "original" for unrestricted source content. Future
- * restricted/virtual-image variants need a stable identity covering all their
- * output-affecting parameters (including watermark placement, if applicable).
+ * variant is REQUIRED: use "original" for unrestricted source content.
+ * Restricted results use "restricted-v1:WIDTHxHEIGHT" for the effective public
+ * canvas; reduced source rasters use "restricted-source-v1" plus full geometry.
+ * The original overlay uses "watermarked"; both paths bind explicit
+ * WatermarkIdentity fields when present.
  * Equal authorized variants may share results; never use tokens/cookies/user IDs.
- * A watermark additionally needs its definitive source identity and version.
+ * WatermarkIdentity owns the definitive mask source version and rendering settings.
  * recipe covers fixed encoder/color/algorithm choices; configurable choices
  * must acquire explicit fields when implemented. No policy execution occurs here.
  *
@@ -50,7 +65,7 @@ struct RenderIdentity {
     iiif::Quality quality;
     PixelLayout input_layout;
     Encoding encoding;
-    std::optional<SourceInfo> watermark;
+    std::optional<WatermarkIdentity> watermark;
     std::string recipe = std::string(current_render_recipe);
     BitonalMethod bitonal_method = BitonalMethod::threshold;
 };

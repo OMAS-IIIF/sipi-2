@@ -102,11 +102,11 @@ Boundary boundary(const PixelInterval& interval, std::uint32_t i, std::uint32_t 
 }
 
 void validate_interval(const PixelInterval& interval, std::uint32_t dimension,
-                       std::uint32_t output) {
+                       std::uint32_t output, bool allow_enlargement = false) {
     const auto bound = static_cast<std::uint64_t>(dimension) * interval.denominator;
     if (!interval.denominator || !interval.extent_numerator ||
         interval.offset_numerator > bound || interval.extent_numerator > bound - interval.offset_numerator ||
-        interval.extent_numerator < static_cast<std::uint64_t>(output) * interval.denominator)
+        (!allow_enlargement && interval.extent_numerator < static_cast<std::uint64_t>(output) * interval.denominator))
         throw ResizeError("Invalid fractional window or enlargement requested");
 }
 
@@ -159,6 +159,80 @@ RasterImage8 downsample_area(RasterImage8 image, const PixelWindow& window,
             }
             const auto index = (static_cast<std::size_t>(y) * width + x) * channels;
             sum.store(output.pixels.data() + index, area, channels);
+        }
+    }
+    return output;
+}
+namespace {
+/** Constant-space support for one output coordinate. Area weights retain exact
+ * rational boundaries; growing axes need only the two nearest pixel centers. */
+struct AxisFilter {
+    std::uint64_t first, last;
+    Boundary left{}, right{};
+    bool linear = false;
+    double fraction = 0;
+
+    double weight(std::uint64_t pixel) const {
+        if (!linear) return overlap(pixel, left, right);
+        if (first == last) return 1;
+        return pixel == first ? 1 - fraction : fraction;
+    }
+};
+AxisFilter filter_axis(const PixelInterval& interval, std::uint32_t index,
+                       std::uint32_t count) {
+    const auto left = boundary(interval, index, count);
+    const auto right = boundary(interval, index + 1, count);
+    if (interval.extent_numerator >= std::uint64_t{count} * interval.denominator)
+        return {left.pixel, right.ceiling() - 1, left, right};
+
+    const auto crop_first = interval.offset_numerator / interval.denominator;
+    const auto crop_end = interval.offset_numerator + interval.extent_numerator;
+    const auto crop_last = crop_end / interval.denominator +
+                          (crop_end % interval.denominator != 0) - 1;
+    const double center = static_cast<double>(left.pixel) +
+        static_cast<double>(left.remainder) / static_cast<double>(left.denominator) +
+        0.5 * static_cast<double>(interval.extent_numerator) / interval.denominator / count - 0.5;
+    const double clamped = std::clamp(center, static_cast<double>(crop_first),
+                                             static_cast<double>(crop_last));
+    const auto first = static_cast<std::uint64_t>(std::floor(clamped));
+    return {first, std::min(first + 1, crop_last), {}, {}, true, clamped - first};
+}
+} // namespace
+
+RasterImage8 resize_image(RasterImage8 image, const PixelWindow& window,
+                          std::uint32_t width, std::uint32_t height,
+                          std::size_t max_working_bytes) {
+    const auto channels = image.channel_count();
+    const auto input_bytes = pixel_bytes(image.width, image.height, channels);
+    const auto output_bytes = pixel_bytes(width, height, channels);
+    if (image.pixels.size() != input_bytes) throw ResizeError("Invalid raster");
+    validate_interval(window.horizontal, image.width, width, true);
+    validate_interval(window.vertical, image.height, height, true);
+    if (window.horizontal.extent_numerator >= std::uint64_t{width} * window.horizontal.denominator &&
+        window.vertical.extent_numerator >= std::uint64_t{height} * window.vertical.denominator)
+        return downsample_area(std::move(image), window, width, height, max_working_bytes);
+    if (input_bytes > max_working_bytes || image.icc_profile.size() > max_working_bytes - input_bytes ||
+        output_bytes > max_working_bytes - input_bytes - image.icc_profile.size())
+        throw ResizeError("Resize working memory exceeds limit");
+    RasterImage8 output{width, height, std::vector<std::uint8_t>(output_bytes),
+                        std::move(image.icc_profile), image.layout, image.srgb_intent};
+    for (std::uint32_t y = 0; y < height; ++y) {
+        const auto vertical = filter_axis(window.vertical, y, height);
+        for (std::uint32_t x = 0; x < width; ++x) {
+            const auto horizontal = filter_axis(window.horizontal, x, width);
+            WeightedPixel sum;
+            double total = 0;
+            for (auto sy = vertical.first; sy <= vertical.last; ++sy) {
+                const double wy = vertical.weight(sy);
+                for (auto sx = horizontal.first; sx <= horizontal.last; ++sx) {
+                    const double weight = wy * horizontal.weight(sx);
+                    total += weight;
+                    const auto offset = static_cast<std::size_t>(sy * image.width + sx) * channels;
+                    sum.add(image.pixels.data() + offset, weight, channels);
+                }
+            }
+            const auto offset = (static_cast<std::size_t>(y) * width + x) * channels;
+            sum.store(output.pixels.data() + offset, total, channels);
         }
     }
     return output;

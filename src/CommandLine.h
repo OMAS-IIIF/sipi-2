@@ -3,10 +3,13 @@
 #include "storage/S3ByteSource.h"
 #include "cache/ResultCache.h"
 #include "cache/MetadataCache.h"
+#include "cache/MaskCache.h"
+#include "cache/VariantCache.h"
 #include "image/ImageSource.h"
 #include "http/WorkerLimits.h"
 #include "image/Bitonal.h"
 #include "image/OutputLimits.h"
+#include "preflight/ScriptConfig.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -36,10 +39,14 @@ struct ServerConfig {
     std::optional<std::filesystem::path> cache_dir;
     cache::CacheLimits cache_limits;
     cache::MetadataCacheLimits metadata_cache_limits;
+    cache::MaskCacheLimits mask_cache_limits;
+    cache::VariantCacheLimits variant_cache_limits;
     unsigned iiif_workers = http::default_worker_count();
     BitonalMethod bitonal_method = BitonalMethod::threshold;
     LogLevel log_level = LogLevel::info;
     std::uint16_t port = 8080;
+    // Numeric IPv4/IPv6 address; containers explicitly opt into 0.0.0.0.
+    std::string listen_address = "127.0.0.1";
     bool size_upscaling = false;
     OutputLimits output_limits;
     // Wildcard is exclusive; explicit origins are matched exactly, never reflected blindly.
@@ -47,6 +54,8 @@ struct ServerConfig {
     bool cors_credentials = false;
     // Absent disables preflight; relative paths use the process working directory.
     std::optional<std::filesystem::path> preflight_script;
+    // Explicit Lua settings only; secret files are read later at startup. Never log.
+    preflight::ScriptSettings preflight_settings;
     // Optional repository root; relative values use the process working directory.
     std::optional<std::filesystem::path> iiif_root;
     // Public origin and optional proxy mount path, without a trailing slash.
@@ -85,11 +94,16 @@ struct RepositoryEnvironment {
 };
 
 /** Caller-supplied SIPI_CACHE_{DIR,MAX_BYTES,TARGET_PERCENT} and
- * SIPI_METADATA_CACHE_{MAX_ENTRIES,MAX_BYTES} snapshots. */
+ * SIPI_METADATA_CACHE_{MAX_ENTRIES,MAX_BYTES} and SIPI_MASK_CACHE_{MAX_ENTRIES,MAX_BYTES},
+ * SIPI_VARIANT_CACHE_{MAX_ENTRIES,MAX_BYTES} snapshots. */
 struct CacheEnvironment {
     std::optional<std::string_view> directory, max_bytes, target_percent;
     std::optional<std::string_view> metadata_max_entries = std::nullopt;
     std::optional<std::string_view> metadata_max_bytes = std::nullopt;
+    std::optional<std::string_view> mask_max_entries = std::nullopt;
+    std::optional<std::string_view> mask_max_bytes = std::nullopt;
+    std::optional<std::string_view> variant_max_entries = std::nullopt;
+    std::optional<std::string_view> variant_max_bytes = std::nullopt;
 };
 
 /** Caller-owned CORS snapshots; origins is * or a comma-separated origin list. */
@@ -126,6 +140,8 @@ struct OutputLimitEnvironment {
  * cors_environment supplies SIPI_CORS_ORIGINS/CREDENTIALS. Origins is * or a
  * comma-separated list of exact HTTP(S) origins; credentials requires a list.
  * Help/version skip the cross-field check, as with S3 credentials.
+ * preflight_environment contains selected SIPI_PREFLIGHT_{CONFIG,SECRETS,SECRET_FILES}_*
+ * NAME=VALUE entries. Merge per name; secret file I/O is deferred to startup.
  * cache_environment supplies the optional cache directory and capacity settings.
  * Parsing validates syntax only; persistent cache initialization belongs to startup.
  * Input views need only live for this call. The returned result owns its data.
@@ -150,6 +166,8 @@ struct OutputLimitEnvironment {
     std::optional<std::string_view> env_iiif_workers = std::nullopt,
     std::optional<std::string_view> env_bitonal_method = std::nullopt,
     OutputLimitEnvironment output_environment = {},
-    CorsEnvironment cors_environment = {});
+    CorsEnvironment cors_environment = {},
+    std::span<const std::string_view> preflight_environment = {},
+    std::optional<std::string_view> env_listen_address = std::nullopt);
 
 } // namespace sipi

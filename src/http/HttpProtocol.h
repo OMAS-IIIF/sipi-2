@@ -1,9 +1,21 @@
 #pragma once
 #include "iiifparser/IIIFParser.h"
 #include <optional>
+#include <map>
+#include <string>
+#include <vector>
 #include <string_view>
 
 namespace sipi::http {
+using QueryParameters = std::map<std::string, std::vector<std::string>>;
+enum class QueryError { malformed, limit };
+/** Parse the raw query without '?', before policy/cache lookup. Percent-decode once,
+ * '+' means space; retain duplicate values in wire order. Empty values are valid,
+ * empty names/components, controls and raw fragments are rejected. Decoded strings
+ * are bytes, without Unicode normalization. Limits: 32 KiB raw, 128 pairs,
+ * 256-byte names and 16 KiB values. Errors never contain credentials. */
+[[nodiscard]] std::variant<QueryParameters, QueryError> parse_query_parameters(std::string_view raw);
+
 /** Parsed IIIF operation; base URIs reuse info authorization/admission before 303.
  * Image-shaped suffixes take precedence over arbitrary-prefix base identities.
  * Invalid image syntax must not turn into a redirect to a different resource.

@@ -32,6 +32,8 @@ struct Case {
     std::uint64_t cache_max_bytes = 1073741824;
     unsigned cache_target_percent = 90;
     sipi::cache::MetadataCacheLimits metadata_limits = {};
+    sipi::cache::MaskCacheLimits mask_limits = {};
+    sipi::cache::VariantCacheLimits variant_limits{};
     std::optional<std::string_view> workers_environment = std::nullopt;
     unsigned workers = sipi::http::default_worker_count();
     std::optional<std::string_view> bitonal_environment = std::nullopt;
@@ -41,6 +43,8 @@ struct Case {
     sipi::CorsEnvironment cors_environment = {};
     std::vector<std::string> cors_origins{"*"};
     bool cors_credentials = false;
+    std::optional<std::string_view> listen_environment = std::nullopt;
+    std::string listen_address = "127.0.0.1";
 };
 
 /** Check either a complete typed result or a nonempty diagnostic. */
@@ -63,7 +67,7 @@ bool check(const Case& test) {
     std::optional<std::string_view> url_environment;
     if (test.url_environment) url_environment = *test.url_environment;
     const auto result = sipi::load_startup_options(arguments, environment, port_environment,
-        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment, test.workers_environment, test.bitonal_environment, test.output_environment, test.cors_environment);
+        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment, test.workers_environment, test.bitonal_environment, test.output_environment, test.cors_environment, {}, test.listen_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&result)) {
         if (test.error && !error->message.empty()) {
             return true;
@@ -73,6 +77,7 @@ bool check(const Case& test) {
     }
     const auto& options = std::get<sipi::StartupOptions>(result);
     const bool matches = !test.error && options.command == test.command &&
+                         options.config.listen_address == test.listen_address &&
                          options.config.cors_origins == test.cors_origins &&
                          options.config.cors_credentials == test.cors_credentials &&
                          options.config.output_limits.max_width == test.output_limits.max_width &&
@@ -88,6 +93,10 @@ bool check(const Case& test) {
                          options.config.cache_dir == test.cache_dir &&
                          options.config.cache_limits.max_bytes == test.cache_max_bytes &&
                          options.config.cache_limits.target_percent == test.cache_target_percent &&
+                         options.config.mask_cache_limits.max_entries == test.mask_limits.max_entries &&
+                         options.config.mask_cache_limits.max_bytes == test.mask_limits.max_bytes &&
+                         options.config.variant_cache_limits.max_entries == test.variant_limits.max_entries &&
+                         options.config.variant_cache_limits.max_bytes == test.variant_limits.max_bytes &&
                          options.config.metadata_cache_limits.max_entries == test.metadata_limits.max_entries &&
                          options.config.metadata_cache_limits.max_bytes == test.metadata_limits.max_bytes &&
                          (options.command != sipi::Command::help ||
@@ -366,6 +375,76 @@ int main(int argc, char* argv[]) {
     metadata_case({"--metadata-cache-max-entries"}, {}, {}, {}, true);
     metadata_case({"--metadata-cache-max-bytes=1","--metadata-cache-max-bytes=2"}, {}, {}, {}, true);
     metadata_case({"--help","--metadata-cache-max-entries=-1"}, {}, {}, {}, true);
+    const auto mask_case = [&](std::vector<std::string> args,
+                                   std::optional<std::string_view> entries,
+                                   std::optional<std::string_view> bytes,
+                                   sipi::cache::MaskCacheLimits expected,
+                                   bool error = false, Command command = Command::run) {
+        Case test;
+        test.name = "mask cache configuration";
+        test.arguments = std::move(args);
+        test.cache_environment.mask_max_entries = entries;
+        test.cache_environment.mask_max_bytes = bytes;
+        test.mask_limits = expected;
+        test.error = error; test.command = command;
+        cases.push_back(std::move(test));
+    };
+    mask_case({"--config",file("mask-cache.toml")}, {}, {}, {12,4096});
+    mask_case({"--config",file("mask-cache.toml")}, "20", "8192", {20,8192});
+    mask_case({"--config",file("mask-cache.toml"),"--mask-cache-max-entries=0"}, "20", "8192", {0,8192});
+    mask_case({"--config",file("mask-cache.toml"),"--mask-cache-max-entries=64","--mask-cache-max-bytes=33554432"},
+                  "0", "0", {});
+    mask_case({}, "0", "0", {0,0});
+    mask_case({"--mask-cache-max-bytes=0"}, {}, {}, {64,0});
+    mask_case({"--mask-cache-max-entries=1","--mask-cache-max-bytes=2"}, "bad", "bad", {1,2});
+    mask_case({"--config",file("invalid-mask-cache.toml")}, "1", "2", {1,2});
+    mask_case({"--config",file("invalid-mask-cache.toml")}, {}, {}, {}, true);
+    mask_case({"--help"}, "bad", "bad", {}, false, Command::help);
+    mask_case({"--version"}, "bad", "bad", {}, false, Command::version);
+    for (const char* invalid_value : {"", "-1", "+1", "1.5", "1MB", "18446744073709551616"}) {
+        mask_case({"--mask-cache-max-entries",invalid_value}, {}, {}, {}, true);
+        mask_case({"--mask-cache-max-bytes",invalid_value}, {}, {}, {}, true);
+        mask_case({}, invalid_value, {}, {}, true);
+        mask_case({}, {}, invalid_value, {}, true);
+    }
+    mask_case({"--mask-cache-max-entries"}, {}, {}, {}, true);
+    mask_case({"--mask-cache-max-bytes=1","--mask-cache-max-bytes=2"}, {}, {}, {}, true);
+    mask_case({"--help","--mask-cache-max-entries=-1"}, {}, {}, {}, true);
+    const auto variant_case = [&](std::vector<std::string> args,
+                                   std::optional<std::string_view> entries,
+                                   std::optional<std::string_view> bytes,
+                                   sipi::cache::VariantCacheLimits expected,
+                                   bool error = false, Command command = Command::run) {
+        Case test;
+        test.name = "variant cache configuration";
+        test.arguments = std::move(args);
+        test.cache_environment.variant_max_entries = entries;
+        test.cache_environment.variant_max_bytes = bytes;
+        test.variant_limits = expected;
+        test.error = error; test.command = command;
+        cases.push_back(std::move(test));
+    };
+    variant_case({"--config",file("variant-cache.toml")}, {}, {}, {12,4096});
+    variant_case({"--config",file("variant-cache.toml")}, "20", "8192", {20,8192});
+    variant_case({"--config",file("variant-cache.toml"),"--variant-cache-max-entries=0"}, "20", "8192", {0,8192});
+    variant_case({"--config",file("variant-cache.toml"),"--variant-cache-max-entries=16","--variant-cache-max-bytes=67108864"},
+                  "0", "0", {});
+    variant_case({}, "0", "0", {0,0});
+    variant_case({"--variant-cache-max-bytes=0"}, {}, {}, {16,0});
+    variant_case({"--variant-cache-max-entries=1","--variant-cache-max-bytes=2"}, "bad", "bad", {1,2});
+    variant_case({"--config",file("invalid-variant-cache.toml")}, "1", "2", {1,2});
+    variant_case({"--config",file("invalid-variant-cache.toml")}, {}, {}, {}, true);
+    variant_case({"--help"}, "bad", "bad", {}, false, Command::help);
+    variant_case({"--version"}, "bad", "bad", {}, false, Command::version);
+    for (const char* invalid_value : {"", "-1", "+1", "1.5", "1MB", "18446744073709551616"}) {
+        variant_case({"--variant-cache-max-entries",invalid_value}, {}, {}, {}, true);
+        variant_case({"--variant-cache-max-bytes",invalid_value}, {}, {}, {}, true);
+        variant_case({}, invalid_value, {}, {}, true);
+        variant_case({}, {}, invalid_value, {}, true);
+    }
+    variant_case({"--variant-cache-max-entries"}, {}, {}, {}, true);
+    variant_case({"--variant-cache-max-bytes=1","--variant-cache-max-bytes=2"}, {}, {}, {}, true);
+    variant_case({"--help","--variant-cache-max-entries=-1"}, {}, {}, {}, true);
     const auto worker_case = [&](std::vector<std::string> args,
                                   std::optional<std::string_view> env, unsigned expected,
                                   bool error = false, Command command = Command::run) {
@@ -455,6 +534,21 @@ int main(int argc, char* argv[]) {
     }
     cors_case({"--cors-origins=http://[::1]:8080"},{},{"http://[::1]:8080"},false);
     cors_case({"--cors-credentials=yes"},{},{},false,true);
+    const auto listen_case = [&](std::vector<std::string> args,
+            std::optional<std::string_view> env, std::string expected, bool error=false) {
+        Case test{"Listen address", std::move(args)};
+        test.listen_environment=env; test.listen_address=std::move(expected);
+        test.error=error; cases.push_back(std::move(test));
+    };
+    listen_case({"--config",file("listen.toml")},{},"0.0.0.0");
+    listen_case({"--config",file("listen.toml")},"::1","::1");
+    listen_case({"--config",file("listen.toml"),"--listen-address=127.0.0.2"},"invalid","127.0.0.2");
+    listen_case({"--help"},"invalid","127.0.0.1");
+    cases.back().command=Command::help;
+    for (const char* bad : {"", "localhost", "[::1]", "1.2.3.999", "0.0.0.0:8182"}) {
+        listen_case({"--listen-address",bad},{},"",true);
+        listen_case({},bad,"",true);
+    }
     int failures = 0;
     for (const auto& test : cases) {
         failures += !check(test);

@@ -2,18 +2,28 @@
 
 A high-performance, versatile IIIF server, developed in small, explainable steps.
 The current executable resolves startup configuration and runs a local Drogon HTTP
-server with HTML hello, JSON health, and IIIF syntax routes. Tiled or strip-based gray/RGB/RGBA8 TIFF-to-JPEG/PNG delivery is implemented; area-weighted reduction is supported; enlargement and streaming come later.
+server with HTML hello, JSON health, and IIIF syntax routes. Tiled or strip-based gray/RGB/RGBA8 TIFF-to-JPEG/PNG delivery is implemented; area-weighted reduction is supported; configurable bilinear enlargement is supported; streaming comes later.
+
+## Delivery feature freeze
+
+The first-release delivery feature set is complete; current work focuses on
+correctness, regression/conformance validation, documentation and release readiness.
+Lua can now restrict the **whole public image** before all IIIF operations, using
+separate public/original service URLs. See [restricted resolution](docs/restricted-resolution.md)
+for policy, cache configuration and the runnable policy example. No OLDAP deployment
+policy is changed automatically.
 
 ## Build and run
 
 Prerequisites: a compiler supporting C++20 for SIPI and C++23 for Grok, CMake 3.24 or newer, Ninja, and Conan 2.
 Python 3 is used by the HTTP integration test (no third-party Python packages).
 Direct dependencies are `spdlog/1.17.0`, `cli11/2.6.2`, `drogon/1.9.13`,
-`libtiff/4.7.2`, `libjpeg/9f`, `libpng/1.6.58`, `grok/20.4.15`, `lua/5.4.8`,
+`libtiff/4.7.2`, `libjpeg/9f`, `libpng/1.6.58`, `grok/20.4.15`, `lua/5.4.8`, `jwt-cpp/0.7.2`,
 `aws-sdk-cpp/1.11.692` (S3), `openssl/3.6.5` (cache-key SHA-256), and `sqlite3/3.53.4` (result index).
 Drogon is built without Boost and ORM support. Its Conan recipe still brings
 OpenSSL transitively, even though our listener uses only plain HTTP.
 `conan.lock` records their resolved versions and recipe revisions.
+For security fixes, follow the [dependency update procedure](docs/dependency-updates.md).
 
 On a new machine, detect a local compiler profile once (already done on the
 initial development machine):
@@ -42,7 +52,8 @@ tools. The versioned `profiles/macos-debug` profile includes the detected local
 profile and selects Debug, standard C++20, and Ninja. It also retains an
 Apple Clang 21 unused-result warning in Trantor 1.5.28 without treating it as an
 error; the exception is scoped to that dependency. Other platforms need a matching
-profile; Linux builds have not yet been validated.
+profile. Linux ARM64 builds and container delivery are now validated through the
+[Docker workflow](docs/docker.md).
 `--build=missing` compiles dependencies if compatible binary packages are missing.
 The subsequent commands configure, build, and run our executable. Re-run Conan
 when dependencies or build settings change; ordinary source edits only need a build.
@@ -167,7 +178,8 @@ before configuring/building in CMake or CLion.
 `src/imgformats/TiffMetadata.h` reads delivery metadata without pixel decoding.
 `src/iiifparser/IIIFGeometry.h` resolves region/size against image dimensions and
 policy. `--size-upscaling true`, `SIPI_SIZE_UPSCALING=true`, or TOML
-`size-upscaling = true` enables enlargement in the geometry policy (default false).
+`size-upscaling = true` enables actual bilinear enlargement (default false), with ^ requests and output limits.
+See [upscaling](docs/upscaling.md).
 The HTTP worker now resolves sources, reads TIFF metadata, and checks geometry.
 Configure `--iiif-root`, `SIPI_IIIF_ROOT`, or TOML `iiif-root` for default identifier
 mapping and relative Lua source paths. Absolute script overrides need no root.
@@ -187,7 +199,13 @@ The independent `preflight` target loads a trusted Lua script and evaluates
 `preflight(request)` into a typed allow/deny decision with an optional source path.
 Each call owns a fresh Lua state; script failures and invalid results are errors,
 not access grants. See [the contract and C++ example](docs/preflight.md) and
-[the sample script](examples/preflight.lua). IIIF image/info GET and HEAD requests invoke it on a dedicated bounded worker. Configure the script with
+[the sample script](examples/preflight.lua). Generic [Lua JSON helpers](docs/lua-json.md) support nested data, null and explicit array/object identity.
+[Lua HTTP(S) requests](docs/lua-http.md) provide bounded external API access with verified TLS and explicit headers.
+[Lua JWT helpers](docs/lua-jwt.md) sign and verify HS256/RS256 tokens with explicit keys and claim policy.
+[Shared Lua value caching](docs/lua-cache.md) provides bounded TTL storage and coalesced loading across requests.
+A tested [OLDAP policy example](docs/oldap-preflight.md) combines media-token authorization, optional anonymous REST lookup and repository mapping.
+[Script configuration/secrets](docs/lua-configuration.md) populate `sipi.config` and `sipi.secrets`
+with per-name CLI/environment/TOML precedence and optional startup secret-file snapshots. IIIF image/info GET and HEAD requests invoke it on a dedicated bounded worker. Configure the script with
 `--preflight-script examples/preflight.lua`, `SIPI_PREFLIGHT_SCRIPT`, or the TOML
 key `preflight-script`. Startup validates the file and entry point before listening;
 invalid configured scripts fail startup. Relative paths use the working directory.
@@ -374,3 +392,33 @@ Public output bounds are configured with --max-width, --max-height and --max-are
 axis, 8388608 pixels; absent height inherits width. The same limits appear in
 info.json and are enforced before cache lookup. Unsupported or predictably
 unaffordable sources fail admission consistently. See [output policy](docs/output-limits.md).
+
+## WebP output
+
+The IIIF delivery pipeline also supports .webp, announced in info.json extraFormats.
+Color defaults to lossy quality 85; gray/bitonal are lossless. Alpha is preserved;
+gray ICC is correctly converted to RGB sRGB rather than copied to the wrong color
+model. Local/S3 sources, cache/restart, canonical links and HEAD are supported.
+Run Conan install and reload CMake after updating: libwebp/1.6.0 is newly pinned.
+See [WebP delivery and color policy](docs/webp-delivery.md).
+
+## Docker trial
+
+See [Docker build and local OLDAP trial](docs/docker.md) for the Linux image,
+listener configuration and reversible Cantaloupe replacement.
+
+## Single-color watermarks
+
+A standalone [single-color watermark compositor](docs/watermarks.md) supports
+centered coverage masks and full-image-anchored crops on native or reduced decoder grids,
+sampled directly from the original mask without a canvas-sized intermediate.
+A bounded PNG mask loader accepts untagged gray 1/2/4/8-bit PNGs, including Adam7.
+A separate color converter maps the chosen sRGB color into the image encoding
+without converting or retagging the image. Lua selects the local/S3 mask, relative
+width, opacity and sRGB color. Delivery applies it before IIIF transforms and binds
+all settings and the mask version into the result cache. A missing or invalid
+required mask fails delivery even on cache hits; no unmarked fallback is served.
+
+A bounded [decoded-mask memory cache](docs/watermarks.md#decoded-mask-memory-cache)
+shares coverage samples across requests after current source-version checks.
+Defaults: 64 entries / 32 MiB, configurable through CLI/environment/TOML.

@@ -1,5 +1,18 @@
 # IIIF Image API 3 conformance audit — 2026-10-06
 
+## Feature-freeze follow-up (2026-10-08)
+
+The unchanged consortium validator now passes 31 level-2 and eight selected
+optional tests on **each** of the original and restricted public services (78/78).
+The public canvas genuinely reduces a 2000 × 2000 source to the required 1000 ×
+1000 reference; exact reference pixels are checked before validation. Independent
+WebP signature/full-decode checks also pass. The upstream Python-3 WebP bytes/text
+bug and the initial test-policy 403/404 mismatch are preserved and explained in
+[method and limitations](external-validation.md), with
+[current evidence](audits/2026-10-08-external-validator.json) and initial diagnostics.
+No production code or upstream assertions changed. Feature freeze continues with
+documentation and release preparation; this is not formal certification.
+
 ## External validation completed
 
 The unchanged consortium validator (commit f05e365a1cb28f8707cbd50466a86d8f611d1ab8)
@@ -132,8 +145,8 @@ Two concrete decisions precede implementation:
 
 ## Separate work
 
-Upscaling is still rejected by the renderer even when geometry policy permits
-it; do not advertise sizeUpscaling. Sizes/tiles/preferred formats, IIIF Auth and
+Upscaling was subsequently implemented behind size-upscaling=true; see
+[implementation and tests](upscaling.md). Advertisement follows this setting. Sizes/tiles/preferred formats, IIIF Auth and
 new codecs remain independent improvements. Floyd–Steinberg's per-request pattern
 boundaries and JPEG's nonbinary decoded tones remain documented quality limits.
 Canonical URLs, internal result cache identity and external cache policy are

@@ -1,0 +1,68 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>SIPI-2 OpenSeadragon measurement</title>
+<style>body{font:16px system-ui;margin:24px;background:#f5f5f5}#viewer{width:960px;height:600px;background:#222}pre{white-space:pre-wrap}</style>
+<h1>SIPI-2: real OpenSeadragon workload</h1>
+<p>Overview → zoom → pan → overview. The running server keeps its existing cache.</p>
+<button id="run">Start measurement</button>
+<pre id="status">Ready</pre><div id="viewer"></div>
+<script src="/openseadragon.min.js"></script>
+<script>
+// This page records actual browser resources; server-side replay separately
+// excludes browser caching and checks identical encoded response bytes.
+const status = document.getElementById('status');
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+document.getElementById('run').onclick = async function () {
+    this.disabled = true;
+    const config = await (await fetch('/config')).json();
+    const begin = performance.now();
+    const errors = [];
+    const viewer = OpenSeadragon({
+        id:'viewer', tileSources:config.info, showNavigator:true,
+        navigatorPosition:'BOTTOM_RIGHT', navigatorSizeRatio:0.18,
+        showNavigationControl:false, blendTime:0.1, animationTime:0.7,
+        constrainDuringPan:true, visibilityRatio:0.8, minZoomImageRatio:0.7,
+        maxZoomPixelRatio:4
+    });
+    viewer.addHandler('tile-load-failed', () => errors.push('tile-load-failed'));
+    try {
+        await new Promise((resolve,reject) => {
+            const timer = setTimeout(() => reject(Error('Open timeout')),15000);
+            viewer.addOnceHandler('open', () => {clearTimeout(timer);resolve();});
+            viewer.addOnceHandler('open-failed', () => {clearTimeout(timer);reject(Error('Open failed'));});
+        });
+        // Wait for the current view, not a guessed network delay. The lower bound
+        // allows the animation and tile scheduler to discover the new viewport.
+        async function settle(label) {
+            status.textContent = label;
+            const start = performance.now();
+            await pause(1000);
+            while (!viewer.world.getItemAt(0).getFullyLoaded()) {
+                if (performance.now()-start > 15000) throw Error('Tile timeout');
+                await pause(100);
+            }
+        }
+        await settle('Overview');
+        viewer.viewport.zoomBy(2); viewer.viewport.applyConstraints();
+        await settle('Zoom 2×');
+        viewer.viewport.panTo(new OpenSeadragon.Point(0.3,0.25)); viewer.viewport.applyConstraints();
+        await settle('Pan left');
+        viewer.viewport.zoomBy(2); viewer.viewport.applyConstraints();
+        await settle('Zoom 4×');
+        viewer.viewport.panTo(new OpenSeadragon.Point(0.7,0.25)); viewer.viewport.applyConstraints();
+        await settle('Pan right');
+        viewer.viewport.goHome(); await settle('Back to overview');
+        const resources = performance.getEntriesByType('resource')
+            .filter(x => x.startTime >= begin && x.name.startsWith(config.base+'/'))
+            .map(x => ({path:new URL(x.name).pathname, duration_ms:x.duration,
+                        start_ms:x.startTime-begin, initiator:x.initiatorType}));
+        const result = {osd:OpenSeadragon.version.versionStr, user_agent:navigator.userAgent,
+            viewport:[960,600], device_pixel_ratio:devicePixelRatio,
+            sequence_ms:performance.now()-begin, errors, resources};
+        if(errors.length || !resources.some(x=>x.path.endsWith('.jpg'))) throw Error('Incomplete image load');
+        const response = await fetch('/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(result)});
+        if(!response.ok) throw Error('Capture rejected');
+        status.textContent = `Capture complete: ${resources.length} IIIF resources, no tile errors.\nRepeated server/API measurements are now running.`;
+    } catch(error) {status.textContent = 'Measurement failed: '+error.message;}
+};
+</script>

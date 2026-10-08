@@ -10,6 +10,9 @@ namespace sipi {
  * The plan belongs to the same source version as its metadata. */
 struct J2kReadPlan {
     std::uint8_t reduction;
+    // Complete selected resolution, independent of the decoded crop. Includes
+    // reference-grid origin rounding; consumers must not assume width / 2^r.
+    std::uint32_t level_width, level_height;
     PixelRegion source_region;
     PixelRegion reduced_region;
     PixelWindow window;

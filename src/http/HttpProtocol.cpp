@@ -4,6 +4,53 @@
 #include <vector>
 
 namespace sipi::http {
+std::variant<QueryParameters, QueryError> parse_query_parameters(std::string_view raw) {
+    if (raw.size() > 32 * 1024) return QueryError::limit;
+    QueryParameters result;
+    if (raw.empty()) return result;
+    const auto hex = [](char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        return -1;
+    };
+    const auto decode = [&](std::string_view input, std::string& output,
+                            std::size_t limit) -> std::optional<QueryError> {
+        for (std::size_t i = 0; i < input.size(); ++i) {
+            auto c = static_cast<unsigned char>(input[i]);
+            if (c == '#') return QueryError::malformed;
+            if (c == '%') {
+                if (input.size() - i < 3) return QueryError::malformed;
+                const int high = hex(input[i + 1]), low = hex(input[i + 2]);
+                if (high < 0 || low < 0) return QueryError::malformed;
+                c = static_cast<unsigned char>(16 * high + low);
+                i += 2;
+            } else if (c == '+') c = ' ';
+            if (c < 32 || c == 127) return QueryError::malformed;
+            if (output.size() == limit) return QueryError::limit;
+            output.push_back(static_cast<char>(c));
+        }
+        return std::nullopt;
+    };
+    std::size_t pairs = 0;
+    while (true) {
+        if (++pairs > 128) return QueryError::limit;
+        const auto end = raw.find('&');
+        const auto pair = raw.substr(0, end);
+        const auto equals = pair.find('=');
+        std::string name, value;
+        if (const auto error = decode(pair.substr(0, equals), name, 256)) return *error;
+        if (name.empty()) return QueryError::malformed;
+        if (equals != std::string_view::npos) {
+            if (const auto error = decode(pair.substr(equals + 1), value, 16 * 1024)) return *error;
+        }
+        result[std::move(name)].push_back(std::move(value));
+        if (end == std::string_view::npos) break;
+        raw.remove_prefix(end + 1);
+    }
+    return result;
+}
+
 namespace {
 std::string_view trim(std::string_view s) {
     while (!s.empty() && (s.front()==' ' || s.front()=='\t')) s.remove_prefix(1);

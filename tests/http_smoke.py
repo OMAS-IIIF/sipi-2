@@ -236,9 +236,9 @@ end
                         "@context": "http://iiif.io/api/image/3/context.json",
                         "id": public_base + service_path,
                         "type": "ImageService3", "profile": "level2", "protocol": "http://iiif.io/api/image",
-                        "width": dimensions[0], "height": dimensions[1],
+                        "width": dimensions[0], "height": dimensions[1], "extraFormats": ["webp"],
                         "maxWidth": 8192, "maxHeight": 8192, "maxArea": 8388608,
-                        **({"extraFeatures": ["canonicalLinkHeader", "mirroring", "profileLinkHeader", "rotationArbitrary"], "extraQualities": ["color", "gray", "bitonal"]}
+                        **({"extraFeatures": ["canonicalLinkHeader", "mirroring", "profileLinkHeader", "rotationArbitrary"] + (["sizeUpscaling"] if upscaling else []), "extraQualities": ["color", "gray", "bitonal"]}
                            if service_path != "/rotated.tif" else {}),
                     }, (path, document)
                     assert headers.get("cache-control") == "no-store"
@@ -436,11 +436,12 @@ end
                                                ("/id/info.json", 200), ("/id/no-region/max/0/default.jpg", 400)):
                     status, _, body = request(path, "HEAD")
                     assert status == expected_status and not body, (path, status, body)
+                assert request("/sample.tif/full/^640,/0/default.jpg")[0] == (200 if upscaling else 501)
                 # Both default mapping and Lua-selected paths feed actual header dimensions.
                 for path, status, code in (
                     ("/sample.tif/320,0,1,1/max/0/default.jpg", 400, "invalid_iiif_geometry"),
                     ("/sample.tif/full/321,/0/default.jpg", 400, "invalid_iiif_geometry"),
-                    ("/sample.tif/full/^640,/0/default.jpg", 501, "not_implemented" if upscaling else "upscaling_disabled"),
+
                     ("/sample.tif/pct:100,0,10,10/max/0/default.jpg", 400, "invalid_iiif_geometry"),
                     ("/rotated.tif/210,0,1,1/max/0/default.jpg", 501, "source_not_deliverable"),
                     ("/rotated.tif/0,210,1,1/max/0/default.jpg", 501, "source_not_deliverable"),

@@ -11,6 +11,9 @@
 #include "image/ImageTransform.h"
 #include "image/GrayConversion.h"
 #include "image/Bitonal.h"
+#include "image/Watermark.h"
+#include "image/WatermarkColor.h"
+#include <tuple>
 #include <array>
 #include <algorithm>
 #include "imgformats/TiffReadPlan.h"
@@ -21,6 +24,7 @@
 #include <optional>
 #include "imgformats/JpegWriter.h"
 #include "imgformats/PngWriter.h"
+#include "imgformats/WebpWriter.h"
 
 namespace sipi::http {
 namespace {
@@ -47,14 +51,48 @@ cache::MetadataPtr read_source_metadata(const ByteSource& source) {
     if (j2k) return std::make_shared<const cache::ImageMetadata>(read_j2k_metadata(source));
     return nullptr;
 }
+/** Read at the selected decoder resolution, retaining the exact crop window.
+ * Used unchanged for original delivery and full-image public-variant generation. */
+std::tuple<RasterImage8, PixelWindow, WatermarkGrid> read_pixels(
+        const ByteSource& source, const cache::ImageMetadata& metadata,
+        const iiif::ImageGeometry& plan) {
+    const auto* tiff_metadata = std::get_if<TiffMetadata>(&metadata);
+    const auto* j2k_metadata = std::get_if<J2kMetadata>(&metadata);
+    const auto* jpeg_metadata = std::get_if<JpegMetadata>(&metadata);
+    const auto* png_metadata = std::get_if<PngMetadata>(&metadata);
+
+    if (tiff_metadata) {
+        const auto read_plan = supported_tiff_plan(*tiff_metadata, plan);
+        return {read_tiff_region(source, read_plan.directory, read_plan.read_region),
+                {read_plan.horizontal, read_plan.vertical},
+                {read_plan.directory.display_width(),read_plan.directory.display_height(),
+                 read_plan.read_region.x,read_plan.read_region.y}};
+    }
+    if (png_metadata) {
+        return {read_png_image(source, *png_metadata),
+            {{plan.region.x, plan.region.width, 1}, {plan.region.y, plan.region.height, 1}},
+            {png_metadata->width,png_metadata->height}};
+    }
+    if (jpeg_metadata) {
+        // Decode the whole JPEG; the shared window resampler crops and
+        // scales without an additional intermediate crop buffer.
+        return {read_jpeg_image(source, *jpeg_metadata),
+            {{plan.region.x, plan.region.width, 1}, {plan.region.y, plan.region.height, 1}},
+            {jpeg_metadata->width,jpeg_metadata->height}};
+    }
+    const auto read_plan = plan_j2k_read(*j2k_metadata, plan);
+    return {read_j2k_region(source, *j2k_metadata, read_plan), read_plan.window,
+        {read_plan.level_width,read_plan.level_height,read_plan.reduced_region.x,read_plan.reduced_region.y}};
+}
+
 constexpr std::size_t encoded_limit = 64 * 1024 * 1024;
 // Use the same explicit setting for identity and actual encoding.
 constexpr int jpeg_quality = 90;
 
 /** Build identical fresh/hit response headers; authorization is never cached. */
-drogon::HttpResponsePtr image_response(std::string encoded, bool png, const std::string& canonical) {
+drogon::HttpResponsePtr image_response(std::string encoded, const std::string& media_type, const std::string& canonical) {
     auto result = drogon::HttpResponse::newHttpResponse();
-    result->setContentTypeCode(png ? drogon::CT_IMAGE_PNG : drogon::CT_IMAGE_JPG);
+    result->setContentTypeString(media_type);
     result->addHeader("Cache-Control", "no-store");
     result->addHeader("Link", "<" + canonical + ">;rel=\"canonical\"");
     result->setBody(std::move(encoded));
@@ -76,10 +114,10 @@ drogon::HttpResponsePtr response(drogon::HttpStatusCode status,
 
 IiifWorker::IiifWorker(std::optional<preflight::LuaPreflight> policy, SourceResolver sources,
                        iiif::SizePolicy size_policy, std::string public_base_url, std::optional<S3Client> s3_client,
-                       std::shared_ptr<cache::ResultCache> result_cache, cache::MetadataCacheLimits metadata_limits, unsigned worker_count, BitonalMethod bitonal_method)
+                       std::shared_ptr<cache::ResultCache> result_cache, cache::MetadataCacheLimits metadata_limits, unsigned worker_count, BitonalMethod bitonal_method, cache::MaskCacheLimits mask_limits, cache::VariantCacheLimits variant_limits)
     : policy_(std::move(policy)), sources_(std::move(sources)), s3_client_(std::move(s3_client)), size_policy_(bounded_output_policy(size_policy)),
       public_base_url_(std::move(public_base_url)), bitonal_method_(bitonal_method), result_cache_(std::move(result_cache)),
-      metadata_cache_(metadata_limits) {
+      metadata_cache_(metadata_limits), mask_cache_(mask_limits), variant_cache_(variant_limits) {
     if (!worker_count || worker_count > maximum_worker_count)
         throw std::invalid_argument("IIIF worker count must be between 1 and 32");
     spdlog::info("IIIF processing pool: {} workers", worker_count);
@@ -158,21 +196,62 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
             return query.resource;
         }, request.query);
         std::optional<SourceOverride> override;
+        std::optional<preflight::Watermark> watermark_policy;
+        std::optional<preflight::ResolutionLimit> resolution;
         if (policy_) {
+            const auto kind = request.redirect_to_info ? preflight::RequestKind::base
+                : std::holds_alternative<iiif::ImageRequest>(request.query)
+                    ? preflight::RequestKind::image : preflight::RequestKind::info;
             const auto decision = policy_->evaluate({resource, request.authorization,
-                                                     request.cookie, request.cookies});
+                                                     request.cookie, request.cookies,
+                                                     request.query_parameters, kind, request.method});
             if (std::holds_alternative<preflight::Deny>(decision))
                 return response(drogon::k403Forbidden, "access_denied", "Access to this image is denied");
-            override = std::get<preflight::Allow>(decision).source;
+            const auto& allow = std::get<preflight::Allow>(decision);
+            watermark_policy = allow.watermark;
+            resolution = allow.resolution;
+            override = allow.source;
         }
-        const auto selected = sources_.resolve_source(resource.identifier, override);
-        std::unique_ptr<ByteSource> source;
-        if (const auto* local = std::get_if<LocalSource>(&selected)) {
-            source = std::make_unique<LocalFileSource>(local->path);
-        } else {
-            if (!s3_client_) throw SourceError(SourceErrorCode::configuration, "S3 is not configured");
+        // Main source and required mask share storage selection/opening semantics.
+        const auto open_source = [&](const std::optional<SourceOverride>& selection) -> std::unique_ptr<ByteSource> {
+            const auto selected = sources_.resolve_source(resource.identifier,selection);
+            if (const auto* local = std::get_if<LocalSource>(&selected))
+                return std::make_unique<LocalFileSource>(local->path);
+            if (!s3_client_) throw SourceError(SourceErrorCode::configuration,"S3 is not configured");
             const auto& remote = std::get<S3Source>(selected);
-            source = std::make_unique<S3ByteSource>(*s3_client_, remote.bucket, remote.key);
+            return std::make_unique<S3ByteSource>(*s3_client_,remote.bucket,remote.key);
+        };
+        auto source = open_source(override);
+        cache::MaskPtr mask;
+        std::optional<cache::WatermarkIdentity> watermark_identity;
+        if (watermark_policy) {
+            try {
+                const auto bytes = open_source(watermark_policy->source);
+                // Always open first: a missing/unavailable/changed source cannot
+                // reuse a prior successful mask, even on an encoded result hit.
+                {
+                    std::lock_guard lock(mask_mutex_);
+                    mask = mask_cache_.get(bytes->info());
+                }
+                if (mask) spdlog::debug("IIIF mask cache hit");
+                else {
+                    spdlog::debug("IIIF mask cache miss");
+                    mask = std::make_shared<const RasterImage8>(read_png_mask(*bytes));
+                    try {
+                        std::lock_guard lock(mask_mutex_);
+                        if (!mask_cache_.put(bytes->info(),mask))
+                            spdlog::debug("IIIF mask cache admission declined");
+                    } catch (const std::exception&) {
+                        // Only retention is optional. Opening and decoding errors
+                        // stay outside this boundary and fail delivery below.
+                        spdlog::warn("IIIF mask cache admission failed; using decoded mask");
+                    }
+                }
+                watermark_identity = cache::WatermarkIdentity{bytes->info(),watermark_policy->width_fraction,
+                    watermark_policy->opacity,watermark_policy->color};
+            } catch (const std::exception&) {
+                throw WatermarkError("Required watermark could not be loaded");
+            }
         }
 
         cache::MetadataPtr metadata;
@@ -229,12 +308,40 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
         if (!readable)
             return response(drogon::k501NotImplemented, "source_not_deliverable",
                             "Source layout or color encoding is not supported for delivery");
+        const auto input_layout = native_gray ?
+            ((png_metadata && png_metadata->transparency) ? PixelLayout::gray_alpha : PixelLayout::gray) :
+            (png_metadata && png_metadata->transparency) ? PixelLayout::rgba :
+            (tiff_metadata && tiff_metadata->image.samples_per_pixel == 4 ? PixelLayout::rgba : PixelLayout::rgb);
+        std::optional<iiif::ImageGeometry> restricted_plan;
+        if (resolution) {
+            // A public canvas is independent of output limits. Do not silently
+            // lower its resolution when server configuration changes.
+            const auto geometry = iiif::resolve_geometry(iiif::FullRegion{},
+                iiif::Size{false,iiif::MaxSize{}},width,height,
+                {false,resolution->max_width,resolution->max_height,std::nullopt});
+            const auto* full = std::get_if<iiif::ImageGeometry>(&geometry);
+            if (!full) throw DeliveryLimitError("Invalid public resolution");
+            restricted_plan = *full;
+            try { validate_delivery_budget(*metadata,*restricted_plan,{false,0}); }
+            catch (const DeliveryLimitError&) {
+                return response(drogon::k501NotImplemented,"source_not_deliverable",
+                    "Public image cannot be generated within current decoding budgets");
+            }
+            width = full->output_width;
+            height = full->output_height;
+        }
+        const auto validate_budget = [&](const iiif::ImageGeometry& geometry, const iiif::Rotation& rotation) {
+            if (restricted_plan) {
+                const auto profile_bytes = std::visit([](const auto& value){return value.icc_profile.size();},*metadata);
+                validate_raster_delivery_budget(std::uint64_t{width}*height*4,profile_bytes,geometry,rotation);
+            } else validate_delivery_budget(*metadata,geometry,rotation);
+        };
         // Admission promises at least the default full/max rendering. This uses
         // metadata/planning only; corruption remains detectable during actual reads.
         const auto maximum = iiif::resolve_geometry(iiif::FullRegion{},
             iiif::Size{false, iiif::MaxSize{}}, width, height, size_policy_);
         if (const auto* full = std::get_if<iiif::ImageGeometry>(&maximum)) {
-            try { validate_delivery_budget(*metadata, *full, {false,0}); }
+            try { validate_budget(*full, {false,0}); }
             catch (const DeliveryLimitError&) {
                 return response(drogon::k501NotImplemented, "source_not_deliverable",
                     "Source cannot provide full/max within current decoding budgets");
@@ -253,13 +360,17 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
             document["extraFeatures"].append("mirroring");
             document["extraFeatures"].append("profileLinkHeader");
             document["extraFeatures"].append("rotationArbitrary");
+            if (size_policy_.allow_upscaling) document["extraFeatures"].append("sizeUpscaling");
             if (!native_gray) document["extraQualities"].append("color");
+            document["extraFormats"].append("webp");
             document["extraQualities"].append("gray");
             document["extraQualities"].append("bitonal");
             if (request.redirect_to_info) {
                 auto result = drogon::HttpResponse::newHttpResponse();
                 result->setStatusCode(drogon::k303SeeOther);
-                result->addHeader("Location", document["id"].asString()+"/info.json");
+                auto location = document["id"].asString() + "/info.json";
+                if (!request.redirect_query.empty()) location += "?" + request.redirect_query;
+                result->addHeader("Location", location);
                 result->addHeader("Cache-Control", "no-store");
                 return result;
             }
@@ -295,21 +406,26 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
             const auto& plan = std::get<iiif::ImageGeometry>(geometry);
             spdlog::debug("Resolved IIIF crop {},{},{},{} -> {}x{}", plan.region.x, plan.region.y,
                           plan.region.width, plan.region.height, plan.output_width, plan.output_height);
-            if (image->format != iiif::Format::jpg && image->format != iiif::Format::png)
+            if (image->format != iiif::Format::jpg && image->format != iiif::Format::png && image->format != iiif::Format::webp)
                 return response(drogon::k400BadRequest, "unsupported_format",
-                                "Only JPEG and PNG output formats are supported");
+                                "Only JPEG, PNG and WebP output formats are supported");
             if ((image->quality != iiif::Quality::default_quality && image->quality != iiif::Quality::color &&
-                 image->quality != iiif::Quality::gray && image->quality != iiif::Quality::bitonal) ||
-                plan.output_width > plan.region.width || plan.output_height > plan.region.height)
+                 image->quality != iiif::Quality::gray && image->quality != iiif::Quality::bitonal))
                 return response(drogon::k501NotImplemented, "not_implemented",
-                    "Only unchanged or reduced RGB/RGBA/gray JPEG/PNG output is supported");
+                    "Unsupported image quality");
 
             // Source admission above and request budgets below both precede cache
             // lookup: a stored result cannot grant capabilities or bypass policy.
             const bool png = image->format == iiif::Format::png;
-            validate_delivery_budget(*metadata, plan, image->rotation);
+            const bool webp = image->format == iiif::Format::webp;
+            const bool webp_lossless = native_gray || image->quality == iiif::Quality::gray ||
+                                       image->quality == iiif::Quality::bitonal;
+            const int webp_quality = 85;
+            validate_budget(plan, image->rotation);
             const auto dimensions = rotated_size(plan.output_width, plan.output_height, image->rotation.degrees);
-            const cache::ResultMetadata output{png ? "image/png" : "image/jpeg", dimensions.width, dimensions.height};
+            if (webp && (dimensions.width > webp_maximum_dimension || dimensions.height > webp_maximum_dimension))
+                return response(drogon::k400BadRequest, "unsupported_webp_dimensions", "WebP axes must not exceed 16383 pixels");
+            const cache::ResultMetadata output{webp ? "image/webp" : png ? "image/png" : "image/jpeg", dimensions.width, dimensions.height};
             const auto canonical = canonical_image_uri(*image, plan, width, height,
                                                        size_policy_, native_gray, public_base_url_);
             std::optional<cache::CacheKey> cache_key;
@@ -319,23 +435,18 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
             std::unique_lock<std::mutex> fill_lock;
             if (result_cache_) {
                 try {
-                    const auto layout = native_gray ?
-                        ((png_metadata && png_metadata->transparency) ? PixelLayout::gray_alpha : PixelLayout::gray) :
-                        (png_metadata && png_metadata->transparency) ? PixelLayout::rgba :
-                        (tiff_metadata && tiff_metadata->image.samples_per_pixel == 4
-                            ? PixelLayout::rgba : PixelLayout::rgb);
                     cache_key.emplace(cache::RenderIdentity{
                         .source = source->info(),
-                        // Current Lua policy supports allow/deny/source selection only.
-                        // Future reduced/watermarked variants must supply their actual identity.
-                        .variant = "original",
+                        .variant = restricted_plan ? "restricted-v1:" + std::to_string(width) + "x" + std::to_string(height)
+                            : watermark_policy ? "watermarked" : "original",
                         .geometry = plan,
                         .rotation = image->rotation,
                         .quality = image->quality,
-                        .input_layout = layout,
-                        .encoding = png ? cache::Encoding{cache::PngEncoding{}}
+                        .input_layout = input_layout,
+                        .encoding = webp ? cache::Encoding{cache::WebpEncoding{webp_lossless, webp_quality}}
+                                        : png ? cache::Encoding{cache::PngEncoding{}}
                                         : cache::Encoding{cache::JpegEncoding{jpeg_quality}},
-                        .watermark = std::nullopt,
+                        .watermark = watermark_identity,
                         .bitonal_method = bitonal_method_
                     });
                     fill = fill_mutex(*cache_key);
@@ -348,7 +459,7 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                         if (hit->bytes->read_at(0, std::as_writable_bytes(std::span{encoded})) != size)
                             throw cache::CacheError("Incomplete cached result");
                         spdlog::debug("IIIF result cache hit");
-                        return image_response(std::move(encoded), png, canonical);
+                        return image_response(std::move(encoded), output.media_type, canonical);
                     }
                     spdlog::debug("IIIF result cache miss");
                 } catch (const std::exception&) {
@@ -362,26 +473,44 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
 
             // Each format selects and reads its own resolution. The owning raster
             // and exact window then enter one shared processing/encoding pipeline.
-            auto [pixels, window] = [&]() -> std::pair<RasterImage8, PixelWindow> {
-                if (tiff_metadata) {
-                    const auto read_plan = supported_tiff_plan(*tiff_metadata, plan);
-                    return {read_tiff_region(*source, read_plan.directory, read_plan.read_region),
-                            {read_plan.horizontal, read_plan.vertical}};
+            auto [pixels, window, watermark_grid] = [&]() -> std::tuple<RasterImage8, PixelWindow, WatermarkGrid> {
+                if (!restricted_plan) return read_pixels(*source,*metadata,plan);
+                // Materialize the SAME full reduced raster for every crop. The
+                // source version and effective dimensions form its complete key.
+                const cache::CacheKey key(cache::RenderIdentity{
+                    .source=source->info(), .variant="restricted-source-v1", .geometry=*restricted_plan,
+                    .rotation={false,0}, .quality=iiif::Quality::default_quality,
+                    .input_layout=input_layout, .encoding=cache::PngEncoding{}, .watermark=std::nullopt});
+                auto fill = fill_mutex(key);
+                std::unique_lock fill_lock(*fill);
+                cache::VariantPtr reduced;
+                {
+                    std::lock_guard lock(variant_mutex_);
+                    reduced = variant_cache_.get(key.serialized());
                 }
-                if (png_metadata) {
-                    return {read_png_image(*source, *png_metadata),
-                        {{plan.region.x, plan.region.width, 1}, {plan.region.y, plan.region.height, 1}}};
+                if (reduced) spdlog::debug("IIIF variant cache hit");
+                else {
+                    spdlog::debug("IIIF variant cache miss");
+                    auto [full, full_window, grid] = read_pixels(*source,*metadata,*restricted_plan);
+                    reduced = std::make_shared<const RasterImage8>(resize_image(std::move(full),full_window,width,height));
+                    try {
+                        std::lock_guard lock(variant_mutex_);
+                        if (!variant_cache_.put(key.serialized(),reduced))
+                            spdlog::debug("IIIF variant cache admission declined");
+                    } catch (const std::exception&) {
+                        spdlog::warn("IIIF variant cache admission failed; using reduced raster");
+                    }
                 }
-                if (jpeg_metadata) {
-                    // Decode the whole JPEG; the shared window resampler crops and
-                    // scales without an additional intermediate crop buffer.
-                    return {read_jpeg_image(*source, *jpeg_metadata),
-                        {{plan.region.x, plan.region.width, 1}, {plan.region.y, plan.region.height, 1}}};
-                }
-                const auto read_plan = plan_j2k_read(*j2k_metadata, plan);
-                return {read_j2k_region(*source, *j2k_metadata, read_plan), read_plan.window};
+                // Copy for the owning processing pipeline; cached pixels remain
+                // immutable. Watermark placement uses this public canvas too.
+                return {*reduced, {{plan.region.x,plan.region.width,1},{plan.region.y,plan.region.height,1}}, {width,height}};
             }();
-            pixels = downsample_area(std::move(pixels), window, plan.output_width, plan.output_height);
+            if (mask) {
+                const auto color = watermark_color(pixels,watermark_policy->color);
+                const auto mark = prepare_watermark(mask,width,height,watermark_policy->width_fraction);
+                pixels = apply_watermark(std::move(pixels),mark,color,watermark_policy->opacity,watermark_grid);
+            }
+            pixels = resize_image(std::move(pixels), window, plan.output_width, plan.output_height);
             pixels = transform_image(std::move(pixels), image->rotation.mirrored, image->rotation.degrees);
             if (image->quality == iiif::Quality::gray || image->quality == iiif::Quality::bitonal) {
                 if ((pixels.layout == PixelLayout::rgb || pixels.layout == PixelLayout::rgba) &&
@@ -396,12 +525,14 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
             // Both cache fill and delivery consume only the completed encoding.
             const auto sink = [&](std::span<const std::uint8_t> bytes) {
                 if (bytes.size() > encoded_limit - encoded.size()) {
+                    if (webp) throw WebpWriteError("Encoded WebP exceeds response limit");
                     if (png) throw PngWriteError("Encoded PNG exceeds response limit");
                     throw JpegWriteError("Encoded JPEG exceeds response limit");
                 }
                 encoded.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
             };
-            if (png) write_png(pixels, sink, image->quality == iiif::Quality::bitonal
+            if (webp) write_webp(pixels, sink, webp_lossless, webp_quality);
+            else if (png) write_png(pixels, sink, image->quality == iiif::Quality::bitonal
                 ? PngBitDepth::one : PngBitDepth::eight);
             else {
                 pixels = composite_on_white(std::move(pixels));
@@ -416,12 +547,14 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                     spdlog::warn("IIIF result cache publication failed; delivering uncached image");
                 }
             }
-            return image_response(std::move(encoded), png, canonical);
+            return image_response(std::move(encoded), output.media_type, canonical);
         }
         return response(drogon::k500InternalServerError, "processing_failed", "Unexpected IIIF request type");
     } catch (const preflight::PreflightError& error) {
         spdlog::error("IIIF preflight failed (category {})", static_cast<int>(error.code()));
         return response(drogon::k500InternalServerError, "preflight_failed", "Image access could not be evaluated");
+    } catch (const WatermarkError&) {
+        return response(drogon::k500InternalServerError,"watermark_failed","Required watermark could not be applied");
     } catch (const SourceError& error) {
         switch (error.code()) {
         case SourceErrorCode::configuration:
@@ -466,6 +599,8 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
         return response(drogon::k500InternalServerError, "processing_failed", "Alpha compositing could not be completed");
     } catch (const ResizeError&) {
         return response(drogon::k500InternalServerError, "processing_failed", "Image resizing could not be completed");
+    } catch (const WebpWriteError&) {
+        return response(drogon::k500InternalServerError, "encoding_failed", "WebP output could not be produced");
     } catch (const PngWriteError&) {
         return response(drogon::k500InternalServerError, "encoding_failed", "PNG output could not be produced");
     } catch (const JpegWriteError&) {

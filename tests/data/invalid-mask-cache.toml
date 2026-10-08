@@ -1,0 +1,2 @@
+mask-cache-max-entries = -1
+mask-cache-max-bytes = "bad"

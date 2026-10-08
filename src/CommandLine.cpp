@@ -78,12 +78,15 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                                 std::optional<std::string_view> env_iiif_workers,
                                 std::optional<std::string_view> env_bitonal_method,
                                 OutputLimitEnvironment output_environment,
-                                CorsEnvironment cors_environment) {
+                                CorsEnvironment cors_environment,
+                                std::span<const std::string_view> preflight_environment,
+                                std::optional<std::string_view> env_listen_address) {
     StartupOptions result;
     bool help = false;
     bool version = false;
     std::string config_path;
     std::string preflight_script;
+    std::vector<std::string> script_config, script_secrets, script_secret_files;
     std::string iiif_root;
     std::string cache_dir;
     std::string public_base_url;
@@ -115,6 +118,16 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     auto* port_option = app.add_option("--port", result.config.port,
                                       "HTTP port (environment: SIPI_PORT; default: 8080)")
                             ->check(CLI::Range(1, 65535));
+    auto* listen_option = app.add_option("--listen-address", result.config.listen_address,
+        "Numeric bind address (SIPI_LISTEN_ADDRESS; default: 127.0.0.1)")
+        ->check(CLI::Validator([](const std::string& value) {
+            in_addr ipv4{};
+            in6_addr ipv6{};
+            return value.find('\0') == std::string::npos &&
+                (inet_pton(AF_INET, value.c_str(), &ipv4) == 1 ||
+                 inet_pton(AF_INET6, value.c_str(), &ipv6) == 1)
+                ? std::string{} : std::string{"Expected a numeric IPv4 or IPv6 address"};
+        }, "IP"));
     auto* upscale_option = app.add_option("--size-upscaling", size_upscaling,
                                           "Allow IIIF enlargement (SIPI_SIZE_UPSCALING; default: false)")
                                ->check(CLI::IsMember({"true", "false"}))->type_name("BOOL");
@@ -125,6 +138,15 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     auto* preflight_option = app.add_option("--preflight-script", preflight_script,
         "Preflight Lua file (SIPI_PREFLIGHT_SCRIPT; default: disabled)")
         ->check(path_validator)->type_name("PATH");
+    auto* script_config_option = app.add_option("--preflight-config", script_config,
+        "Lua setting NAME=VALUE (repeatable; SIPI_PREFLIGHT_CONFIG_<NAME>)")
+        ->expected(1)->multi_option_policy(CLI::MultiOptionPolicy::TakeAll)->type_name("NAME=VALUE");
+    auto* script_secret_option = app.add_option("--preflight-secret", script_secrets,
+        "Lua secret NAME=VALUE (prefer environment/file; SIPI_PREFLIGHT_SECRETS_<NAME>)")
+        ->expected(1)->multi_option_policy(CLI::MultiOptionPolicy::TakeAll)->type_name("NAME=VALUE");
+    auto* script_file_option = app.add_option("--preflight-secret-file", script_secret_files,
+        "Lua secret NAME=PATH (repeatable; SIPI_PREFLIGHT_SECRET_FILES_<NAME>)")
+        ->expected(1)->multi_option_policy(CLI::MultiOptionPolicy::TakeAll)->type_name("NAME=PATH");
     auto* root_option = app.add_option("--iiif-root", iiif_root,
         "Image repository root (SIPI_IIIF_ROOT; default: not configured)")
         ->check(path_validator)->type_name("PATH");
@@ -163,6 +185,22 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     auto* metadata_bytes_option = app.add_option("--metadata-cache-max-bytes",
         result.config.metadata_cache_limits.max_bytes,
         "Metadata cache byte budget (SIPI_METADATA_CACHE_MAX_BYTES; default: 67108864; 0 disables)")
+        ->check(unsigned_decimal)->check(CLI::Range(std::size_t{0}, std::numeric_limits<std::size_t>::max()));
+    auto* mask_entries_option = app.add_option("--mask-cache-max-entries",
+        result.config.mask_cache_limits.max_entries,
+        "Mask cache entry limit (SIPI_MASK_CACHE_MAX_ENTRIES; default: 64; 0 disables)")
+        ->check(unsigned_decimal)->check(CLI::Range(std::size_t{0}, std::numeric_limits<std::size_t>::max()));
+    auto* mask_bytes_option = app.add_option("--mask-cache-max-bytes",
+        result.config.mask_cache_limits.max_bytes,
+        "Mask cache byte budget (SIPI_MASK_CACHE_MAX_BYTES; default: 33554432; 0 disables)")
+        ->check(unsigned_decimal)->check(CLI::Range(std::size_t{0}, std::numeric_limits<std::size_t>::max()));
+    auto* variant_entries_option = app.add_option("--variant-cache-max-entries",
+        result.config.variant_cache_limits.max_entries,
+        "Variant cache entry limit (SIPI_VARIANT_CACHE_MAX_ENTRIES; default: 16; 0 disables)")
+        ->check(unsigned_decimal)->check(CLI::Range(std::size_t{0}, std::numeric_limits<std::size_t>::max()));
+    auto* variant_bytes_option = app.add_option("--variant-cache-max-bytes",
+        result.config.variant_cache_limits.max_bytes,
+        "Variant cache byte budget (SIPI_VARIANT_CACHE_MAX_BYTES; default: 67108864; 0 disables)")
         ->check(unsigned_decimal)->check(CLI::Range(std::size_t{0}, std::numeric_limits<std::size_t>::max()));
     auto* public_url_option = app.add_option("--public-base-url", public_base_url,
         "Public origin and proxy mount (SIPI_PUBLIC_BASE_URL; default: local listener)")
@@ -246,6 +284,9 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     std::vector<std::string> tokens(arguments.rbegin(), arguments.rend());
     try {
         app.parse(tokens);
+        const auto cli_script = preflight::parse_script_settings(script_config, script_secrets, script_secret_files);
+        preflight::validate_script_settings(cli_script);
+        result.config.preflight_settings = cli_script;
         if (help || version) {
             result.config.log_level = levels.at(log_level);
             result.config.size_upscaling = size_upscaling == "true";
@@ -310,8 +351,13 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                 option->run_callback();
             }
         };
+        load_setting(listen_option, env_listen_address);
         load_setting(metadata_entries_option, cache_environment.metadata_max_entries);
         load_setting(metadata_bytes_option, cache_environment.metadata_max_bytes);
+        load_setting(mask_entries_option, cache_environment.mask_max_entries);
+        load_setting(mask_bytes_option, cache_environment.mask_max_bytes);
+        load_setting(variant_entries_option, cache_environment.variant_max_entries);
+        load_setting(variant_bytes_option, cache_environment.variant_max_bytes);
         load_setting(cache_dir_option, cache_environment.directory);
         load_setting(cache_max_option, cache_environment.max_bytes);
         load_setting(cache_target_option, cache_environment.target_percent);
@@ -330,6 +376,10 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
         load_setting(area_option, output_environment.area);
         load_setting(origins_option, cors_environment.origins);
         load_setting(credentials_option, cors_environment.credentials);
+        // These collections merge by name, unlike scalar options. Retain the
+        // CLI snapshot and let CLI11 read all file entries into fresh vectors.
+        script_config_option->clear(); script_secret_option->clear(); script_file_option->clear();
+        script_config.clear(); script_secrets.clear(); script_secret_files.clear();
         if (!config_option->empty()) {
             std::ifstream input{config_path};
             if (!input) {
@@ -340,6 +390,11 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                 return ParseError{"Cannot read configuration file: " + config_path};
             }
         }
+        result.config.preflight_settings = preflight::merge_script_settings(cli_script,
+            preflight::parse_script_environment(preflight_environment),
+            preflight::parse_script_settings(script_config, script_secrets, script_secret_files));
+    } catch (const preflight::ScriptConfigError& error) {
+        return ParseError{error.what()}; // Only fixed, value-free messages from this module.
     } catch (const CLI::ParseError& error) {
         // CLI11 diagnostics may echo arbitrary argument/file values, including
         // secrets on duplicate, conversion or unknown-option errors. Keep only
@@ -366,6 +421,8 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     if (!credentials.session_token.empty() && credentials.access_key.empty())
         return ParseError{"S3 session token requires an access key and secret key"};
     if (!preflight_option->empty()) result.config.preflight_script = preflight_script;
+    if (!result.config.preflight_settings.empty() && !result.config.preflight_script)
+        return ParseError{"Preflight settings require preflight-script"};
     if (!root_option->empty()) result.config.iiif_root = iiif_root;
     if (!cache_dir_option->empty()) result.config.cache_dir = cache_dir;
     save_public_url();

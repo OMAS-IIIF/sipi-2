@@ -32,4 +32,10 @@ public:
 void validate_delivery_budget(const cache::ImageMetadata& metadata,
                               const iiif::ImageGeometry& geometry,
                               const iiif::Rotation& rotation);
+/** Apply resample/transform/color budgets to an already materialized source.
+ * raster_bytes describes the active owned copy; shared cache residency is separate.
+ * Used for reduced public images so original decoder coordinates never leak into
+ * downstream planning. No decoder work is included in this check. */
+void validate_raster_delivery_budget(std::uint64_t raster_bytes, std::size_t profile_bytes,
+                                    const iiif::ImageGeometry& geometry, const iiif::Rotation& rotation);
 } // namespace sipi::http

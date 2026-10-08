@@ -191,7 +191,7 @@ ratio when fitting it within the configured bounds, without enlarging a smaller
 original. All subsequent IIIF operations use this reduced source.
 
 For example, a 6000 x 4000 original can have a public variant of approximately
-1000 x 667 pixels (the exact rounding contract must be defined in implementation):
+1000 x 667 pixels (nearest integer, ties upward, at least one pixel per axis):
 
 - Its info.json reports the reduced dimensions.
 - Pixel regions refer to the reduced image's coordinate system.
@@ -201,7 +201,7 @@ For example, a 6000 x 4000 original can have a public variant of approximately
 
 Give the public and original variants separate stable service identities. Example
 paths are /iiif/public/image123 and /iiif/original/image123; these are illustrative,
-not a finalized route convention. The original still requires authorization.
+chosen by deployment Lua policy, not hard-coded C++ routes. The original still requires authorization.
 Do not silently change a service's coordinate system according to login state.
 Separate identities preserve the meaning of links, regions, and annotations.
 
@@ -216,9 +216,9 @@ way that changes sampling alignment between requests.
 This is a delivery-time derivative; it does not require an upload pipeline or a
 pre-generated derivative for every original. A 1000 x 1000 RGB8 raster occupies
 about 3 MB of pixel storage, but aggregate memory/cache usage must be bounded.
-The general cache rules below establish persistence, eviction, concurrent
-generation and invalidation principles. The reduced-source storage format and its
-integration remain open. Source changes and changes to the derivative recipe must
+The implementation uses a bounded immutable in-memory VariantCache; completed
+encoded responses continue to use the persistent result cache. See
+[restricted resolution](restricted-resolution.md) for lifecycle and configuration. Source changes and changes to the derivative recipe must
 invalidate the corresponding derivative and rendered responses.
 
 Distinguish the cache of reduced sources from the cache of final encoded responses.
@@ -234,9 +234,8 @@ Whether a deployment additionally limits the final encoded image's dimensions,
 including after rotation, needs an explicit policy.
 
 Do not silently substitute a smaller result for an explicit IIIF size. Adaptive
-forms such as max and confined sizes follow their defined limit semantics. Exact
-HTTP error mapping and publication of effective limits in info.json remain to be
-specified when integrating delivery.
+forms such as max and confined sizes follow their defined limit semantics. Existing geometry errors and published global output limits apply unchanged;
+info.json width/height now describe the reduced public canvas.
 
 ## Cache architecture (agreed 2026-10-04)
 
@@ -374,23 +373,17 @@ Reduced effective-source derivatives and final encoded responses have different
 contents and identities. They may later share storage infrastructure, but the
 first cache increment needs no generic multi-layer cache framework.
 
-## Proposed building blocks and remaining decisions
+## Implementation status and deferred scope
 
-- A simple RenderPlan value could carry resolved operations, keeping URL and
-  preflight interpretation out of codecs. Its interface is not yet designed.
-- RasterImage8 is the owning gray/RGB/RGBA8 representation with an explicit PixelLayout.
-- Lua 5.4.8 now implements the initial standalone allow/deny and optional-source
-  contract; see [preflight](preflight.md). Host-provided JWT verification/signing,
-  HTTPS, JSON, and restriction fields are still pending.
-- Extend the typed allow/deny decision with the agreed variant/restriction model. Define
-  timeouts for future native/network operations. Root mapping is implemented in
-  SourceResolver; relative Lua source results now use iiif-root. The initial
-  HTTP integration uses isolated Lua states, memory/instruction budgets, and a
-  bounded worker; blocking work must not occupy Drogon's I/O thread.
-- Define stable variant naming, the restricted-source recipe, rounding, and how
-  clients discover/switch between public and authorized services.
-- Full IIIF Authorization Flow integration is deferred. Its substitute-resource
-  mechanism is compatible with the chosen distinct-variant model.
+- RasterImage8 owns gray/RGB/straight-alpha pixels and source color declarations.
+- Lua exposes JSON, HTTP(S), JWT, configuration, explicit shared caching, source
+  overrides, watermarks and reduced public resolution. See [preflight](preflight.md).
+- Distinct service prefixes and original authorization are deployment Lua policy;
+  default source mapping continues to ignore prefixes.
+- The full reduced-source raster, fixed rounding and versioned cache identities
+  are implemented; see [restricted resolution](restricted-resolution.md).
+- Automatic client discovery/switching and full IIIF Authorization Flow remain
+  deferred. The delivery feature set is frozen for validation/documentation/release.
 
 ## References
 
