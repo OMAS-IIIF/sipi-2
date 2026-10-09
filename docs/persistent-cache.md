@@ -11,6 +11,11 @@ S3-backed TIFF/JPEG 2000 sources. A hit skips pixel decoding, resizing and encod
 source opening/version checks still run, while unchanged headers can come from the metadata cache. Browser/proxy responses
 retain `Cache-Control: no-store`; server-side reuse is independent of that policy.
 
+JPEG quality and effective chroma sampling are part of the result identity.
+Changing the server-wide JPEG settings after a restart cannot return an old,
+incompatible JPEG. Defaults retain existing keys; obsolete variants age out through
+normal LRU cleanup. See [JPEG settings](command-line.md#jpeg-encoding).
+
 ## Configuration and layout
 
 ```toml

@@ -3,7 +3,7 @@ spdlog/1.17.0
 cli11/2.6.2
 drogon/1.9.13
 libtiff/4.7.2
-libjpeg/9f
+libjpeg-turbo/3.2.0
 libpng/1.6.58
 libwebp/1.6.0
 lcms/2.19.1
@@ -15,6 +15,12 @@ openssl/3.6.5
 sqlite3/3.53.4
 
 [options]
+libtiff/*:jpeg=libjpeg-turbo
+libjpeg-turbo/*:shared=False
+libjpeg-turbo/*:SIMD=True
+libjpeg-turbo/*:turbojpeg=False
+libjpeg-turbo/*:libjpeg7_compatibility=False
+libjpeg-turbo/*:libjpeg8_compatibility=False
 drogon/*:with_boost=False
 drogon/*:with_orm=False
 aws-sdk-cpp/*:s3=True

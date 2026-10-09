@@ -74,10 +74,14 @@ rotation.binary64:16:0000000000000000
 quality:5:color
 encoding:4:jpeg
 jpeg.quality:2:90
-recipe:14:sipi-render-v3
+recipe:14:sipi-render-v4
 )";
         require(original.serialized()==expected,"stable v1 serialization");
-        require(original.digest()=="d115eb903dc4f7466cb37ef11bd673e912d268c7629e5e8ec6b3b7ccbd58aebd","stable SHA-256 digest");
+        require(original.digest()=="11928da1eabf9b0e5dec53967aed4a0b196469ab784518abf1486ef0ec37baa2","stable SHA-256 digest");
+        auto legacy = base();
+        legacy.recipe = "sipi-render-v3";
+        require(CacheKey(legacy).digest()=="d115eb903dc4f7466cb37ef11bd673e912d268c7629e5e8ec6b3b7ccbd58aebd", "Legacy recipe remains distinct");
+        require(CacheKey(legacy) != original, "Codec switch invalidates previous rendered bytes");
         require(original.digest().size()==64 && original.digest().find_first_not_of("0123456789abcdef")==std::string_view::npos,
                 "digest is a filename-safe lowercase SHA-256");
 
@@ -101,6 +105,21 @@ recipe:14:sipi-render-v3
         require(from_url("/id/full/500,/90.0/default.jpg") ==
                 from_url("/id/full/500,/90/default.jpg"),"equivalent decimal angles");
 
+        // Chroma sampling does not affect one-component JPEGs or their keys.
+        for (auto quality : {iiif::Quality::gray, iiif::Quality::bitonal}) {
+            auto gray = base();
+            gray.quality = quality;
+            const CacheKey original(gray);
+            gray.encoding = JpegEncoding{90,JpegSampling::yuv420};
+            require(CacheKey(gray) == original, "Gray/bitonal sampling-independent key");
+        }
+        for (auto layout : {PixelLayout::gray, PixelLayout::gray_alpha}) {
+            auto native = base();
+            native.input_layout = layout;
+            const CacheKey original(native);
+            native.encoding = JpegEncoding{90,JpegSampling::yuv420};
+            require(CacheKey(native) == original, "Native gray default ignores sampling");
+        }
         const std::vector<std::function<void(RenderIdentity&)>> changes{
             [](auto& v){v.source.identity="s3:another-source";},
             [](auto& v){v.source.version="v2";}, [](auto& v){++v.source.size;},
@@ -111,7 +130,8 @@ recipe:14:sipi-render-v3
             [](auto& v){v.rotation.mirrored=true;}, [](auto& v){v.rotation.degrees=90;},
             [](auto& v){v.rotation.degrees=std::nextafter(0.0,1.0);},
             [](auto& v){v.quality=iiif::Quality::gray;}, [](auto& v){v.quality=iiif::Quality::bitonal;},
-            [](auto& v){v.encoding=JpegEncoding{91};}, [](auto& v){v.encoding=PngEncoding{};},
+            [](auto& v){v.encoding=JpegEncoding{91};},
+            [](auto& v){v.encoding=JpegEncoding{90,JpegSampling::yuv420};}, [](auto& v){v.encoding=PngEncoding{};},
             [](auto& v){v.recipe="sipi-render-v2-linear-light";},
             [](auto& v){v.watermark=WatermarkIdentity{SourceInfo{"local:watermark","w1",99},0.5,0.25,{255,255,255}};}
         };
@@ -189,6 +209,7 @@ recipe:14:sipi-render-v3
             [](auto& v){v.input_layout=static_cast<PixelLayout>(99);},
             [](auto& v){v.encoding=WebpEncoding{false,0};},
             [](auto& v){v.encoding=WebpEncoding{true,101};},
+            [](auto& v){v.encoding=JpegEncoding{90,static_cast<JpegSampling>(99)};},
             [](auto& v){v.encoding=JpegEncoding{0};}, [](auto& v){v.encoding=JpegEncoding{101};},
             [](auto& v){v.watermark=WatermarkIdentity{SourceInfo{"","v1",1},0.5,0.25,{255,255,255}};},
             [](auto& v){v.watermark=WatermarkIdentity{SourceInfo{"id","",1},0.5,0.25,{255,255,255}};}, [](auto& v){v.watermark=WatermarkIdentity{SourceInfo{"id","v1",0},0.5,0.25,{255,255,255}};}

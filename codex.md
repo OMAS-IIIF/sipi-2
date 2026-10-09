@@ -1,5 +1,154 @@
 # SIPI-2 project context
 
+## Controlled JPEG performance follow-up (2026-10-08)
+
+The archive runner now supports `--jpeg-comparison`: retained IJG 9f at 90/4:4:4,
+libjpeg-turbo 3.2.0 at 90/4:4:4, and the same turbo binary at 90/4:2:0. Existing
+four-server mode remains available. Explicit image arguments resolve to immutable
+IDs; SOF factors are checked before timing. Shared container helper optionally
+passes JPEG flags only to SIPI; the historical image receives none. Five runner
+regression tests pass. No production/runtime/default change in this step.
+
+Completed 144 trials, 1,092,270 verified measured responses, 2,160 decoded references,
+216 info checks and 432 exact native PNG checks. Matrix and balanced URL counts
+are complete; hashes stay stable across repetitions/cache modes. All 60 distinct
+4:4:4 JPEGs are byte-identical between IJG and turbo in this corpus; PNG bytes and
+ICC are unchanged across all variants. Prepared source hashes remain unchanged.
+Native ARM64, 4 CPU / 4 GiB quotas, 8-client rendering median: TIFF→JPEG 485.3→643.0
+requests/s (about +33%); JP2→JPEG 68.4→69.0 (overlapping ranges, no clear gain).
+Turbo 4:2:0 yields 657.2/69.4 and about 15% smaller JPEGs; keep 90/4:4:4 defaults.
+Cache rates measure serving, not encoding; no new competitor ranking is inferred.
+See docs/benchmarks/2026-10-08-jpeg-backends.md and companion JSON; raw logs,
+commands, source snapshots and audit exporter are in build/archive-jpeg-2026-10-08.
+Next: controlled OLDAP setup deployment with a pinned image, auth/viewer checks
+and rollback; public IIIF communication should use the qualified measured claims.
+Existing OLDAP/MinIO services were untouched; no registry push or deployment.
+
+## libjpeg-turbo backend (2026-10-08)
+
+The requested JPEG backend migration is complete: conanfile.txt/lock pin
+libjpeg-turbo 3.2.0 instead of IJG 9f. libtiff explicitly selects the same provider.
+SIMD on, static linking, v6b-compatible API/ABI (v7/v8 emulation off), TurboJPEG
+wrapper API off. Existing jpeglib.h reader/writer callbacks remain unchanged;
+CMake links libjpeg-turbo::jpeg-static. Intel NASM is locked; unrelated package
+revisions and Linux-only lock entries were retained. Consumers must be rebuilt
+together; this is not a binary swap. Clear stale libjpeg-turbo_DIR in existing
+CMake caches after installing dependencies and reload CMake in CLion. Verified
+one Conan JPEG archive and matching 3.2.0 headers for Debug and Release.
+Render recipe v4 invalidates previous codec results across all output formats
+(JPEG decoding can also affect PNG/WebP), including reduced source cache identities.
+No database/schema change or manual purge. JPEG quality/sampling remain configurable
+with defaults 90/4:4:4; same settings need not produce identical IJG/turbo bytes.
+All 70 CTest cases pass per local configuration (Release cache golden vector
+retested after its deliberate recipe/digest update); 78 external IIIF checks and
+companion WebP probes pass. Local ARM64/AMD64 Docker images built/tested with SIMD,
+including actual default/4:2:0 JPEG output and JPEG-to-PNG decoding. Tags:
+sipi-benchmark/sipi-2-turbo:verify-0.1.0-{arm64,amd64}; no registry push/deployment.
+See docs/jpeg-delivery.md#jpeg-backend-and-rebuilds and docs/dependency-updates.md.
+The controlled follow-up is complete; see the section above.
+
+## Configurable JPEG encoding (2026-10-08)
+
+Explicitly requested addition after the performance comparison: server-wide
+`jpeg-quality` (1..100, default 90) and `jpeg-sampling` (4:4:4 default, or 4:2:0),
+with CLI > SIPI_JPEG_QUALITY/SIPI_JPEG_SAMPLING > TOML > defaults. Settings are
+resolved at startup, not per request. src/imgformats/JpegOptions.h is the shared
+value type used by ServerConfig, the immutable worker settings, JPEG writer and
+cache identity. Cache JpegEncoding aliases this type to prevent divergent settings.
+RGB 4:2:0 halves chroma on both axes; gray/bitonal stays one component. ICC and
+existing default output remain unchanged. Cache quality remains explicit; color
+4:2:0 adds a sampling field, absence retains the old 4:4:4 key. Gray ignores sampling
+in keys and output; PNG/WebP and reduced source caches are unaffected. No recipe
+bump or manual purge; returning to old settings can reuse retained variants.
+Debug/Release builds and focused tests pass, including 490 startup cases and an
+HTTP restart test inspecting SOF/DQT markers, per-source precedence and cache
+reuse. See docs/command-line.md#jpeg-encoding, docs/jpeg-delivery.md, docs/cache-key.md.
+The subsequent backend migration is recorded above. Next: repeat controlled JPEG
+benchmarks with documented quality/sampling; production deployment remains unchanged.
+
+## Consolidation workflow (2026-10-08)
+
+Root Makefile now provides version bumps, native build/full test orchestration and
+Docker verification/publication. CMakeLists.txt remains the sole version source;
+scripts/version.py atomically edits only its declaration without Git side effects.
+`make test` runs every registered CTest with MinIO enabled, the external IIIF
+validator and native Docker runtime checks; dependencies are explicit, never skipped.
+`make docker-build` verifies both amd64/arm64 then pushes lrosenth/sipi-2:VERSION
+and :latest through the selected Buildx builder. `docker-local`/`docker-test` do
+not publish. scripts/docker_image.py sequences build/check/push and stops on failure.
+Runtime images contain stripped executable/shared libraries and optional OLDAP Lua
+examples, no C++ sources/build toolchain; media/Lua/configuration are mounted at
+runtime. docker/compose.example.yaml is a generic example, independent of OLDAP
+setup. See docs/makefile.md and docs/docker.md. Existing development MinIO data is
+preserved; smoke containers/volumes are uniquely owned and removed by tests.
+Verified: all 69 CTests, 78 external IIIF checks and companion WebP probes; real
+amd64/arm64 runtime/OLDAP/generic-mount checks and the Compose example pass.
+No registry push, version bump or deployment was performed for this consolidation.
+
+## Comparative performance baseline (2026-10-08)
+
+Opt-in `benchmarks/server_compare.py` now runs isolated, native ARM64 Docker
+comparisons against Cantaloupe 5.0.7, IIPImage 1.3 and a digest-pinned Triplet.
+Same synthetic pyramidal TIFF; 1/8 clients, JPEG/PNG, caches off/on, three
+repetitions, independent decoded references and per-response byte checks.
+96 timed trials / 1,024,576 measured responses passed. Results are workload-specific:
+IIPImage leads rendering; SIPI-2 leads cached PNG; Triplet leads cached JPEG with
+smaller/more lossy output. JPEG sampling/quality, PNG compression, reduced TIFF
+sampling and cache types differ explicitly. Retain trial ranges: some first trials
+were slow without an isolated cause. Do not infer a universal server ranking.
+See docs/server-comparison.md and docs/benchmarks/2026-10-08-servers.{md,json}.
+Raw timings/configs/logs/runner snapshot: build/server-compare-2026-10-08/.
+No product optimization/deployment change. The real-master extension below uses
+separately documented JPEG2000 decoders, preserving feature freeze.
+
+## Prepared real-image corpus (2026-10-08)
+
+Offline `prepare-archive-image` (EXCLUDE_FROM_ALL CMake target) plus
+`benchmarks/prepare_archives.py` normalize the user TIFFs at full input precision
+with LCMS and generate controlled RGB8/Gray8 pairs. Original files remain unchanged.
+Six pairs include a subsequently supplied 229 MP Swiss palette GeoTIFF, expanded
+losslessly to RGB. Tagged RGB16 -> sRGB8; Gray16 Gamma 1.8 -> Gamma 2.2 D50;
+pharch_01 alpha becomes uniformly opaque at 8 bits, then is omitted. Target ICC
+matches across reference/LZW 256px main-IFD pyramid/lossless Grok JP2 (1024px tiles,
+six resolutions, RGB reversible MCT). Independent Pillow/OpenJPEG pixel checks,
+34 pyramid levels, three tool regressions and 48 HTTP checks pass.
+Canonical generated corpus: build/archive-images/; audit and reproduction:
+docs/archive-test-corpus.md, docs/benchmarks/2026-10-08-archive-{corpus,http}.json.
+No new server input support, import route or format-performance claim.
+The default admission policy rejects the 18 MP JP2 because full/max exceeds the
+conservative decoding budget. Existing max-width/max-height=2048, max-area=4194304
+admits all six pairs without reducing source coordinates; this is test configuration,
+not a production change. The real-corpus comparison retains these bounds; the
+separate synthetic comparison runner still uses its original 4096px source.
+
+## Real-image comparison workflow (2026-10-08)
+
+`benchmarks/archive_compare.py` reuses the comparison container/timing functions
+for all six TIFF/JP2 pairs, JPEG/PNG output, five native/fractional/overview requests
+per image, 1/8 clients, caches off/on and three repetitions (192 timed trials).
+Every client completes whole balanced rounds; references decode independently,
+native PNGs must match in common sRGB, and all timed responses retain their own
+server's reference bytes. Cantaloupe's OpenJpegProcessor invokes an external
+OpenJPEG CLI; benchmarks/docker/CantaloupeOpenJPEG.Dockerfile prepares a local
+derivative with that dependency. TIFF remains on Java2dProcessor. Other decoders:
+SIPI Grok, IIP OpenJPEG, Triplet libvips/OpenJPEG. This compares complete pipelines,
+not identical codec implementations or equal-distortion JPEG. Cache types and
+encoder settings still differ as documented. No source or delivery code changes.
+See docs/archive-comparison.md for reproduction, output bounds, ICC diagnostics
+and benchmark limitations. Three workload/accounting regressions run through
+benchmarks/test_archive_compare.py without Docker or the private corpus.
+Completed: 192 timed trials / 1,201,230 verified responses, 2,880 serial decoded
+outputs and 288 corpus info checks. Every trial is balanced; source hashes and
+per-server reference bytes are unchanged across cache modes/repetitions. Results:
+docs/benchmarks/2026-10-08-archive-servers.{md,json}; raw evidence and measured runner
+snapshots: build/archive-compare-2026-10-08/. SIPI TIFF-to-JPEG is ~7.2x its JP2 rate
+in this mixed workload; SIPI JPEG rendering is ~1.76x/1.91x the configured Cantaloupe
+TIFF/JP2 rates. IIP leads TIFF rendering; JP2 rates are closer. Retain encoder/cache
+and colour caveats, including Cantaloupe's frequently omitted ICC profiles.
+No universal ranking or new optimization follows automatically. All owned containers
+were removed; existing OLDAP/MinIO services remain unchanged. Next: discuss measured
+tradeoffs and whether to align JPEG settings before the deferred optimization work.
+
 ## Current milestone: delivery feature freeze (2026-10-08)
 
 The agreed reduced public image feature is implemented. Lua Allow::resolution has
@@ -96,7 +245,7 @@ ExternalProject build wholesale; adopt libraries and source modules incrementall
 - `docs/tiff-metadata-and-geometry.md`: reader limits, rounding rules, composition, feature roadmap.
 - `src/iiifparser/IIIFParser.h`, `.cpp`: pure IIIF 3 path parser and owning value types.
 - `docs/iiif-parser.md`, `tests/IIIFParserTests.cpp`: parser contract and regression cases.
-- `conanfile.txt`: spdlog 1.17.0, CLI11 2.6.2, Drogon 1.9.13 (no Boost/ORM), libtiff 4.7.2, libjpeg 9f, Lua 5.4.8, CMake generators and layout.
+- `conanfile.txt`: spdlog 1.17.0, CLI11 2.6.2, Drogon 1.9.13 (no Boost/ORM), libtiff 4.7.2, libjpeg-turbo 3.2.0, Lua 5.4.8, CMake generators and layout.
 - `conan.lock`: pinned direct and transitive dependency recipe revisions.
 - `profiles/macos-debug`: Debug/C++20/Ninja host settings and scoped Trantor warning policy.
 - `src/HttpServer.h`, `.cpp`: loopback listener, health/hello routes, IIIF catch-all, and read-only method policy.
@@ -346,7 +495,7 @@ JSON-LD content negotiation, CORS and base-URI redirects remain later increments
 ## First pixel delivery (2026-10-04)
 
 src/imgformats/JpegWriter.* / jpegwriter is an independent RGB8-to-JPEG encoder
-using direct Conan libjpeg/9f (already pinned transitively in conan.lock).
+using the libjpeg API of direct Conan libjpeg-turbo/3.2.0.
 Synchronous span callbacks emit <=16 KiB blocks. Quality defaults to 90, baseline
 4:4:4; preserve opaque ICC via APP2 chunks, without sRGB conversion or other tags.
 Heap-owned codec/error state plus setjmp keeps libjpeg failures within C frames;
@@ -632,8 +781,8 @@ protect serialization. OpenSSL 3.6.5 is explicitly required (already transitive)
 The persistent index keeps serialized identity beside digest for collision checks.
 
 current_render_recipe in CacheKey.h versions all fixed pixel/color/encoder
-semantics; bump for output-affecting algorithm/codec changes. JPEG quality is
-explicit, with no independent cache default. Future configurable color/encoder
+semantics; bump for output-affecting algorithm/codec changes. JPEG quality and
+effective sampling come from the shared JpegOptions value. Future configurable color/encoder
 settings need actual fields. Effective variant MUST reflect actual restrictions;
 watermark parameters and source/version are explicit fields of WatermarkIdentity. Restrictions are not implemented by this module. Authorization,
 geometry and capability checks still precede EVERY lookup. Storage and HTTP
@@ -678,7 +827,7 @@ main -> run_http_server -> IiifWorker share ownership of the configured ResultCa
 Every image request still runs preflight, opens the definitive version-bound source,
 reuses/reads its header, resolves geometry and checks current source/operation support.
 Then the worker builds the original-variant identity using actual source layout,
-JPEG quality 90 (also explicitly passed to the writer) or fixed PNG parameters.
+Configured JPEG quality/sampling (defaults 90/4:4:4, shared with the writer) or fixed PNG parameters.
 Hit metadata must match the output plan; complete bounded reads precede 200. A hit
 skips decoding/resizing/encoding. Missing entries render and publish only complete
 successful output. Separate cache exception boundaries allow uncached delivery;
@@ -808,7 +957,7 @@ if profiling is needed. No production behavior/defaults changed by this step.
 
 ## JPEG source metadata (2026-10-05)
 
-src/imgformats/JpegReader.* / jpegreader uses pinned libjpeg/9f over ByteSource,
+src/imgformats/JpegReader.* / jpegreader uses pinned libjpeg-turbo/3.2.0 over ByteSource,
 without pixel decompression or pathname reopening. Owning JpegMetadata contains
 SOF width/height, logical gray/RGB, progressive flag and reconstructed ICC bytes.
 Accept 8-bit gray/RGB/YCbCr, baseline/progressive, EXIF absent or orientation 1.

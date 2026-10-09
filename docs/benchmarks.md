@@ -1,5 +1,7 @@
 # Reproducible local tile workload
 
+For the four-server Docker comparison, see [server comparison](server-comparison.md).
+
 This benchmark evaluates IIIF worker concurrency, not general TIFF-versus-JPEG 2000
 quality, compression or archival suitability. It does not change server behavior.
 Run on an otherwise quiet machine, outside the IDE debugger and without parallel

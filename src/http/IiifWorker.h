@@ -3,6 +3,7 @@
 #include "preflight/LuaPreflight.h"
 #include "http/WorkerLimits.h"
 #include "image/Bitonal.h"
+#include "imgformats/JpegOptions.h"
 #include "cache/ResultCache.h"
 #include "cache/MetadataCache.h"
 #include "cache/MaskCache.h"
@@ -55,6 +56,7 @@ public:
      * through the shared fill registry, without I/O under the LRU mutex.
      * size_policy is bounded by the buffered renderer's public defaults/ceilings;
      * the same policy is advertised and enforced, with source admission on full/max.
+     * jpeg_options are validated and shared immutably by cache lookup and encoding.
      * worker_count must be 1..32. Construction joins started threads if startup fails. */
     IiifWorker(std::optional<preflight::LuaPreflight> policy, SourceResolver sources,
                iiif::SizePolicy size_policy, std::string public_base_url,
@@ -64,7 +66,8 @@ public:
                unsigned worker_count = default_worker_count(),
                BitonalMethod bitonal_method = BitonalMethod::threshold,
                cache::MaskCacheLimits mask_limits = {},
-               cache::VariantCacheLimits variant_limits = {});
+               cache::VariantCacheLimits variant_limits = {},
+               JpegOptions jpeg_options = {});
     ~IiifWorker();
     IiifWorker(const IiifWorker&) = delete;
     IiifWorker& operator=(const IiifWorker&) = delete;
@@ -85,6 +88,7 @@ private:
     std::optional<S3Client> s3_client_;
     iiif::SizePolicy size_policy_;
     std::string public_base_url_;
+    const JpegOptions jpeg_options_; // Same immutable settings for cache and encoder.
     BitonalMethod bitonal_method_; // Immutable rendering policy shared by workers.
     std::shared_ptr<cache::ResultCache> result_cache_;
     cache::MetadataCache metadata_cache_; // Protected by metadata_mutex_; no I/O under this lock.

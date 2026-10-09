@@ -60,7 +60,7 @@ The supported file schema includes these root keys: `log-level`, `port`, `size-u
 `metadata-cache-max-entries`, `metadata-cache-max-bytes`,
 `mask-cache-max-entries`, `mask-cache-max-bytes`,
 `variant-cache-max-entries`, `variant-cache-max-bytes`, `iiif-workers`,
-`bitonal-method`, `max-width`, `max-height`, `max-area`, `cors-origins`, and
+`bitonal-method`, `jpeg-quality`, `jpeg-sampling`, `max-width`, `max-height`, `max-area`, `cors-origins`, and
 `cors-credentials`. Unknown keys
 and startup actions in the file are rejected. CLI11's built-in TOML-style reader
 is used directly; this is not a promise of full TOML grammar validation (including
@@ -447,3 +447,38 @@ of `--port` / `SIPI_PORT` / TOML `port` (default 8080). Containers typically use
 `0.0.0.0`; do not publish their port directly when Caddy is the intended ingress.
 The bind address does not determine canonical URLs: configure `public-base-url`
 separately. Docker's image default sets SIPI_LISTEN_ADDRESS=0.0.0.0.
+
+## JPEG encoding
+
+| CLI | Environment | TOML root key | Default |
+| --- | --- | --- | --- |
+| `--jpeg-quality` | `SIPI_JPEG_QUALITY` | `jpeg-quality` | `90` |
+| `--jpeg-sampling` | `SIPI_JPEG_SAMPLING` | `jpeg-sampling` | `"4:4:4"` |
+
+Quality must be an integer from 1 to 100. Sampling accepts exactly `4:4:4` or
+`4:2:0`. Both resolve independently in CLI > environment > TOML > default order,
+with the usual invalid-value and help/version rules. Settings apply server-wide
+at startup; restart after changing them. They are not per-request IIIF parameters.
+
+```toml
+jpeg-quality = 85
+jpeg-sampling = "4:2:0"
+```
+
+```sh
+./build/debug/sipi-2 --jpeg-quality=85 --jpeg-sampling=4:2:0
+SIPI_JPEG_QUALITY=85 SIPI_JPEG_SAMPLING=4:2:0 ./build/debug/sipi-2
+```
+
+4:4:4 retains full chroma resolution; 4:2:0 halves chroma resolution horizontally
+and vertically while retaining full luminance resolution. It typically reduces
+file size but can blur fine coloured edges/text. Quality controls quantization;
+100 is still lossy, and the setting is not a direct speed control. Actual speed
+and size depend on image content and encoding. Defaults preserve previous output.
+
+Gray/bitonal JPEG has one component, so sampling is ignored; quality still applies.
+PNG/WebP encoding and ICC handling are unchanged. The encoded-result cache binds
+quality and effective sampling; switching settings cannot reuse incompatible JPEG
+bytes. Original 4:4:4 keys remain valid, and switching back can reuse old entries.
+Unused variants are removed by normal LRU cleanup; no manual purge is needed.
+See [JPEG delivery](jpeg-delivery.md) and [cache identity](cache-key.md).

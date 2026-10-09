@@ -28,7 +28,9 @@ EXIF pixel dimensions instead of JPEG SOF dimensions.
 ## Storage, ownership and resource limits
 
 `src/imgformats/JpegReader.h/.cpp` provides `read_jpeg_metadata(const ByteSource&,
-max_read_bytes)` in the `jpegreader` target, with the already-pinned libjpeg/9f.
+max_read_bytes)` in the `jpegreader` target, with pinned libjpeg-turbo/3.2.0 through its ordinary libjpeg API.
+The reader/source callbacks remain unchanged; SIPI and libtiff share one JPEG
+provider. See [backend and rebuild notes](jpeg-delivery.md#jpeg-backend-and-rebuilds).
 `JpegMetadata` owns width/height, logical gray/RGB color, progressive flag and ICC
 bytes. There are no borrowed codec pointers. Each call has an independent codec,
 cursor, buffer and error boundary, permitting concurrent local/S3 reads.

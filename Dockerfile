@@ -11,7 +11,7 @@ WORKDIR /src
 COPY conanfile.txt conan.lock ./
 COPY conan/ conan/
 COPY docker/conan-profile docker/conan-profile
-RUN --mount=type=cache,target=/root/.conan2 \
+RUN --mount=type=cache,target=/root/.conan2,sharing=locked \
     conan profile detect --force && conan export conan/recipes/grok && \
     conan lock create . -pr:h docker/conan-profile -pr:b docker/conan-profile \
       --lockfile=conan.lock --lockfile-partial --lockfile-out=/tmp/docker.lock && \
@@ -20,12 +20,13 @@ RUN --mount=type=cache,target=/root/.conan2 \
 COPY CMakeLists.txt ./
 COPY src/ src/
 COPY benchmarks/ benchmarks/
-RUN --mount=type=cache,target=/root/.conan2 \
+RUN --mount=type=cache,target=/root/.conan2,sharing=locked \
     cmake -S . -B build/Release -DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake \
       -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF && \
     cmake --build build/Release --parallel ${BUILD_JOBS} && \
     mkdir -p /out/lib && cp build/Release/sipi-2 /out/ && \
-    ldd /out/sipi-2 | awk '/=> \/root\/\.conan2/ {print $3}' | xargs -r -I '{}' cp -L '{}' /out/lib/
+    ldd /out/sipi-2 | awk '/=> \/root\/\.conan2/ {print $3}' | xargs -r -I '{}' cp -L '{}' /out/lib/ && \
+    find /out -type f -exec strip --strip-unneeded '{}' +
 
 FROM ubuntu:24.04 AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 libgomp1 \

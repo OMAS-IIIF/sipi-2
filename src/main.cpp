@@ -91,10 +91,13 @@ int main(int argc, char* argv[]) {
             text.starts_with("SIPI_PREFLIGHT_SECRET_FILES_"))
             preflight_environment.push_back(text);
     }
+    sipi::JpegEnvironment jpeg_environment;
+    if (const char* value = std::getenv("SIPI_JPEG_QUALITY")) jpeg_environment.quality = value;
+    if (const char* value = std::getenv("SIPI_JPEG_SAMPLING")) jpeg_environment.sampling = value;
     std::optional<std::string_view> env_listen_address;
     if (const char* value = std::getenv("SIPI_LISTEN_ADDRESS")) env_listen_address = value;
     const auto parsed = sipi::load_startup_options(arguments, env_log_level, env_port,
-        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment, env_iiif_workers, env_bitonal_method, output_environment, cors_environment, preflight_environment, env_listen_address);
+        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment, env_iiif_workers, env_bitonal_method, output_environment, cors_environment, preflight_environment, env_listen_address, jpeg_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&parsed)) {
         std::cerr << "Configuration error: " << error->message << '\n';
         return 2;

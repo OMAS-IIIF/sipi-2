@@ -1,6 +1,7 @@
 #pragma once
 
 #include "image/RasterImage.h"
+#include "JpegOptions.h"
 #include <functional>
 #include <span>
 #include <stdexcept>
@@ -24,7 +25,8 @@ using JpegSink = std::function<void(std::span<const std::uint8_t>)>;
 /** Encode an owning gray8 or RGB8 raster as baseline JPEG, emitting bounded byte blocks.
  * Input and sink must live for this call; independent calls share no codec state.
  * PixelLayout::gray and rgb are accepted; RGBA must be composited explicitly first.
- * quality is 1..100 (default 90), with RGB 4:4:4 sampling to retain chroma detail.
+ * Quality is 1..100 (default 90); RGB sampling is 4:4:4 (default) or 4:2:0.
+ * Grayscale is always one component with 1x1 sampling.
  * Embedded ICC bytes are preserved in APP2 markers; no color conversion occurs.
  * Gray profiles undergo basic GRAY header checks, not full ICC validation.
  * Explicit srgb_intent assigns a matching embedded RGB/gray sRGB ICC v4 profile,
@@ -37,6 +39,6 @@ using JpegSink = std::function<void(std::span<const std::uint8_t>)>;
  * The encoder buffers blocks, not the complete JPEG. Sink/storage limits belong
  * to the caller. No exception crosses a C callback and codec resources use RAII.
  */
-void write_jpeg(const RasterImage8& image, const JpegSink& sink, int quality = 90);
+void write_jpeg(const RasterImage8& image, const JpegSink& sink, JpegOptions options = {});
 
 } // namespace sipi

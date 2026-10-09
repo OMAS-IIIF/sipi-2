@@ -13,12 +13,27 @@ separate public/original service URLs. See [restricted resolution](docs/restrict
 for policy, cache configuration and the runnable policy example. No OLDAP deployment
 policy is changed automatically.
 
+## Common commands
+
+```sh
+make help
+make show-version
+make bump-patch-level       # Or bump-minor-level / bump-major-level; no Git side effects
+make test                  # All CTests + MinIO + external validator + native container checks
+make docker-local          # Build/test locally, no push
+make docker-build          # Verify amd64 + arm64, push version and latest
+```
+
+See [Makefile setup and scope](docs/makefile.md). Docker defaults to `lrosenth/sipi-2`.
+The runtime image contains binaries/libraries, not C++ sources or build tools;
+[media and Lua scripts are selected with runtime mounts/configuration](docs/docker.md).
+
 ## Build and run
 
 Prerequisites: a compiler supporting C++20 for SIPI and C++23 for Grok, CMake 3.24 or newer, Ninja, and Conan 2.
 Python 3 is used by the HTTP integration test (no third-party Python packages).
 Direct dependencies are `spdlog/1.17.0`, `cli11/2.6.2`, `drogon/1.9.13`,
-`libtiff/4.7.2`, `libjpeg/9f`, `libpng/1.6.58`, `grok/20.4.15`, `lua/5.4.8`, `jwt-cpp/0.7.2`,
+`libtiff/4.7.2`, `libjpeg-turbo/3.2.0`, `libpng/1.6.58`, `grok/20.4.15`, `lua/5.4.8`, `jwt-cpp/0.7.2`,
 `aws-sdk-cpp/1.11.692` (S3), `openssl/3.6.5` (cache-key SHA-256), and `sqlite3/3.53.4` (result index).
 Drogon is built without Boost and ORM support. Its Conan recipe still brings
 OpenSSL transitively, even though our listener uses only plain HTTP.
@@ -253,7 +268,7 @@ Open `/tiled.tif/full/max/0/default.jpg` for the full image or
 `/tiled.tif/50,30,100,80/max/0/default.jpg` for a crop. The earlier `sample.tif`
 is strip-based and also supports pixel delivery.
 
-The independent JPEG writer uses libjpeg 9f (now a direct Conan dependency),
+The independent JPEG writer uses the libjpeg API of libjpeg-turbo 3.2.0,
 preserves ICC profiles, and emits synchronous byte blocks. HTTP currently buffers
 up to 64 MiB before responding. See [the supported subset, limits and tests](docs/jpeg-delivery.md).
 
@@ -343,7 +358,27 @@ The opt-in [tile benchmark](docs/benchmarks.md) builds deterministic large TIFF/
 fixtures and compares 1/2/4 workers in Release with empty/populated result caches.
 It records throughput, latency, sampled RSS and verifies every response against
 serial output. An isolated Drogon/Trantor TSan build is documented there too.
+The separate [server comparison](docs/server-comparison.md) measures SIPI-2,
+Cantaloupe, IIPImage and Triplet in native ARM64 Docker containers with identical
+TIFF tile requests, independent pixel checks and documented encoder/cache differences.
+The [real-image corpus preparation](docs/archive-test-corpus.md) documents normalized
+TIFF/JP2 pairs, colour handling, independent validation and large-source output limits.
+The [archive comparison](docs/archive-comparison.md) uses these six pairs for balanced,
+nonaligned requests across all four servers, including Cantaloupe with OpenJPEG.
+Its [recorded results](docs/benchmarks/2026-10-08-archive-servers.md) cover 192 trials
+and document rendering, cache throughput, response sizes and colour differences.
+The [controlled JPEG follow-up](docs/benchmarks/2026-10-08-jpeg-backends.md) reruns
+the IJG baseline alongside libjpeg-turbo at 4:4:4 and 4:2:0, keeping PNG controls.
 
+
+### JPEG output settings
+
+Server-wide `--jpeg-quality=85 --jpeg-sampling=4:2:0` selects JPEG quantization and
+chroma sampling. Defaults remain quality 90 and 4:4:4. Environment variables
+`SIPI_JPEG_QUALITY` / `SIPI_JPEG_SAMPLING` and TOML keys `jpeg-quality` /
+`jpeg-sampling` follow CLI > environment > TOML > defaults. Restart after changes;
+the persistent cache separates output variants automatically. Gray JPEG ignores
+sampling. See [configuration and tradeoffs](docs/command-line.md#jpeg-encoding).
 
 ### JPEG input
 

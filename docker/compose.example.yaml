@@ -1,0 +1,41 @@
+# Generic runtime example, independent of OLDAP. Host paths must already exist.
+# Select a version tag for deployments; verify-* tags can be used for local tests.
+name: sipi-2-runtime
+services:
+  sipi:
+    image: ${SIPI_IMAGE:?Set SIPI_IMAGE to the desired tagged runtime image}
+    ports:
+      - "127.0.0.1:${SIPI_HOST_PORT:-8080}:8080"
+    environment:
+      SIPI_PORT: "8080"
+      SIPI_IIIF_ROOT: /data/images
+      SIPI_PREFLIGHT_SCRIPT: /etc/sipi/preflight.lua
+      SIPI_CACHE_DIR: /var/cache/sipi
+      SIPI_PUBLIC_BASE_URL: ${SIPI_PUBLIC_BASE_URL:?Set the externally visible base URL}
+    volumes:
+      - type: bind
+        source: ${SIPI_MEDIA_DIRECTORY:?Set an absolute media directory}
+        target: /data/images
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${SIPI_LUA_SCRIPT:?Set an absolute path to the Lua script}
+        target: /etc/sipi/preflight.lua
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: cache
+        target: /var/cache/sipi
+    read_only: true
+    tmpfs:
+      - /tmp
+    working_dir: /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+volumes:
+  cache:

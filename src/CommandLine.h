@@ -9,6 +9,7 @@
 #include "http/WorkerLimits.h"
 #include "image/Bitonal.h"
 #include "image/OutputLimits.h"
+#include "imgformats/JpegOptions.h"
 #include "preflight/ScriptConfig.h"
 
 #include <cstdint>
@@ -49,6 +50,7 @@ struct ServerConfig {
     std::string listen_address = "127.0.0.1";
     bool size_upscaling = false;
     OutputLimits output_limits;
+    JpegOptions jpeg; // Server-wide encoding settings, immutable after startup.
     // Wildcard is exclusive; explicit origins are matched exactly, never reflected blindly.
     std::vector<std::string> cors_origins{"*"};
     bool cors_credentials = false;
@@ -116,6 +118,11 @@ struct OutputLimitEnvironment {
     std::optional<std::string_view> width, height, area;
 };
 
+/** Caller-owned SIPI_JPEG_QUALITY and SIPI_JPEG_SAMPLING snapshots. */
+struct JpegEnvironment {
+    std::optional<std::string_view> quality, sampling;
+};
+
 /**
  * Resolve startup options in CLI > environment > TOML file > default order.
  *
@@ -144,6 +151,7 @@ struct OutputLimitEnvironment {
  * NAME=VALUE entries. Merge per name; secret file I/O is deferred to startup.
  * cache_environment supplies the optional cache directory and capacity settings.
  * Parsing validates syntax only; persistent cache initialization belongs to startup.
+ * jpeg_environment supplies quality (1..100) and sampling (4:4:4 or 4:2:0).
  * Input views need only live for this call. The returned result owns its data.
  * Reads only an explicitly requested --config file; does not print, log, mutate
  * the environment, or set logging levels. CLI errors are checked even for help
@@ -168,6 +176,7 @@ struct OutputLimitEnvironment {
     OutputLimitEnvironment output_environment = {},
     CorsEnvironment cors_environment = {},
     std::span<const std::string_view> preflight_environment = {},
-    std::optional<std::string_view> env_listen_address = std::nullopt);
+    std::optional<std::string_view> env_listen_address = std::nullopt,
+    JpegEnvironment jpeg_environment = {});
 
 } // namespace sipi

@@ -80,7 +80,8 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                                 OutputLimitEnvironment output_environment,
                                 CorsEnvironment cors_environment,
                                 std::span<const std::string_view> preflight_environment,
-                                std::optional<std::string_view> env_listen_address) {
+                                std::optional<std::string_view> env_listen_address,
+                                JpegEnvironment jpeg_environment) {
     StartupOptions result;
     bool help = false;
     bool version = false;
@@ -93,6 +94,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     std::string storage = "local", bucket, path_style = "false";
     std::string log_level = "info";
     std::string bitonal_method = "threshold";
+    std::string jpeg_sampling = "4:4:4";
     std::string size_upscaling = "false";
     std::string cors_origins = "*", cors_credentials = "false";
     CLI::App app{"SIPI-2 IIIF server", "sipi-2"};
@@ -166,6 +168,12 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     auto* area_option = app.add_option("--max-area", result.config.output_limits.max_area,
         "Output pixel area limit (SIPI_MAX_AREA; default/ceiling: 8388608)")
         ->check(unsigned_decimal)->check(CLI::Range(std::uint64_t{1}, OutputLimits::area_ceiling));
+    auto* jpeg_quality_option = app.add_option("--jpeg-quality", result.config.jpeg.quality,
+        "JPEG quality (SIPI_JPEG_QUALITY; default: 90; range: 1..100)")
+        ->check(unsigned_decimal)->check(CLI::Range(1, 100));
+    auto* jpeg_sampling_option = app.add_option("--jpeg-sampling", jpeg_sampling,
+        "JPEG chroma sampling (SIPI_JPEG_SAMPLING; default: 4:4:4)")
+        ->check(CLI::IsMember({"4:4:4", "4:2:0"}));
     auto* bitonal_option = app.add_option("--bitonal-method", bitonal_method,
         "Bitonal method (SIPI_BITONAL_METHOD; default: threshold)")
         ->check(CLI::IsMember({"threshold", "floyd-steinberg"}));
@@ -291,6 +299,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
             result.config.log_level = levels.at(log_level);
             result.config.size_upscaling = size_upscaling == "true";
             result.config.bitonal_method = bitonal_method == "threshold" ? BitonalMethod::threshold : BitonalMethod::floyd_steinberg;
+            result.config.jpeg.sampling = jpeg_sampling == "4:4:4" ? JpegSampling::yuv444 : JpegSampling::yuv420;
             if (!preflight_option->empty()) result.config.preflight_script = preflight_script;
             if (!root_option->empty()) result.config.iiif_root = iiif_root;
             if (!cache_dir_option->empty()) result.config.cache_dir = cache_dir;
@@ -371,6 +380,8 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
         load_setting(token_option, s3_environment.session_token);
         load_setting(workers_option, env_iiif_workers);
         load_setting(bitonal_option, env_bitonal_method);
+        load_setting(jpeg_quality_option, jpeg_environment.quality);
+        load_setting(jpeg_sampling_option, jpeg_environment.sampling);
         load_setting(width_option, output_environment.width);
         load_setting(height_option, output_environment.height);
         load_setting(area_option, output_environment.area);
@@ -429,6 +440,7 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     result.config.log_level = levels.at(log_level);
     result.config.size_upscaling = size_upscaling == "true";
     result.config.bitonal_method = bitonal_method == "threshold" ? BitonalMethod::threshold : BitonalMethod::floyd_steinberg;
+    result.config.jpeg.sampling = jpeg_sampling == "4:4:4" ? JpegSampling::yuv444 : JpegSampling::yuv420;
     return result;
 }
 

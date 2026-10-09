@@ -1,0 +1,444 @@
+{
+  "complete": true,
+  "manifest_sha256": "fcbdd69fe385bbe5b8ad7ece19fda383251f21b24179660d948a89e5fb3baf70",
+  "server_sha256": "ce8a30f01917f8b64fa8fed234ac22c168eb93a568f3647a624c9510b2ed6f6d",
+  "output_policy": {
+    "max_width": 2048,
+    "max_height": 2048,
+    "max_area": 4194304
+  },
+  "checks": [
+    {
+      "image": "pharch_01",
+      "file": "pyramid.tif",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "pharch_01",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_01",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/1574,2129,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_01",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/full/256,/0/default.png",
+      "size": [
+        256,
+        339
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_01",
+      "file": "image.jp2",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "pharch_01",
+      "file": "image.jp2",
+      "request": "/image.jp2/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_01",
+      "file": "image.jp2",
+      "request": "/image.jp2/1574,2129,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_01",
+      "file": "image.jp2",
+      "request": "/image.jp2/full/256,/0/default.png",
+      "size": [
+        256,
+        339
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_02",
+      "file": "pyramid.tif",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "pharch_02",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_02",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/3587,2361,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_02",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/full/256,/0/default.png",
+      "size": [
+        256,
+        170
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_02",
+      "file": "image.jp2",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "pharch_02",
+      "file": "image.jp2",
+      "request": "/image.jp2/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_02",
+      "file": "image.jp2",
+      "request": "/image.jp2/3587,2361,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_02",
+      "file": "image.jp2",
+      "request": "/image.jp2/full/256,/0/default.png",
+      "size": [
+        256,
+        170
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_03",
+      "file": "pyramid.tif",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "pharch_03",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_03",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/3561,3419,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_03",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/full/256,/0/default.png",
+      "size": [
+        256,
+        245
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_03",
+      "file": "image.jp2",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "pharch_03",
+      "file": "image.jp2",
+      "request": "/image.jp2/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_03",
+      "file": "image.jp2",
+      "request": "/image.jp2/3561,3419,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "pharch_03",
+      "file": "image.jp2",
+      "request": "/image.jp2/full/256,/0/default.png",
+      "size": [
+        256,
+        245
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tif-01",
+      "file": "pyramid.tif",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "sample-tif-01",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tif-01",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/3587,2361,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tif-01",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/full/256,/0/default.png",
+      "size": [
+        256,
+        170
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tif-01",
+      "file": "image.jp2",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "sample-tif-01",
+      "file": "image.jp2",
+      "request": "/image.jp2/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tif-01",
+      "file": "image.jp2",
+      "request": "/image.jp2/3587,2361,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tif-01",
+      "file": "image.jp2",
+      "request": "/image.jp2/full/256,/0/default.png",
+      "size": [
+        256,
+        170
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tiff-02",
+      "file": "pyramid.tif",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "sample-tiff-02",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tiff-02",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/5087,3373,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tiff-02",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/full/256,/0/default.png",
+      "size": [
+        256,
+        171
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tiff-02",
+      "file": "image.jp2",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "sample-tiff-02",
+      "file": "image.jp2",
+      "request": "/image.jp2/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tiff-02",
+      "file": "image.jp2",
+      "request": "/image.jp2/5087,3373,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "sample-tiff-02",
+      "file": "image.jp2",
+      "request": "/image.jp2/full/256,/0/default.png",
+      "size": [
+        256,
+        171
+      ],
+      "ok": true
+    },
+    {
+      "image": "swiss-map-raster500_500_komb_25_2056",
+      "file": "pyramid.tif",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "swiss-map-raster500_500_komb_25_2056",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "swiss-map-raster500_500_komb_25_2056",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/17983,12557,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "swiss-map-raster500_500_komb_25_2056",
+      "file": "pyramid.tif",
+      "request": "/pyramid.tif/full/256,/0/default.png",
+      "size": [
+        256,
+        179
+      ],
+      "ok": true
+    },
+    {
+      "image": "swiss-map-raster500_500_komb_25_2056",
+      "file": "image.jp2",
+      "request": "info.json",
+      "ok": true
+    },
+    {
+      "image": "swiss-map-raster500_500_komb_25_2056",
+      "file": "image.jp2",
+      "request": "/image.jp2/11,7,257,193/max/0/default.png",
+      "size": [
+        257,
+        193
+      ],
+      "ok": true
+    },
+    {
+      "image": "swiss-map-raster500_500_komb_25_2056",
+      "file": "image.jp2",
+      "request": "/image.jp2/17983,12557,97,83/max/0/default.png",
+      "size": [
+        97,
+        83
+      ],
+      "ok": true
+    },
+    {
+      "image": "swiss-map-raster500_500_komb_25_2056",
+      "file": "image.jp2",
+      "request": "/image.jp2/full/256,/0/default.png",
+      "size": [
+        256,
+        179
+      ],
+      "ok": true
+    }
+  ]
+}

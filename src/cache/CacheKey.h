@@ -2,6 +2,7 @@
 
 #include "image/RasterImage.h"
 #include "image/Bitonal.h"
+#include "imgformats/JpegOptions.h"
 #include "iiifparser/IIIFGeometry.h"
 #include "storage/ByteSource.h"
 #include <optional>
@@ -17,12 +18,15 @@ namespace sipi::cache {
  * ICC; straight alpha; JPEG white composition, baseline 4:4:4; PNG level 6,
  * noninterlaced. v2: LCMS gray conversion and native PNG gray-alpha preservation.
  * v3: pack bitonal PNG as one-bit grayscale.
+ * v4: libjpeg-turbo 3.2.0 replaces IJG 9f in readers, writers and libtiff;
+ * JPEG input changes can affect PNG/WebP and reduced source rasters as well.
+ * Configurable JPEG quality/sampling are explicit identity fields, with absence
+ * of sampling retaining the original 4:4:4 behavior.
  * This is independent of the cache serialization schema. */
-inline constexpr std::string_view current_render_recipe = "sipi-render-v3";
+inline constexpr std::string_view current_render_recipe = "sipi-render-v4";
 
-/** Actual JPEG encoder quality, not the IIIF quality parameter; range 1..100.
- * No default here: callers must supply the value used for encoding. */
-struct JpegEncoding { int quality; };
+/** Use the same value settings for the key and the actual encoder. */
+using JpegEncoding = JpegOptions;
 /** Fixed PNG parameters belong to the rendering recipe until configurable. */
 struct PngEncoding {};
 /** WebP quality controls lossy fidelity or lossless effort; fixed method/exact

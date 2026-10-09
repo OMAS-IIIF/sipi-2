@@ -100,10 +100,14 @@ std::string serialize(const RenderIdentity& value) {
     field(result,"rotation.binary64",angle(value.rotation.degrees));
     field(result,"quality",effective_quality(value.quality,value.input_layout));
     if (const auto* jpeg = std::get_if<JpegEncoding>(&value.encoding)) {
-        if (jpeg->quality < 1 || jpeg->quality > 100)
-            throw std::invalid_argument("Invalid cache JPEG encoder quality");
+        if (!jpeg->valid())
+            throw std::invalid_argument("Invalid cache JPEG encoding options");
         field(result,"encoding","jpeg");
         number(result,"jpeg.quality",static_cast<unsigned>(jpeg->quality));
+        // Absent means legacy 4:4:4. Gray/bitonal output has no chroma at all.
+        if (jpeg->sampling == JpegSampling::yuv420 &&
+            effective_quality(value.quality, value.input_layout) == "color")
+            field(result,"jpeg.sampling","4:2:0");
     } else if (const auto* webp = std::get_if<WebpEncoding>(&value.encoding)) {
         if (webp->quality < 1 || webp->quality > 100)
             throw std::invalid_argument("Invalid cache WebP quality");

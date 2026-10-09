@@ -45,6 +45,8 @@ struct Case {
     bool cors_credentials = false;
     std::optional<std::string_view> listen_environment = std::nullopt;
     std::string listen_address = "127.0.0.1";
+    sipi::JpegEnvironment jpeg_environment;
+    sipi::JpegOptions jpeg;
 };
 
 /** Check either a complete typed result or a nonempty diagnostic. */
@@ -67,7 +69,7 @@ bool check(const Case& test) {
     std::optional<std::string_view> url_environment;
     if (test.url_environment) url_environment = *test.url_environment;
     const auto result = sipi::load_startup_options(arguments, environment, port_environment,
-        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment, test.workers_environment, test.bitonal_environment, test.output_environment, test.cors_environment, {}, test.listen_environment);
+        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment, test.workers_environment, test.bitonal_environment, test.output_environment, test.cors_environment, {}, test.listen_environment, test.jpeg_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&result)) {
         if (test.error && !error->message.empty()) {
             return true;
@@ -78,6 +80,8 @@ bool check(const Case& test) {
     const auto& options = std::get<sipi::StartupOptions>(result);
     const bool matches = !test.error && options.command == test.command &&
                          options.config.listen_address == test.listen_address &&
+                         options.config.jpeg.quality == test.jpeg.quality &&
+                         options.config.jpeg.sampling == test.jpeg.sampling &&
                          options.config.cors_origins == test.cors_origins &&
                          options.config.cors_credentials == test.cors_credentials &&
                          options.config.output_limits.max_width == test.output_limits.max_width &&
@@ -548,6 +552,35 @@ int main(int argc, char* argv[]) {
     for (const char* bad : {"", "localhost", "[::1]", "1.2.3.999", "0.0.0.0:8182"}) {
         listen_case({"--listen-address",bad},{},"",true);
         listen_case({},bad,"",true);
+    }
+    const auto jpeg_case = [&](std::vector<std::string> args, sipi::JpegEnvironment env,
+                               sipi::JpegOptions expected, bool error=false) {
+        Case test{"JPEG configuration", std::move(args)};
+        test.jpeg_environment = env; test.jpeg = expected; test.error = error;
+        cases.push_back(std::move(test));
+    };
+    using enum sipi::JpegSampling;
+    jpeg_case({}, {}, {90, yuv444});
+    jpeg_case({"--config",file("jpeg.toml")}, {}, {75, yuv420});
+    jpeg_case({"--config",file("jpeg.toml")}, {"85", "4:4:4"}, {85, yuv444});
+    jpeg_case({"--config",file("jpeg.toml"),"--jpeg-quality=100"}, {"bad", "4:4:4"}, {100, yuv444});
+    jpeg_case({"--jpeg-sampling=4:2:0"}, {"1", "invalid"}, {1, yuv420});
+    jpeg_case({"--config",file("jpeg.toml"),"--jpeg-quality=90","--jpeg-sampling=4:4:4"}, {}, {});
+    for (const char* bad : {"", "0", "101", "-1", "+90", "90.5", "high"}) {
+        jpeg_case({"--jpeg-quality",bad}, {}, {}, true);
+        jpeg_case({}, {bad, {}}, {}, true);
+    }
+    for (const char* bad : {"", "444", "4:2:2", "4:1:1"}) {
+        jpeg_case({"--jpeg-sampling",bad}, {}, {}, true);
+        jpeg_case({}, {{}, bad}, {}, true);
+    }
+    jpeg_case({"--config",file("invalid-jpeg.toml")}, {}, {}, true);
+    jpeg_case({"--jpeg-quality=80","--jpeg-quality=90"}, {}, {}, true);
+    jpeg_case({"--jpeg-sampling=4:4:4","--jpeg-sampling=4:2:0"}, {}, {}, true);
+    jpeg_case({"--help","--jpeg-sampling=bad"}, {}, {}, true);
+    for (const auto command : {Command::help, Command::version}) {
+        jpeg_case({command == Command::help ? "--help" : "--version"}, {"bad", "bad"}, {});
+        cases.back().command = command;
     }
     int failures = 0;
     for (const auto& test : cases) {

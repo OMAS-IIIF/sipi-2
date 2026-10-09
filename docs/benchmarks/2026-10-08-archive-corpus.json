@@ -1,0 +1,841 @@
+{
+  "complete": true,
+  "recipe": "archive-pairs-v1",
+  "helper_sha256": "b7c083e7c13b889cc42e7cf5cb54f4f21286682697bf4baf83ee35fc6844aaf6",
+  "orchestrator_sha256": "45315e7f61a9da33b3990f110a9f502bbddfed044435b7eb0fe1ececa8832794",
+  "python": "3.13.9",
+  "pillow": "12.3.0",
+  "openjpeg": "2.5.4",
+  "provenance": "User-supplied SALSAH and web samples; external URLs/licences not yet recorded.",
+  "originals": [
+    {
+      "file": "pharch_01.jp2",
+      "bytes": 14597538,
+      "sha256": "223113193bc6696a03207910ba4cfae0380cc257c9e7e6b613cd49c57eac6834",
+      "size": [
+        1671,
+        2212
+      ],
+      "pillow_mode": "RGBA",
+      "frames": 1,
+      "jp2": {
+        "colour_method": 1,
+        "enumerated_colourspace": 16,
+        "bits": [
+          16,
+          16,
+          16,
+          16
+        ],
+        "signed": [
+          false,
+          false,
+          false,
+          false
+        ],
+        "tile_size": [
+          1671,
+          2212
+        ],
+        "progression": 0,
+        "layers": 4,
+        "mct": 1,
+        "resolutions": 6,
+        "codeblock": [
+          64,
+          64
+        ],
+        "reversible_5_3": true
+      }
+    },
+    {
+      "file": "pharch_01.tif",
+      "bytes": 30452388,
+      "sha256": "eb5bca6d54e91eafead81d47303aa38dbdb8a8e0a557d7b97859ffdfe2b198c7",
+      "size": [
+        1671,
+        2212
+      ],
+      "pillow_mode": "RGBA",
+      "frames": 1,
+      "tiff": {
+        "bits": [
+          16,
+          16,
+          16,
+          16
+        ],
+        "compression": 5,
+        "photometric": 2,
+        "orientation": 1,
+        "samples": 4,
+        "rows_per_strip": 9,
+        "tile_width": null,
+        "tile_height": null,
+        "extra_samples": [
+          1
+        ]
+      },
+      "icc_sha256": "2a18161bb96fd584d19e737ce294732789e0e8e6ae8c8e4e5f09f1b138232a63",
+      "icc_description": "Generic RGB Profile"
+    },
+    {
+      "file": "pharch_02.jp2",
+      "bytes": 15944213,
+      "sha256": "062208a2f8e28feb5baf1a6778af3440ff6c1151f5a8c465429928c89aa785d9",
+      "size": [
+        3684,
+        2444
+      ],
+      "pillow_mode": "RGB",
+      "frames": 1,
+      "jp2": {
+        "colour_method": 1,
+        "enumerated_colourspace": 16,
+        "bits": [
+          8,
+          8,
+          8
+        ],
+        "signed": [
+          false,
+          false,
+          false
+        ],
+        "tile_size": [
+          3684,
+          2444
+        ],
+        "progression": 0,
+        "layers": 4,
+        "mct": 1,
+        "resolutions": 6,
+        "codeblock": [
+          64,
+          64
+        ],
+        "reversible_5_3": true
+      }
+    },
+    {
+      "file": "pharch_02.tif",
+      "bytes": 27011268,
+      "sha256": "9bb7e44bf98989728d3715507cd291b897769895f25303e19c8b8ac2a28f2e94",
+      "size": [
+        3684,
+        2444
+      ],
+      "pillow_mode": "RGB",
+      "frames": 1,
+      "tiff": {
+        "bits": [
+          8,
+          8,
+          8
+        ],
+        "compression": 1,
+        "photometric": 2,
+        "orientation": null,
+        "samples": 3,
+        "rows_per_strip": null,
+        "tile_width": null,
+        "tile_height": null,
+        "extra_samples": null
+      }
+    },
+    {
+      "file": "pharch_03.jp2",
+      "bytes": 20811027,
+      "sha256": "8205e8c1e6052380093872cbb0e8ef261693e58d7ee823c89426917a79e45c06",
+      "size": [
+        3658,
+        3502
+      ],
+      "pillow_mode": "I;16",
+      "frames": 1,
+      "jp2": {
+        "colour_method": 1,
+        "enumerated_colourspace": 17,
+        "bits": [
+          16
+        ],
+        "signed": [
+          false
+        ],
+        "tile_size": [
+          3658,
+          3502
+        ],
+        "progression": 0,
+        "layers": 4,
+        "mct": 0,
+        "resolutions": 6,
+        "codeblock": [
+          64,
+          64
+        ],
+        "reversible_5_3": true
+      }
+    },
+    {
+      "file": "pharch_03.tif",
+      "bytes": 25651144,
+      "sha256": "6f802beb76fa36521740c2c80146d315bfb675ffa5ff6de72ec37ed03433ff7e",
+      "size": [
+        3658,
+        3502
+      ],
+      "pillow_mode": "I;16B",
+      "frames": 1,
+      "tiff": {
+        "bits": [
+          16
+        ],
+        "compression": 1,
+        "photometric": 1,
+        "orientation": 1,
+        "samples": 1,
+        "rows_per_strip": 3502,
+        "tile_width": null,
+        "tile_height": null,
+        "extra_samples": null
+      },
+      "icc_sha256": "03ecbaeb4274cd04206698bfd0297e68750f33d5d6520ec222c29962c0a42379",
+      "icc_description": "EPSON  Gray - Gamma 1.8"
+    },
+    {
+      "file": "sample-tif-01.tif",
+      "bytes": 27011268,
+      "sha256": "395a5336cccfc985596c4c1e9630c11be1f9cae8f2d90d01d3471fed9c05e83f",
+      "size": [
+        3684,
+        2444
+      ],
+      "pillow_mode": "RGB",
+      "frames": 1,
+      "tiff": {
+        "bits": [
+          8,
+          8,
+          8
+        ],
+        "compression": 1,
+        "photometric": 2,
+        "orientation": null,
+        "samples": 3,
+        "rows_per_strip": null,
+        "tile_width": null,
+        "tile_height": null,
+        "extra_samples": null
+      }
+    },
+    {
+      "file": "sample-tiff-02.tif",
+      "bytes": 53747976,
+      "sha256": "17211a1a9083d172db8267a146f7b50a81635f8308d0ffc86415dde160a22595",
+      "size": [
+        5184,
+        3456
+      ],
+      "pillow_mode": "RGB",
+      "frames": 1,
+      "tiff": {
+        "bits": [
+          8,
+          8,
+          8
+        ],
+        "compression": 1,
+        "photometric": 2,
+        "orientation": 1,
+        "samples": 3,
+        "rows_per_strip": 3456,
+        "tile_width": null,
+        "tile_height": null,
+        "extra_samples": null
+      }
+    },
+    {
+      "file": "swiss-map-raster500_500_komb_25_2056.tif",
+      "bytes": 31643665,
+      "sha256": "92519de59e0ef7a3742b377984bafe1e45c7293bd6e323f292cca4774825afef",
+      "size": [
+        18080,
+        12640
+      ],
+      "pillow_mode": "P",
+      "frames": 6,
+      "tiff": {
+        "bits": [
+          8
+        ],
+        "compression": 5,
+        "photometric": 3,
+        "orientation": null,
+        "samples": 1,
+        "rows_per_strip": null,
+        "tile_width": 512,
+        "tile_height": 512,
+        "extra_samples": null
+      }
+    }
+  ],
+  "prepared": {
+    "pharch_01": {
+      "size": [
+        1671,
+        2212
+      ],
+      "mode": "RGB",
+      "pixel_sha256": "bcf3ae22fdae32a2e7e3e252d6e612052f05d843e63bc70f32422911ae1fa76e",
+      "icc_sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683",
+      "levels": [
+        [
+          1671,
+          2212
+        ],
+        [
+          836,
+          1106
+        ],
+        [
+          418,
+          553
+        ],
+        [
+          209,
+          277
+        ],
+        [
+          105,
+          139
+        ]
+      ],
+      "jp2": {
+        "colour_method": 2,
+        "icc_sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683",
+        "icc_bytes": 8796,
+        "bits": [
+          8,
+          8,
+          8
+        ],
+        "signed": [
+          false,
+          false,
+          false
+        ],
+        "tile_size": [
+          1024,
+          1024
+        ],
+        "progression": 0,
+        "layers": 1,
+        "mct": 1,
+        "resolutions": 6,
+        "codeblock": [
+          64,
+          64
+        ],
+        "reversible_5_3": true
+      },
+      "files": {
+        "image.jp2": {
+          "bytes": 4246757,
+          "sha256": "6d7a62ed6def5cd46eb8b9cadfd982b38b9b5cb3083549e27fd590bb72fa053a"
+        },
+        "pyramid.tif": {
+          "bytes": 9968996,
+          "sha256": "639d2d1dd153c2ff5b23cbfc1f4d4a50a790ae17e5d54a8046e72384eaa7ccbc"
+        },
+        "reference.tif": {
+          "bytes": 11098288,
+          "sha256": "800787f16169e00cec878bf891001ed404fec2354e445cb673215d08568819e2"
+        },
+        "source.icc": {
+          "bytes": 1456,
+          "sha256": "2a18161bb96fd584d19e737ce294732789e0e8e6ae8c8e4e5f09f1b138232a63"
+        },
+        "target.icc": {
+          "bytes": 8796,
+          "sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683"
+        }
+      },
+      "normalization": {
+        "width": 1671,
+        "height": 2212,
+        "channels": 3,
+        "source_bits": 16,
+        "source_samples": 4,
+        "alpha_min": 65528,
+        "alpha_max": 65535,
+        "source_tagged": 1
+      },
+      "palette_expanded": false,
+      "libraries": "libtiff=20260627 lcms=2180 grok=20.4.15"
+    },
+    "pharch_02": {
+      "size": [
+        3684,
+        2444
+      ],
+      "mode": "RGB",
+      "pixel_sha256": "d24233090f0ce0389b8ebd51ae6fbd49593923c2f81edd382f71af55f3f62259",
+      "icc_sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683",
+      "levels": [
+        [
+          3684,
+          2444
+        ],
+        [
+          1842,
+          1222
+        ],
+        [
+          921,
+          611
+        ],
+        [
+          461,
+          306
+        ],
+        [
+          231,
+          153
+        ]
+      ],
+      "jp2": {
+        "colour_method": 2,
+        "icc_sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683",
+        "icc_bytes": 8796,
+        "bits": [
+          8,
+          8,
+          8
+        ],
+        "signed": [
+          false,
+          false,
+          false
+        ],
+        "tile_size": [
+          1024,
+          1024
+        ],
+        "progression": 0,
+        "layers": 1,
+        "mct": 1,
+        "resolutions": 6,
+        "codeblock": [
+          64,
+          64
+        ],
+        "reversible_5_3": true
+      },
+      "files": {
+        "image.jp2": {
+          "bytes": 15952531,
+          "sha256": "871bf27c169f426173a4db616c90eb9a2dbb77b3124e5514b595828ebd67e073"
+        },
+        "pyramid.tif": {
+          "bytes": 26196834,
+          "sha256": "cf9618689810f19826626c10fe6508ef75732f5843a7263405f576b1ec8a3c0c"
+        },
+        "reference.tif": {
+          "bytes": 27020676,
+          "sha256": "fe5c7fe5ad9a130b24c48069c0133d49708f3e6c0ce8959cf0545734a2fe530a"
+        },
+        "target.icc": {
+          "bytes": 8796,
+          "sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683"
+        }
+      },
+      "normalization": {
+        "width": 3684,
+        "height": 2444,
+        "channels": 3,
+        "source_bits": 8,
+        "source_samples": 3,
+        "alpha_min": 255,
+        "alpha_max": 255,
+        "source_tagged": 0
+      },
+      "palette_expanded": false,
+      "libraries": "libtiff=20260627 lcms=2180 grok=20.4.15"
+    },
+    "pharch_03": {
+      "size": [
+        3658,
+        3502
+      ],
+      "mode": "L",
+      "pixel_sha256": "3511bb30f4909891314590e7891570b82e83aa096348973d43b2d8d8dfeb06fc",
+      "icc_sha256": "06fe6c766e4e2b086f762fc34b5796205018ba5ea92820fd43f88183ee1035bb",
+      "levels": [
+        [
+          3658,
+          3502
+        ],
+        [
+          1829,
+          1751
+        ],
+        [
+          915,
+          876
+        ],
+        [
+          458,
+          438
+        ],
+        [
+          229,
+          219
+        ]
+      ],
+      "jp2": {
+        "colour_method": 2,
+        "icc_sha256": "06fe6c766e4e2b086f762fc34b5796205018ba5ea92820fd43f88183ee1035bb",
+        "icc_bytes": 384,
+        "bits": [
+          8
+        ],
+        "signed": [
+          false
+        ],
+        "tile_size": [
+          1024,
+          1024
+        ],
+        "progression": 0,
+        "layers": 1,
+        "mct": 0,
+        "resolutions": 6,
+        "codeblock": [
+          64,
+          64
+        ],
+        "reversible_5_3": true
+      },
+      "files": {
+        "image.jp2": {
+          "bytes": 7945294,
+          "sha256": "6c077d4b18d64e87fe66d3e48e794d65458ca65aa3ac8d0a96992e52cabb8863"
+        },
+        "pyramid.tif": {
+          "bytes": 14063506,
+          "sha256": "1ce7fe79d74d0bff6e81dfde15feb8816daba56b2122eb3bb2f0c6bdc31ec071"
+        },
+        "reference.tif": {
+          "bytes": 12811750,
+          "sha256": "667ca6c6d48d810d69a3ef962fd64729efed2cdf2221242281cf16f957fab583"
+        },
+        "source.icc": {
+          "bytes": 444,
+          "sha256": "03ecbaeb4274cd04206698bfd0297e68750f33d5d6520ec222c29962c0a42379"
+        },
+        "target.icc": {
+          "bytes": 384,
+          "sha256": "06fe6c766e4e2b086f762fc34b5796205018ba5ea92820fd43f88183ee1035bb"
+        }
+      },
+      "normalization": {
+        "width": 3658,
+        "height": 3502,
+        "channels": 1,
+        "source_bits": 16,
+        "source_samples": 1,
+        "alpha_min": 65535,
+        "alpha_max": 65535,
+        "source_tagged": 1
+      },
+      "palette_expanded": false,
+      "libraries": "libtiff=20260627 lcms=2180 grok=20.4.15"
+    },
+    "sample-tif-01": {
+      "size": [
+        3684,
+        2444
+      ],
+      "mode": "RGB",
+      "pixel_sha256": "2e17ca0d69ae2d963fb2da164bad6e33dd85e93e2c678ef416eda177098b6b40",
+      "icc_sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683",
+      "levels": [
+        [
+          3684,
+          2444
+        ],
+        [
+          1842,
+          1222
+        ],
+        [
+          921,
+          611
+        ],
+        [
+          461,
+          306
+        ],
+        [
+          231,
+          153
+        ]
+      ],
+      "jp2": {
+        "colour_method": 2,
+        "icc_sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683",
+        "icc_bytes": 8796,
+        "bits": [
+          8,
+          8,
+          8
+        ],
+        "signed": [
+          false,
+          false,
+          false
+        ],
+        "tile_size": [
+          1024,
+          1024
+        ],
+        "progression": 0,
+        "layers": 1,
+        "mct": 1,
+        "resolutions": 6,
+        "codeblock": [
+          64,
+          64
+        ],
+        "reversible_5_3": true
+      },
+      "files": {
+        "image.jp2": {
+          "bytes": 15079219,
+          "sha256": "544e51f760f4e2cfced9723c3e113aa22d0e1b28e18a4e57347331aeb5fd99b9"
+        },
+        "pyramid.tif": {
+          "bytes": 25056034,
+          "sha256": "6c413d67f65e77ec9797f3c06714aef38a952a816feca2148e567a074a311e7d"
+        },
+        "reference.tif": {
+          "bytes": 27020676,
+          "sha256": "fe65310165bf339a63f02d00389985717d66bd81b3951eb03273057cb0659b70"
+        },
+        "target.icc": {
+          "bytes": 8796,
+          "sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683"
+        }
+      },
+      "normalization": {
+        "width": 3684,
+        "height": 2444,
+        "channels": 3,
+        "source_bits": 8,
+        "source_samples": 3,
+        "alpha_min": 255,
+        "alpha_max": 255,
+        "source_tagged": 0
+      },
+      "palette_expanded": false,
+      "libraries": "libtiff=20260627 lcms=2180 grok=20.4.15"
+    },
+    "sample-tiff-02": {
+      "size": [
+        5184,
+        3456
+      ],
+      "mode": "RGB",
+      "pixel_sha256": "24ce94be31c1e8abe0b14f9012ee07d2acdee9028e26704f235457520f7e3b23",
+      "icc_sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683",
+      "levels": [
+        [
+          5184,
+          3456
+        ],
+        [
+          2592,
+          1728
+        ],
+        [
+          1296,
+          864
+        ],
+        [
+          648,
+          432
+        ],
+        [
+          324,
+          216
+        ],
+        [
+          162,
+          108
+        ]
+      ],
+      "jp2": {
+        "colour_method": 2,
+        "icc_sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683",
+        "icc_bytes": 8796,
+        "bits": [
+          8,
+          8,
+          8
+        ],
+        "signed": [
+          false,
+          false,
+          false
+        ],
+        "tile_size": [
+          1024,
+          1024
+        ],
+        "progression": 0,
+        "layers": 1,
+        "mct": 1,
+        "resolutions": 6,
+        "codeblock": [
+          64,
+          64
+        ],
+        "reversible_5_3": true
+      },
+      "files": {
+        "image.jp2": {
+          "bytes": 23118626,
+          "sha256": "94bf885553523c659d34a332d62e24e33ed8ded7946da47128cd62e3afe89aec"
+        },
+        "pyramid.tif": {
+          "bytes": 51709724,
+          "sha256": "278fece6b81bcca5dac22a4d4060fba8c81f9bc332a834c03f8b10865e88ab63"
+        },
+        "reference.tif": {
+          "bytes": 53757548,
+          "sha256": "3738c1d0fb519648985ec7835f64db05b3590fc062cc77d3dab1e12965e51576"
+        },
+        "target.icc": {
+          "bytes": 8796,
+          "sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683"
+        }
+      },
+      "normalization": {
+        "width": 5184,
+        "height": 3456,
+        "channels": 3,
+        "source_bits": 8,
+        "source_samples": 3,
+        "alpha_min": 255,
+        "alpha_max": 255,
+        "source_tagged": 0
+      },
+      "palette_expanded": false,
+      "libraries": "libtiff=20260627 lcms=2180 grok=20.4.15"
+    },
+    "swiss-map-raster500_500_komb_25_2056": {
+      "size": [
+        18080,
+        12640
+      ],
+      "mode": "RGB",
+      "pixel_sha256": "13526a4664ab643b4f47b40d95918dbea3f988ef81e458cd7452a12475593e4c",
+      "icc_sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683",
+      "levels": [
+        [
+          18080,
+          12640
+        ],
+        [
+          9040,
+          6320
+        ],
+        [
+          4520,
+          3160
+        ],
+        [
+          2260,
+          1580
+        ],
+        [
+          1130,
+          790
+        ],
+        [
+          565,
+          395
+        ],
+        [
+          283,
+          198
+        ],
+        [
+          142,
+          99
+        ]
+      ],
+      "jp2": {
+        "colour_method": 2,
+        "icc_sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683",
+        "icc_bytes": 8796,
+        "bits": [
+          8,
+          8,
+          8
+        ],
+        "signed": [
+          false,
+          false,
+          false
+        ],
+        "tile_size": [
+          1024,
+          1024
+        ],
+        "progression": 0,
+        "layers": 1,
+        "mct": 1,
+        "resolutions": 6,
+        "codeblock": [
+          64,
+          64
+        ],
+        "reversible_5_3": true
+      },
+      "files": {
+        "image.jp2": {
+          "bytes": 214372888,
+          "sha256": "5758b66414a1f1c143528a8fa78352d5c3d1b3c890463e8a460b89a363cfbe2e"
+        },
+        "pyramid.tif": {
+          "bytes": 102586612,
+          "sha256": "1aaa740e2a77693ab805159b1d73557ee004c2a09ecf3fbebe29995e6313e610"
+        },
+        "reference.tif": {
+          "bytes": 685605732,
+          "sha256": "b95c492ecf13b5577ba88cfe73f8cf05010404be3dd5cfbf91af6ffa22c0064f"
+        },
+        "target.icc": {
+          "bytes": 8796,
+          "sha256": "b8200ecc35c3bb93a97856bfde28ceb426b2a26771c96a6bf35ccfed8e29f683"
+        }
+      },
+      "normalization": {
+        "width": 18080,
+        "height": 12640,
+        "channels": 3,
+        "source_bits": 8,
+        "source_samples": 3,
+        "alpha_min": 255,
+        "alpha_max": 255,
+        "source_tagged": 0
+      },
+      "palette_expanded": true,
+      "expanded_input_sha256": "2e2777797772d0b6251eced704e791818f36d37896fa1901e84595ad15131cb4",
+      "libraries": "libtiff=20260627 lcms=2180 grok=20.4.15"
+    }
+  },
+  "originals_unchanged": true
+}

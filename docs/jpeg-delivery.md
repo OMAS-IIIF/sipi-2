@@ -44,11 +44,12 @@ supported subset does not make every metadata-readable TIFF deliverable.
 
 ## Encoder boundary and ownership
 
-`src/imgformats/JpegWriter.h` exposes `write_jpeg(image, sink, quality=90)`.
+`src/imgformats/JpegWriter.h` exposes `write_jpeg(image, sink, JpegOptions options={})`.
 The encoder depends on the format-neutral owning `RasterImage8`, not TIFF, Drogon,
-files or a cache. libjpeg 9f is now an explicit Conan dependency and is linked
-privately by the `jpegwriter` CMake target; the locked version was already used
-transitively by libtiff.
+files or a cache. libjpeg-turbo 3.2.0 is an explicit Conan dependency and its
+`libjpeg-turbo::jpeg-static` target is linked privately by `jpegwriter`.
+The API remains `jpeglib.h`, including the existing destination callbacks; no
+TurboJPEG handle/buffer API or additional buffering layer is introduced.
 
 The sink synchronously consumes spans of at most 16 KiB. Spans borrow a codec
 buffer and must not be retained. The raster and callback remain caller-owned and
@@ -56,8 +57,13 @@ live throughout encoding. A sink exception aborts output and propagates unchange
 Any previously received bytes must be discarded or their destination aborted.
 Successful return, not a final callback, signals complete encoding.
 
-Baseline JPEG uses quality 90 and 4:4:4 sampling. The quality argument is 1..100;
-HTTP currently uses the default. ICC bytes are preserved exactly in ordered APP2
+Baseline JPEG defaults to quality 90 and 4:4:4 sampling. `JpegOptions` holds
+quality (1..100) and typed sampling (4:4:4 or 4:2:0); the same value settings are
+used by the worker and its cache identity. HTTP startup configuration exposes
+`jpeg-quality` and `jpeg-sampling` through CLI/environment/TOML, as documented in
+[configuration](command-line.md#jpeg-encoding). No per-request override exists.
+One-component gray/bitonal output ignores chroma sampling but still uses quality.
+ICC bytes are preserved exactly in ordered APP2
 chunks; gray profiles receive basic GRAY header checks, without full validation or color conversion. Untagged RGB remains
 untagged. RGB is not automatically sRGB. EXIF/IPTC and other TIFF metadata are not
 copied; long-term metadata/original preservation remains a separate decision.
@@ -114,3 +120,39 @@ Explicit source sRGB is now retained: PNG emits an sRGB chunk; JPEG assigns a
 matching embedded RGB/gray ICC v4 profile. Original ICC remains unchanged and
 untagged input stays untagged. No profile conversion occurs. See
 [color management](color-management.md) for the complete decision table.
+
+## JPEG backend and rebuilds
+
+Conan selects libjpeg-turbo 3.2.0 for both SIPI and libtiff. The package uses SIMD,
+static linking and the default v6b-compatible libjpeg ABI; v7/v8 emulation and the
+separate TurboJPEG API are disabled. Intel builds use the locked NASM build tool;
+ARM64 uses NEON. SIMD also benefits the ordinary libjpeg API. See the project's
+[API distinction](https://libjpeg-turbo.org/About/TurboJPEG) and
+[compatibility notes](https://www.libjpeg-turbo.org/About/Jpeg-9).
+
+This is a source-level migration, not a drop-in replacement of the old IJG 9f
+binary. Reinstall Conan dependencies and rebuild SIPI **and libtiff** together.
+Do not link both JPEG providers or replace a library underneath an old binary.
+Conan's `libtiff/*:jpeg=libjpeg-turbo` selection keeps one provider in the graph;
+CMake links the explicit turbo target instead of relying on system JPEG discovery.
+A stale CMake package-directory cache can still select Homebrew: clear the affected
+entry when migrating an existing build (`cmake -S . -B build/debug -U libjpeg-turbo_DIR`)
+**after** installing the new Conan dependencies, then reload CMake in CLion.
+Check that the linked JPEG archive and headers belong to the Conan package.
+
+Input support, output options and ICC marker handling stay as documented. JPEG
+bytes and some decoded samples can differ between implementations. Rendering recipe
+`sipi-render-v4` therefore separates all new results from the previous codec,
+including PNG/WebP derived from JPEG inputs. Existing files can age out normally;
+no cache-directory deletion is required. Quality 90 / sampling 4:4:4 remain defaults,
+but byte-for-byte compatibility with IJG 9f is not promised. Performance gains must
+be measured separately; changing quality/sampling at the same time changes the
+comparison as well.
+
+## Measured backend and sampling tradeoffs
+
+The [controlled archive-corpus experiment](benchmarks/2026-10-08-jpeg-backends.md)
+compares IJG 9f and libjpeg-turbo 3.2.0 at quality 90 / 4:4:4, then changes only
+turbo sampling to 4:2:0. It includes PNG controls, response sizes, actual sampling
+factors and three repetitions. These are local pipeline measurements, not a
+general performance or visual-quality guarantee. Defaults remain 90 / 4:4:4.

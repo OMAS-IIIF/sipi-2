@@ -58,3 +58,17 @@ in src/cache/CacheKey.cpp so old cached output cannot masquerade as the new resu
    the development Conan cache does not patch a running server.
 
 Reference: [Conan install and lockfile options](https://docs.conan.io/2/reference/commands/install.html).
+
+## JPEG provider switch (2026-10-08)
+
+`libjpeg-turbo/3.2.0` replaces `libjpeg/9f`; `libtiff/*:jpeg=libjpeg-turbo`
+selects the same provider for TIFF. SIMD is enabled and the TurboJPEG wrapper API
+is disabled. The lock change preserves unrelated revisions and Linux-only entries,
+adding NASM for Intel builds. A clean lock resolved only on macOS can drop Linux
+conditional dependencies; keep or separately resolve the deployment graph too.
+
+Rebuild all consumers because the old v9 and new v6b-compatible ABIs differ.
+Clear stale `libjpeg-turbo_DIR` CMake cache entries before configuring an existing
+build if they point outside Conan. The migration verified one Conan JPEG archive
+and matching 3.2.0 headers in both local configurations. See
+[JPEG backend notes](jpeg-delivery.md#jpeg-backend-and-rebuilds).

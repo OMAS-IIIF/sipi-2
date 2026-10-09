@@ -18,7 +18,7 @@ resolution, geometry/policy validation and renderer capability checks.
 | `geometry` | Resolved integer crop and output dimensions before mirroring/rotation. Coordinates belong to the effective image. |
 | `rotation` | Mirroring flag and clockwise angle; 360 and either signed zero normalize to 0. |
 | `quality`, `input_layout` | Resolve default/color to color for RGB/RGBA, or gray for native grayscale. Explicit gray and bitonal remain distinct operations. |
-| `encoding` | JPEG with quality (1..100), PNG, or WebP with lossless/quality and a codec-specific recipe. These types identify the output format. |
+| `encoding` | JPEG with quality (1..100) and effective chroma sampling, PNG, or WebP with lossless/quality and a codec-specific recipe. These types identify the output format. |
 | `watermark` | Optional WatermarkIdentity: definitive source identity/version/length, relative width, opacity and sRGB8 color. |
 | `recipe` | Version of fixed rendering semantics and encoding/color decisions. Defaults to `current_render_recipe`. |
 
@@ -43,6 +43,15 @@ because its geometry would match an existing key. Do not infer additional pixel
 equivalence, such as a symmetric image after rotation or a gray-looking RGB image.
 Exact unequal angles remain unequal: no rounding tolerance is introduced.
 
+## Codec migration
+
+Recipe v4 replaces IJG libjpeg 9f with libjpeg-turbo 3.2.0 in both reading and
+writing (including libtiff). It intentionally invalidates prior encoded results
+for every format: a JPEG source can also change a PNG/WebP result. The old cache
+schema is unchanged and obsolete entries expire through normal LRU cleanup. The
+same policy separates in-memory reduced-source variants; no per-codec key machinery
+is needed. Subsequent quality/sampling changes still use their explicit fields.
+
 ## Variants and versioning
 
 A future reduced virtual source must use a different `variant` from the original,
@@ -59,10 +68,16 @@ CacheKey does not invent policy semantics or turn an arbitrary role label into
 a safe variant. The opaque identity is an explicit contract with that future
 policy implementation, not a substitute for implementing it.
 
-`current_render_recipe = "sipi-render-v3"` covers current TIFF/Grok resolution
+`current_render_recipe = "sipi-render-v4"` covers current TIFF/Grok resolution
 planning, stored-sample area filtering, preserved ICC, straight alpha, encoded
 white JPEG composition, baseline JPEG/4:4:4 and PNG compression level 6 without
-interlacing. JPEG quality is already variable and is therefore an explicit field.
+interlacing. JPEG quality is an explicit field. The shared `JpegOptions` value
+is used for both encoding and identity. Color 4:2:0 adds `jpeg.sampling=4:2:0`;
+absence means the historical 4:4:4 recipe, preserving all existing default keys.
+Native gray, explicit gray and bitonal outputs ignore sampling because they have
+one component. Quality still affects their keys. PNG/WebP and unencoded reduced
+source variants do not acquire JPEG settings. Changing only these settings needs no recipe bump or cache purge; returning
+to previous settings within the same codec recipe can reuse retained entries.
 Bump the recipe when fixed algorithms, color treatment, settings or codec changes
 can affect bytes. Do not use the application display version as a substitute.
 When another setting becomes configurable (e.g. target color profile), add its

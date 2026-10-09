@@ -15,7 +15,7 @@ void require(bool condition, const char* message) {
 
 /** Independent libjpeg decompression checks output pixels and saved ICC chunks.
  * This is a test process: libjpeg's default fatal handler exits it on bad JPEGs. */
-sipi::RasterImage8 decode(const std::vector<unsigned char>& bytes, bool require_gray = false) {
+sipi::RasterImage8 decode(const std::vector<unsigned char>& bytes, bool require_gray = false, int y_sampling = 1) {
     jpeg_decompress_struct codec{};
     jpeg_error_mgr error{};
     codec.err = jpeg_std_error(&error);
@@ -28,6 +28,11 @@ sipi::RasterImage8 decode(const std::vector<unsigned char>& bytes, bool require_
     jpeg_save_markers(&codec, JPEG_APP0 + 2, 65535);
     require(jpeg_read_header(&codec, TRUE) == JPEG_HEADER_OK, "JPEG header");
     if (require_gray) require(codec.num_components == 1 && codec.jpeg_color_space == JCS_GRAYSCALE, "Native grayscale JPEG");
+    for (int i = 0; i < codec.num_components; ++i) {
+        const int factor = i == 0 && codec.num_components == 3 ? y_sampling : 1;
+        require(codec.comp_info[i].h_samp_factor == factor &&
+                codec.comp_info[i].v_samp_factor == factor, "JPEG sampling factors");
+    }
     codec.out_color_space = JCS_RGB;
     jpeg_start_decompress(&codec);
     sipi::RasterImage8 image{codec.output_width, codec.output_height, {}, {}};
@@ -135,9 +140,37 @@ int main(int argc, char** argv) {
         const auto decoded = decode(bytes);
         gradient(decoded, 0, 0, 320, 200);
         require(decoded.icc_profile == image.icc_profile, "ICC preserved");
+        const auto default_bytes = bytes;
+        bytes.clear();
+        sipi::write_jpeg(image, collect, {90, sipi::JpegSampling::yuv444});
+        require(bytes == default_bytes, "Explicit defaults preserve bytes");
+        // Odd edges exercise chroma padding without changing delivered dimensions.
+        auto odd = image;
+        odd.width = 319; odd.height = 199;
+        odd.pixels.resize(static_cast<std::size_t>(odd.width) * odd.height * 3);
+        for (int quality : {1, 75, 100}) {
+            bytes.clear();
+            sipi::write_jpeg(odd, collect, {quality, sipi::JpegSampling::yuv420});
+            const auto output = decode(bytes, false, 2);
+            require(output.width == odd.width && output.height == odd.height, "Odd 4:2:0 dimensions");
+            require(output.icc_profile == odd.icc_profile, "4:2:0 ICC preserved");
+        }
+        sipi::RasterImage8 gray{13, 9, std::vector<std::uint8_t>(13*9, 127), {}};
+        gray.layout = sipi::PixelLayout::gray;
+        bytes.clear();
+        sipi::write_jpeg(gray, collect);
+        const auto gray_bytes = bytes;
+        bytes.clear();
+        sipi::write_jpeg(gray, collect, {90, sipi::JpegSampling::yuv420});
+        require(bytes == gray_bytes, "Sampling never changes grayscale JPEG bytes");
+        (void)decode(bytes, true);
+        bool invalid_sampling = false;
+        try { sipi::write_jpeg(image, collect, {90, static_cast<sipi::JpegSampling>(99)}); }
+        catch (const sipi::JpegWriteError&) { invalid_sampling = true; }
+        require(invalid_sampling, "Invalid sampling rejected");
         for (int quality : {0, 101}) {
             bool failed = false;
-            try { sipi::write_jpeg(image, collect, quality); } catch (const sipi::JpegWriteError&) { failed = true; }
+            try { sipi::write_jpeg(image, collect, {quality}); } catch (const sipi::JpegWriteError&) { failed = true; }
             require(failed, "invalid quality rejected");
         }
         for (const auto& bad : {sipi::RasterImage8{0, 1, {}, {}}, sipi::RasterImage8{65501, 1, {}, {}},

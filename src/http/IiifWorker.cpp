@@ -86,8 +86,6 @@ std::tuple<RasterImage8, PixelWindow, WatermarkGrid> read_pixels(
 }
 
 constexpr std::size_t encoded_limit = 64 * 1024 * 1024;
-// Use the same explicit setting for identity and actual encoding.
-constexpr int jpeg_quality = 90;
 
 /** Build identical fresh/hit response headers; authorization is never cached. */
 drogon::HttpResponsePtr image_response(std::string encoded, const std::string& media_type, const std::string& canonical) {
@@ -114,10 +112,12 @@ drogon::HttpResponsePtr response(drogon::HttpStatusCode status,
 
 IiifWorker::IiifWorker(std::optional<preflight::LuaPreflight> policy, SourceResolver sources,
                        iiif::SizePolicy size_policy, std::string public_base_url, std::optional<S3Client> s3_client,
-                       std::shared_ptr<cache::ResultCache> result_cache, cache::MetadataCacheLimits metadata_limits, unsigned worker_count, BitonalMethod bitonal_method, cache::MaskCacheLimits mask_limits, cache::VariantCacheLimits variant_limits)
+                       std::shared_ptr<cache::ResultCache> result_cache, cache::MetadataCacheLimits metadata_limits, unsigned worker_count, BitonalMethod bitonal_method, cache::MaskCacheLimits mask_limits, cache::VariantCacheLimits variant_limits, JpegOptions jpeg_options)
     : policy_(std::move(policy)), sources_(std::move(sources)), s3_client_(std::move(s3_client)), size_policy_(bounded_output_policy(size_policy)),
-      public_base_url_(std::move(public_base_url)), bitonal_method_(bitonal_method), result_cache_(std::move(result_cache)),
+      public_base_url_(std::move(public_base_url)), jpeg_options_(jpeg_options), bitonal_method_(bitonal_method), result_cache_(std::move(result_cache)),
       metadata_cache_(metadata_limits), mask_cache_(mask_limits), variant_cache_(variant_limits) {
+    if (!jpeg_options_.valid())
+        throw std::invalid_argument("Invalid JPEG encoding options");
     if (!worker_count || worker_count > maximum_worker_count)
         throw std::invalid_argument("IIIF worker count must be between 1 and 32");
     spdlog::info("IIIF processing pool: {} workers", worker_count);
@@ -445,7 +445,7 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                         .input_layout = input_layout,
                         .encoding = webp ? cache::Encoding{cache::WebpEncoding{webp_lossless, webp_quality}}
                                         : png ? cache::Encoding{cache::PngEncoding{}}
-                                        : cache::Encoding{cache::JpegEncoding{jpeg_quality}},
+                                        : cache::Encoding{jpeg_options_},
                         .watermark = watermark_identity,
                         .bitonal_method = bitonal_method_
                     });
@@ -536,7 +536,7 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                 ? PngBitDepth::one : PngBitDepth::eight);
             else {
                 pixels = composite_on_white(std::move(pixels));
-                write_jpeg(pixels, sink, jpeg_quality);
+                write_jpeg(pixels, sink, jpeg_options_);
             }
             if (cache_key) {
                 try {

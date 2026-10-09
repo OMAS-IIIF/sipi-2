@@ -73,12 +73,12 @@ void finish_destination(j_compress_ptr codec) noexcept {
 std::uint32_t jpeg_maximum_dimension() noexcept { return JPEG_MAX_DIMENSION; }
 std::size_t jpeg_maximum_icc_bytes() noexcept { return 255 * icc_chunk_bytes; }
 
-void write_jpeg(const RasterImage8& image, const JpegSink& sink, int quality) {
+void write_jpeg(const RasterImage8& image, const JpegSink& sink, JpegOptions options) {
     const auto channels = image.channel_count();
-    if ((image.layout != PixelLayout::rgb && image.layout != PixelLayout::gray) || !sink || quality < 1 || quality > 100 || image.width == 0 || image.height == 0 ||
+    if ((image.layout != PixelLayout::rgb && image.layout != PixelLayout::gray) || !sink || !options.valid() || image.width == 0 || image.height == 0 ||
         image.width > JPEG_MAX_DIMENSION || image.height > JPEG_MAX_DIMENSION ||
         static_cast<std::uint64_t>(image.width) * image.height * channels != image.pixels.size())
-        throw JpegWriteError("Invalid JPEG raster, quality or sink");
+        throw JpegWriteError("Invalid JPEG raster, encoding options or sink");
     if (image.icc_profile.size() > jpeg_maximum_icc_bytes())
         throw JpegWriteError("ICC profile exceeds JPEG marker capacity");
 
@@ -112,10 +112,15 @@ void write_jpeg(const RasterImage8& image, const JpegSink& sink, int quality) {
     state->codec.input_components = static_cast<int>(channels);
     state->codec.in_color_space = channels == 1 ? JCS_GRAYSCALE : JCS_RGB;
     jpeg_set_defaults(&state->codec);
-    jpeg_set_quality(&state->codec, quality, TRUE);
+    jpeg_set_quality(&state->codec, options.quality, TRUE);
     for (int i = 0; i < state->codec.num_components; ++i) {
         state->codec.comp_info[i].h_samp_factor = 1;
         state->codec.comp_info[i].v_samp_factor = 1;
+    }
+    if (channels == 3 && options.sampling == JpegSampling::yuv420) {
+        // Y uses a 2x2 grid, Cb/Cr stay 1x1: half chroma resolution on both axes.
+        state->codec.comp_info[0].h_samp_factor = 2;
+        state->codec.comp_info[0].v_samp_factor = 2;
     }
     jpeg_start_compress(&state->codec, TRUE);
     // ICC APP2 payload: signature including NUL, sequence number, chunk count.
