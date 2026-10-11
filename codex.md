@@ -6,7 +6,10 @@ Startup and runtime logs now include readable error categories and Lua diagnosti
 with source location. The Lua boundary masks exact configured secrets and incoming
 credentials, escapes controls and bounds message length; HTTP errors stay generic.
 Script authors must avoid logging transformed secrets or remote response bodies.
-See docs/lua-configuration.md for limits; a rebuilt image is needed for deployment.
+Cache loaders preserve their original Lua error/source location across C++ cleanup;
+native cache failures retain fixed reasons such as wait deadline or capacity.
+Waiters do not inherit the loader request’s diagnostic. See docs/lua-configuration.md
+and docs/lua-cache.md for limits; a rebuilt image is needed for deployment.
 
 ## Controlled JPEG performance follow-up (2026-10-08)
 

@@ -1,3 +1,9 @@
+### Update 2026-10-11 22:40
+- Decisions: Preserve original Lua cache-loader errors and distinguish fixed native cache failure reasons. Do not share loader diagnostics with waiting requests or retain them in cache entries.
+- Implementation: Added a trivial loader-failure marker to unwind native owners before rethrowing the existing Lua error object; forward bounded fixed native diagnostics only after leaving catch scopes. Added explicit TTL/result/size/nesting messages, documentation and tests for error identity, loader recovery, exact wait timeout and end-to-end secret masking through a loader failure.
+- Open: Publish/deploy a new SIPI image and reproduce the Home permission lookup failure to obtain its underlying reason; no deployment performed.
+- Risks/Assumptions: Lua authors must still avoid remote bodies/transformed credentials in diagnostics. All 70 Debug CTest cases pass; updated timeout assertion also passes in a focused rerun. Diff check clean. Existing user version change in CMakeLists.txt preserved.
+
 ### Update 2026-10-11 22:32
 - Decisions: Include readable preflight categories and Lua diagnostics in operator logs at startup and runtime; keep public HTTP failure bodies generic. Mask exact known credentials at the Lua boundary while request/config context is available.
 - Implementation: Added category names, overlapping/repeated secret masking, incoming authorization/cookie/query masking, control-byte escaping and a 2048-byte diagnostic limit. Updated operator documentation, project context and real-process/unit regressions, including configured-secret handling in the HTTP smoke fixture.

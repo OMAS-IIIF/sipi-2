@@ -134,9 +134,11 @@ preflight-secret-file=["jwt_key=missing-overridden-secret"]
         script.write_text("error(sipi.secrets.jwt_key)\nfunction preflight() return {decision='allow'} end")
         startup_failure(cli, env)
         script.write_text("""function preflight(request)
+    sipi.cache.get_or_load('failing-loader', function()
     error('diagnostic marker\\n' .. sipi.secrets.jwt_key .. ' ' ..
         request.headers.authorization .. ' ' .. request.cookies.session .. ' ' ..
         request.query.token[1])
+    end)
 end""")
         run_server(cli, env, runtime_error=True)
         print(f"{checks} startup/runtime script configuration and redaction scenarios passed")

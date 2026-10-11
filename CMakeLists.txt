@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(sipi-2 VERSION 0.1.0 LANGUAGES CXX)
+project(sipi-2 VERSION 0.1.1 LANGUAGES CXX)
 
 find_package(Threads REQUIRED)
 find_package(spdlog CONFIG REQUIRED)

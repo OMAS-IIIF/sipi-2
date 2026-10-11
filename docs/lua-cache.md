@@ -72,9 +72,17 @@ by another request cannot be retracted.
   available inside a loader.
 
 Operations are enabled only while `preflight(request)` runs. Top-level validation
-and state teardown cannot read or change the cache. Native cache failures and Lua
-loader failures become credential-free Lua errors; the server maps an uncaught
-error to its usual technical preflight failure. No stale entry is served on error.
+and state teardown cannot read or change the cache. A failing Lua loader retains
+its original error object and source location: Lua `pcall` sees the original value,
+and uncaught errors reach the preflight diagnostic masking described in
+[lua-configuration.md](lua-configuration.md#limits-and-diagnostics). Do not include
+remote response bodies or credentials in loader errors.
+Native failures retain their fixed reason, e.g. `Cache load failed: Cache loader
+wait deadline exceeded`, invalid TTL, capacity exhaustion or an expired value.
+A waiter whose loader failed receives the generic `Cache loader failed` reason;
+only the loader's own request carries its original Lua diagnostic. No error text
+or credentials are retained in shared cache entries. Public HTTP errors remain
+generic, and no stale entry is served on error.
 A successful cache fill is independent of the enclosing policy decision: a later
 deny or error does not roll back the fill. Do not use the cache as a transaction.
 

@@ -64,9 +64,14 @@ void native_tests() {
     auto owner=std::async(std::launch::async,[&]{ return shared.get_or_load("wait",[&]{entered.set_value(); gate.wait();return load();},deadline()); });
     entered.get_future().wait();
     check(!shared.get("wait"));
-    rejects([&]{shared.get_or_load("wait",load,SharedCache::Clock::now()+10ms);});
+    bool timed_out = false;
+    try { shared.get_or_load("wait",load,SharedCache::Clock::now()+10ms); }
+    catch (const std::runtime_error& error) {
+        timed_out = std::string(error.what()) == "Cache loader wait deadline exceeded";
+    }
     check(shared.get_or_load("independent",load,deadline()).bytes=="value");
     release.set_value(); check(owner.get().bytes=="value");
+    check(timed_out);
     SharedCache small({1,16});
     std::promise<void> filling, finish;
     auto finish_gate=finish.get_future();
@@ -119,7 +124,19 @@ void lua_tests(const std::filesystem::path& directory) {
           return sipi.cache.get_or_load('nested',function() return 'x',60 end)
         end) end))
         assert(sipi.cache.get('recursive')==nil)
-        assert(not pcall(function() sipi.cache.get_or_load('bad',function() error('secret') end) end))
+        local ok, message = pcall(function()
+          sipi.cache.get_or_load('bad',function() error('loader diagnostic marker') end)
+        end)
+        assert(not ok and message:find('loader diagnostic marker',1,true))
+        local marker = {}
+        local object_ok, object = pcall(function()
+          sipi.cache.get_or_load('object-error',function() error(marker) end)
+        end)
+        assert(not object_ok and object == marker)
+        local ttl_ok, ttl_error = pcall(function()
+          sipi.cache.get_or_load('bad-ttl',function() return 'value',3601 end)
+        end)
+        assert(not ttl_ok and ttl_error:find('Cache TTL must be in 0..3600 seconds',1,true))
         assert(sipi.cache.get_or_load('bad',function() return 'recovered',60 end)=='recovered')
         local _, v=sipi.cache.get('bad'); assert(sipi.cache.invalidate('bad',v))
         for _, loader in ipairs({function() return nil,1 end, function() return {},-1 end,
