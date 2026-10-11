@@ -1,5 +1,13 @@
 # SIPI-2 project context
 
+## Preflight operator diagnostics (2026-10-11)
+
+Startup and runtime logs now include readable error categories and Lua diagnostics
+with source location. The Lua boundary masks exact configured secrets and incoming
+credentials, escapes controls and bounds message length; HTTP errors stay generic.
+Script authors must avoid logging transformed secrets or remote response bodies.
+See docs/lua-configuration.md for limits; a rebuilt image is needed for deployment.
+
 ## Controlled JPEG performance follow-up (2026-10-08)
 
 The archive runner now supports `--jpeg-comparison`: retained IJG 9f at 90/4:4:4,

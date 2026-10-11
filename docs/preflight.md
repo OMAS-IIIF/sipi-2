@@ -220,8 +220,11 @@ invoking an error object's metamethod. Results are copied before state destructi
 `PreflightError` distinguishes script-file I/O, script loading, script execution,
 invalid contracts, Lua allocation failures, and instruction exhaustion. C++ allocation failures may still
 raise `std::bad_alloc`. A technical failure is never an authorization result.
-C++ diagnostics can include script-supplied secrets. The server prints only the
-error category at startup/runtime and never uses raw diagnostics as client bodies.
+Server logs include the category name/number and bounded, single-line Lua diagnostics,
+including script path/line where Lua supplies them. Known secrets and incoming
+credentials are masked; arbitrary script text can still be sensitive. See
+[lua-configuration.md](lua-configuration.md#limits-and-diagnostics) for the exact
+protection and script-author obligations. Client responses remain generic.
 
 Available standard libraries are base, table, string, math, and utf8. Base functions
 `dofile`, `loadfile`, `load`, `print`, and `warn` are removed. io, os, package, debug,

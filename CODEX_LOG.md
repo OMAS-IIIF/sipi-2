@@ -1,3 +1,9 @@
+### Update 2026-10-11 22:32
+- Decisions: Include readable preflight categories and Lua diagnostics in operator logs at startup and runtime; keep public HTTP failure bodies generic. Mask exact known credentials at the Lua boundary while request/config context is available.
+- Implementation: Added category names, overlapping/repeated secret masking, incoming authorization/cookie/query masking, control-byte escaping and a 2048-byte diagnostic limit. Updated operator documentation, project context and real-process/unit regressions, including configured-secret handling in the HTTP smoke fixture.
+- Open: Build/publish a new SIPI image and deploy it to Home before reproducing the reported preflight failure; no deployment or registry push performed.
+- Risks/Assumptions: Trusted Lua authors must not include transformed/partial secrets or remote response data in errors; exact-value filtering is not general secret detection. Logs can contain source paths. All 70 Debug CTest cases pass across the full run and targeted reruns after adapting old log-format/suppression expectations; masking, controls, truncation and generic HTTP bodies verified. Diff check clean.
+
 ### Update 2026-10-08 17:32
 - Decisions: Keep quality 90 / 4:4:4 defaults. The controlled run supports a clear TIFF→JPEG gain from libjpeg-turbo, but no meaningful eight-client JP2 gain; 4:2:0 mainly reduces response size. Deployment and public IIIF communication remain subsequent steps.
 - Implementation: Completed and audited 144 trials / 1,092,270 measured responses, 2,160 decoded references, 216 info checks and 432 exact native PNG checks. Added dated Markdown/JSON results, reproduction/settings documentation and README/master context links. Raw commands/logs/source snapshots and report exporter remain in build/archive-jpeg-2026-10-08. Five runner tests, Python compilation and diff checks pass; incomplete-run report export is rejected.

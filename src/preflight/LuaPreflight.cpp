@@ -301,6 +301,18 @@ int evaluate_protected(lua_State* state) {
 PreflightError::PreflightError(ErrorCode code, const std::string& message)
     : std::runtime_error(message), code_(code) {}
 
+std::string_view error_name(ErrorCode code) noexcept {
+    switch (code) {
+    case ErrorCode::script_file: return "script_file";
+    case ErrorCode::script_load: return "script_load";
+    case ErrorCode::script_execution: return "script_execution";
+    case ErrorCode::contract: return "contract";
+    case ErrorCode::memory: return "memory";
+    case ErrorCode::instruction_limit: return "instruction_limit";
+    }
+    return "unknown";
+}
+
 LuaPreflight::LuaPreflight(const std::filesystem::path& script_path, ScriptConfig config)
     : chunk_name_("@" + script_path.string()), config_(std::move(config)), cache_(std::make_shared<SharedCache>()) {
     validate_script_config(config_);
@@ -365,6 +377,75 @@ struct Runtime {
     }
 };
 
+/** Prepare an operator diagnostic before losing the request/config context.
+ * Mask exact known credentials before truncation, including overlapping matches.
+ * This cannot recognize transformed secrets or credentials returned by remote APIs;
+ * trusted scripts must never include those in error()/assert() messages.
+ */
+std::string diagnostic(std::string_view message, const ScriptConfig& config, const Request* request) {
+    std::vector<bool> hidden(message.size(), false);
+    const auto hide = [&](std::string_view value) {
+        if (value.empty()) return;
+        for (std::size_t at = message.find(value); at != std::string_view::npos;
+             at = message.find(value, at + 1)) {
+            for (std::size_t i = at; i < at + value.size(); ++i) hidden[i] = true;
+        }
+    };
+    for (const auto& [name, value] : config.secrets) hide(value);
+    if (request) {
+        if (request->authorization) {
+            hide(*request->authorization);
+            const auto split = request->authorization->find(' ');
+            if (split != std::string::npos) hide(std::string_view(*request->authorization).substr(split + 1));
+        }
+        if (request->cookie) {
+            hide(*request->cookie);
+            // Also protect values when a script extracts cookies from the raw header.
+            std::string_view remaining = *request->cookie;
+            while (!remaining.empty()) {
+                const auto end = remaining.find(';');
+                const auto pair = remaining.substr(0, end);
+                const auto equals = pair.find('=');
+                if (equals != std::string_view::npos) {
+                    auto value = pair.substr(equals + 1);
+                    while (!value.empty() && value.front() == ' ') value.remove_prefix(1);
+                    while (!value.empty() && value.back() == ' ') value.remove_suffix(1);
+                    hide(value);
+                }
+                if (end == std::string_view::npos) break;
+                remaining.remove_prefix(end + 1);
+            }
+        }
+        for (const auto& [name, value] : request->cookies) hide(value);
+        for (const auto& [name, values] : request->query)
+            for (const auto& value : values) hide(value);
+    }
+    constexpr std::size_t limit = 2048;
+    std::string result;
+    for (std::size_t i = 0; i < message.size();) {
+        std::string piece;
+        if (hidden[i]) {
+            piece = "[redacted]";
+            do { ++i; } while (i < message.size() && hidden[i]);
+        } else {
+            const auto byte = static_cast<unsigned char>(message[i++]);
+            // Escape line breaks, NUL and terminal controls to keep one log record.
+            if (byte < 32 || byte == 127) {
+                constexpr char hex[] = "0123456789abcdef";
+                piece = "\\x";
+                piece += hex[byte >> 4];
+                piece += hex[byte & 15];
+            } else piece += static_cast<char>(byte);
+        }
+        if (result.size() + piece.size() > limit) {
+            result += " [truncated]";
+            break;
+        }
+        result += piece;
+    }
+    return result;
+}
+
 /** Common protected boundary for startup validation and request evaluation. */
 void execute(Runtime& runtime, const std::string& script, const std::string& chunk_name,
              const Request* request, const ScriptConfig& config) {
@@ -386,8 +467,8 @@ void execute(Runtime& runtime, const std::string& script, const std::string& chu
         const char* message = lua_type(state.get(), -1) == LUA_TSTRING
             ? lua_tolstring(state.get(), -1, &length) : nullptr;
         throw PreflightError(status == LUA_ERRMEM ? ErrorCode::memory : evaluation.phase,
-                             message ? std::string(message, length)
-                                     : "Lua raised a non-string error");
+                             diagnostic(message ? std::string_view(message, length)
+                                                : "Lua raised a non-string error", config, request));
     }
 
 }

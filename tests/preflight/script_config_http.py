@@ -58,7 +58,7 @@ preflight-secret-file=["jwt_key=missing-overridden-secret"]
         def request(port, path, token=None):
             client = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
             try:
-                client.request("GET", path, headers={"Authorization": "Bearer "+token} if token else {})
+                client.request("GET", path, headers={"Authorization": "Bearer "+token, "Cookie": "session=cookie-sensitive-value"} if token else {})
                 response = client.getresponse()
                 return response.status, response.read()
             finally:
@@ -97,7 +97,7 @@ preflight-secret-file=["jwt_key=missing-overridden-secret"]
                          "iss":"issuer","aud":"image-service","image":"id"})
                 token = (data+b"."+base64.urlsafe_b64encode(hmac.digest(SECRET.encode(),data,"sha256")).rstrip(b"=")).decode()
                 for _ in range(2):
-                    status, body = request(port, "/id/info.json", token)
+                    status, body = request(port, "/id/info.json?token=query-sensitive-value", token)
                     assert status == (500 if runtime_error else 403), (status, body)
                     assert SECRET.encode() not in body
                 checks += 1
@@ -105,6 +105,15 @@ preflight-secret-file=["jwt_key=missing-overridden-secret"]
                 process.send_signal(signal.SIGTERM) if process.poll() is None else None
                 out, err = process.communicate(timeout=5)
                 assert SECRET not in out + err
+                if runtime_error:
+                    assert token not in out + err
+                    assert "cookie-sensitive-value" not in out + err
+                    assert "query-sensitive-value" not in out + err
+                    assert "script_execution; category 2" in out + err
+                    assert "policy.lua:" in out + err
+                    assert "diagnostic marker" in out + err
+                    assert "[redacted]" in out + err
+                    assert r"\x0a" in out + err
 
         run_server(cli, env)
         file_env = dict(env)
@@ -124,7 +133,11 @@ preflight-secret-file=["jwt_key=missing-overridden-secret"]
         assert help_result.returncode==0 and SECRET not in help_result.stdout+help_result.stderr
         script.write_text("error(sipi.secrets.jwt_key)\nfunction preflight() return {decision='allow'} end")
         startup_failure(cli, env)
-        script.write_text("function preflight() error(sipi.secrets.jwt_key) end")
+        script.write_text("""function preflight(request)
+    error('diagnostic marker\\n' .. sipi.secrets.jwt_key .. ' ' ..
+        request.headers.authorization .. ' ' .. request.cookies.session .. ' ' ..
+        request.query.token[1])
+end""")
         run_server(cli, env, runtime_error=True)
         print(f"{checks} startup/runtime script configuration and redaction scenarios passed")
 

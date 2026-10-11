@@ -152,6 +152,32 @@ void request_and_decision() {
           "length-aware input strings and unmodified relative source");
 }
 
+void diagnostics() {
+    (void)script("function preflight() error('abcdabcd') end");
+    ScriptConfig config;
+    config.secrets = {{"first", "abc"}, {"second", "bcd"}};
+    try {
+        (void)LuaPreflight(directory / "policy.lua", config).evaluate({{{}, "example"}, {}, {}});
+        check(false, "expected overlapping secret failure");
+    } catch (const PreflightError& error) {
+        const std::string message = error.what();
+        check(message.ends_with("[redacted]") && message.find("abcd") == std::string::npos,
+              "overlapping and repeated secrets are completely masked");
+    }
+
+    try {
+        (void)script("function preflight() error('marker' .. string.char(0,10,27) .. string.rep('x',4000)) end")
+            .evaluate({{{}, "example"}, {}, {}});
+        check(false, "expected diagnostic failure");
+    } catch (const PreflightError& error) {
+        const std::string message = error.what();
+        check(message.find("marker\\x00\\x0a\\x1b") != std::string::npos,
+              "diagnostic escapes NUL, newlines and terminal control bytes");
+        check(message.size() <= 2060 && message.ends_with(" [truncated]"), "bounded diagnostic");
+        check(error_name(error.code()) == "script_execution", "readable category");
+    }
+}
+
 void invalid_scripts_and_results() {
     rejects("function preflight(", ErrorCode::script_load, "syntax error");
     rejects("error('initialization failed')", ErrorCode::script_execution, "top-level failure");
@@ -385,6 +411,7 @@ int main(int argc, char** argv) {
         watermark_contract();
         resolution_contract();
         invalid_scripts_and_results();
+        diagnostics();
         isolation_and_snapshot();
         library_contract();
         json_contract();

@@ -118,17 +118,26 @@ Lua's existing allocator and instruction budgets still apply to each state.
 
 Configuration/secret-file errors use fixed messages, without names, values, paths
 or environment contents. CLI11 diagnostics remain sanitized, and help does not
-print supplied values. Server startup and request logs never print raw
-`PreflightError::what()`: a script can include secrets in `error()`, `assert()` or
-source fragments. Startup reports the error category and exits 2; runtime errors
-remain generic preflight failures. Current categories are script_file (0),
-script_load (1), script_execution (2), contract (3), memory (4), instruction_limit (5).
+print supplied values. Server startup and request logs include the category name,
+number and Lua diagnostic (normally script path and line). Startup exits 2;
+HTTP clients still receive only the generic `preflight_failed` response.
+Current categories are script_file (0), script_load (1), script_execution (2),
+contract (3), memory (4), instruction_limit (5).
 
-The C++ exception still carries a diagnostic for controlled developer inspection;
-callers outside the server must treat it as sensitive. Scripts remain trusted
-operator code and can deliberately send secrets through the HTTP helper or other
-script-controlled outputs. Separating the tables is organizational, not a sandbox
-or an automatic secret-redaction guarantee for arbitrary script behavior.
+Before constructing the Lua exception, SIPI masks exact occurrences of configured
+secret values, incoming Authorization (including its credential part), raw and
+parsed cookies, and decoded query values. Overlapping matches are masked together.
+Control bytes are escaped (e.g. `\x0a`) to prevent multiline log injection; the
+message is limited to 2048 bytes plus a truncation marker. Non-string Lua errors
+receive a fixed diagnostic. This applies to startup and request evaluation.
+
+This is defense in depth, not a guarantee for arbitrary script output: transformed
+or partially printed credentials, secrets hardcoded in scripts/config, and tokens
+or personal data returned by external APIs cannot reliably be recognized. Never
+put these, complete HTTP bodies or headers into `error()`/`assert()` messages.
+Use contextual messages such as `error("permission lookup: unexpected HTTP 503")`.
+Keep operator logs access-controlled; diagnostics are never suitable client bodies.
+Scripts remain trusted operator code, not a sandbox.
 
 ## Using configured JWT settings
 

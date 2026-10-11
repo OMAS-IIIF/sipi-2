@@ -124,10 +124,8 @@ int main(int argc, char* argv[]) {
             std::cerr << "Preflight configuration error: " << error.what() << '\n';
             return 2;
         } catch (const sipi::preflight::PreflightError& error) {
-            // Lua diagnostics can include secrets via error(), assert() or source
-            // snippets. Keep server logs value-free, as in the request worker.
-            std::cerr << "Preflight startup error: category " << static_cast<int>(error.code())
-                      << "; check script syntax, configuration and entry point\n";
+            std::cerr << "Preflight startup error: (" << sipi::preflight::error_name(error.code())
+                      << "; category " << static_cast<int>(error.code()) << "): " << error.what() << '\n';
             return 2;
         }
         spdlog::info("Preflight script validated");

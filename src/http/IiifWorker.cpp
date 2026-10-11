@@ -551,7 +551,8 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
         }
         return response(drogon::k500InternalServerError, "processing_failed", "Unexpected IIIF request type");
     } catch (const preflight::PreflightError& error) {
-        spdlog::error("IIIF preflight failed (category {})", static_cast<int>(error.code()));
+        spdlog::error("IIIF preflight failed ({}; category {}): {}",
+                      preflight::error_name(error.code()), static_cast<int>(error.code()), error.what());
         return response(drogon::k500InternalServerError, "preflight_failed", "Image access could not be evaluated");
     } catch (const WatermarkError&) {
         return response(drogon::k500InternalServerError,"watermark_failed","Required watermark could not be applied");

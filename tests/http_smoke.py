@@ -88,7 +88,7 @@ function preflight(request)
     if id == 'jpeg-alias' then return {decision='allow', source='tiled.tif'} end
     if id == 'metadata-box.jp2' or id == 'corrupt-tile.jp2' or id == 'sixteen.jp2' or id == 'rgb-unknown.j2k' or id == 'source.jp2' or id == 'source.j2k' or id == 'offset.jp2' or id == 'broken.jp2' or id == 'tiled.tif' or id == 'broken-tile.tif' or id == 'invalid-profile.tif' or id:match('^pyramid') or id:match('^alpha') or id:match('^gray') or id == 'strip-rgba.tif' then return {decision='allow', source=id} end
     if id == 'denied' then return {decision='deny'} end
-    if id == 'script-error' then error('secret-token /private/source.tif') end
+    if id == 'script-error' then error(sipi.secrets.test_token .. ' /private/source.tif') end
     if id == 'invalid-result' then return {decision='allow', restrictions={}} end
     if id == 'loop' then while true do end end
     if id == 'memory' then local huge = string.rep('x', 32*1024*1024) end
@@ -115,7 +115,7 @@ end
             Path(directory, "config").mkdir()
             Path(directory, "config", "server.toml").write_text(
                 'preflight-script = "policy with spaces.lua"\n')
-            arguments += ["--config", "config/server.toml"]
+            arguments += ["--config", "config/server.toml", "--preflight-secret", "test_token=secret-token"]
         with tempfile.TemporaryFile(mode="w+") as log:
             process = subprocess.Popen(
                 arguments, cwd=directory,
@@ -500,7 +500,9 @@ end
                     log.flush()
                     log.seek(0)
                     recorded = log.read()
-                    assert "secret-token" not in recorded and "/private/source.tif" not in recorded
+                    assert "secret-token" not in recorded
+                    assert "[redacted] /private/source.tif" in recorded
+                    assert "script_execution; category 2" in recorded
                 process.send_signal(signal.SIGTERM)
                 assert process.wait(timeout=5) == 0
                 print("HTTP smoke checks passed (including SIGTERM shutdown)")

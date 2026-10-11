@@ -13,6 +13,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -73,8 +74,12 @@ using Decision = std::variant<Allow, Deny>;
 
 enum class ErrorCode { script_file, script_load, script_execution, contract, memory, instruction_limit };
 
+/** Stable operator-facing name for a preflight failure category. */
+[[nodiscard]] std::string_view error_name(ErrorCode code) noexcept;
+
 /** Technical failure, never an implicit allow/deny decision. Diagnostics are for
- * operators and can contain script-supplied text; do not expose them to clients. */
+ * operators; Lua diagnostics mask known secrets/request credentials and escape
+ * controls. Arbitrary script text remains sensitive; never expose it to clients. */
 class PreflightError : public std::runtime_error {
 public:
     PreflightError(ErrorCode code, const std::string& message);
