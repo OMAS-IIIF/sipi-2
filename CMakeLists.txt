@@ -252,6 +252,10 @@ if(BUILD_TESTING)
     target_link_libraries(upscale-tests PRIVATE imageprocessing)
     add_test(NAME upscale COMMAND upscale-tests)
 
+    add_executable(resize-weights-tests tests/ResizeWeightsTests.cpp)
+    target_link_libraries(resize-weights-tests PRIVATE imageprocessing)
+    add_test(NAME resize-weights COMMAND resize-weights-tests)
+
     add_executable(area-resize-tests tests/AreaResizeTests.cpp)
     target_link_libraries(area-resize-tests PRIVATE imageprocessing)
     add_test(NAME area-resize COMMAND area-resize-tests)
@@ -470,3 +474,10 @@ add_executable(prepare-archive-image EXCLUDE_FROM_ALL benchmarks/PrepareArchiveI
 target_link_libraries(prepare-archive-image PRIVATE TIFF::TIFF grok::grok lcms::lcms)
 target_compile_features(prepare-archive-image PRIVATE cxx_std_20)
 set_target_properties(prepare-archive-image PROPERTIES CXX_EXTENSIONS OFF)
+
+# Offline resampling baseline; excluded from normal builds and runtime images.
+add_executable(resize-benchmark EXCLUDE_FROM_ALL benchmarks/ResizeBenchmark.cpp)
+target_link_libraries(resize-benchmark PRIVATE imageprocessing tiffreader j2kreader
+    imagestorage jpegwriter JsonCpp::JsonCpp)
+target_compile_features(resize-benchmark PRIVATE cxx_std_20)
+set_target_properties(resize-benchmark PROPERTIES CXX_EXTENSIONS OFF)

@@ -1,5 +1,49 @@
 # SIPI-2 project context
 
+## Portable scaling experiment (2026-10-12)
+
+The opt-in Docker target `resize-benchmark` packages before/after resamplers built
+with identical dependencies and flags. `benchmarks/reference/` freezes the old
+source solely as an experiment fixture; the server never links it. The Python
+runner performs ABBA runs, verifies output fingerprints and records raw samples,
+CPU/cgroup details and input/binary/source hashes. AMD64 images can be built on
+the Mac and transferred offline to an Intel/AMD VM; emulated smoke-test timings
+are not performance evidence. `benchmarks/package_resize_corpus.py` packages the
+six recorded TIFF/JP2 pairs after verifying their baseline hashes; the included
+launcher verifies checksums and mounts only that corpus read-only. The server and
+media repository remain untouched. See `docs/benchmarks/resize-docker.md`.
+
+## Cached scaling weights (2026-10-12)
+
+Resampling reuses compact horizontal supports and computes vertical supports once
+per row. The optional table fits within the existing source/output/ICC working
+budget; tight budgets use the same formulas on demand. Contribution order,
+alpha handling and quantization remain unchanged. No SIMD or channel specialization.
+A paired ARM64 Release comparison shows TIFF render-core time about 12% lower for
+thumbnails and 6% for previews; tiles are essentially unchanged. JP2 remains
+decoder-bound. All measured outputs match; 4,000 randomized old/new comparisons,
+71 Debug and 71 Release tests, and ASan/UBSan pass. See
+`docs/benchmarks/2026-10-12-axis-weights.md` and its raw JSON evidence.
+Home x86 VM measurements also confirm improvement (RGB reduction 1.09–1.24×,
+enlargement 2.34×), with identical outputs; the guest exposes no AVX/AVX2. See
+`docs/benchmarks/2026-10-12-x86-resize.md`. The archive follow-up confirms about 9% lower TIFF preview core time and 3% for
+tiles; thumbnails are mixed and JP2 remains decoder-bound. See
+`docs/benchmarks/2026-10-12-x86-archive-resize.md`. Keep the current implementation
+and defer further optimization until a concrete workload warrants it.
+No image build or deployment performed.
+
+## Scaling baseline (2026-10-11)
+
+Added opt-in offline resize-benchmark, using unchanged production resampling and
+TIFF/J2K planning/decoding/JPEG routines. Two Release ARM64 runs cover 15 synthetic
+gray/RGB/RGBA kernels and 36 archive render-core cases, 918 measured outputs with
+stable fingerprints. TIFF scaling shares are 14–34%; lossless JP2 1–3%, dominated
+by decoding. These exclude HTTP/auth/caches and are not x86 or server-capacity
+results. Compiler reports show both vectorized and non-vectorized loop instances.
+This motivated the bounded axis precomputation above. Explicit SIMD remains
+deferred until measurements justify it. The baseline itself changed no runtime code.
+See docs/benchmarks/2026-10-11-resize.md and its JSON evidence.
+
 ## Preflight operator diagnostics (2026-10-11)
 
 Startup and runtime logs now include readable error categories and Lua diagnostics

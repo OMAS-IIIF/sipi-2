@@ -1,0 +1,6772 @@
+{
+  "environment": {
+    "cpu": "Apple M5 Max",
+    "architecture": "arm64",
+    "os": "macOS 27.0.1",
+    "compiler": "Apple LLVM 21.0.0 (clang-2100.3.34.2)",
+    "build": "Release -O3 -DNDEBUG, no fast-math or native CPU flag",
+    "git_head": "1ba4391d172bf5fc2fa057cae3e97142abeab52d",
+    "codec_workers": 1,
+    "benchmark_workers": 1,
+    "jpeg_quality": 90,
+    "jpeg_sampling": "4:4:4",
+    "order": [
+      "forward",
+      "reverse"
+    ]
+  },
+  "source_sha256": {
+    "benchmarks/ResizeBenchmark.cpp": "7b7a49a07f7c4309b9000b1a21410d88a308645832689decb18820e3bdb42908",
+    "src/image/AreaResize.cpp": "bd642e69f5b9441b6d74c74264970e8e9a02c9780c1a254365a1d85c76f16e4b",
+    "conan.lock": "a24913544dcddd49843aed5b5f2cd6e948083d4f98e28070fb05b0d57f5cd633",
+    "build/release/resize-benchmark": "ee75128c3cda33d672d86dcdb900c59c9f35a981323696879e0812d2a50a3e6a"
+  },
+  "inputs_sha256": {
+    "build/archive-images/pharch_01/pyramid.tif": "639d2d1dd153c2ff5b23cbfc1f4d4a50a790ae17e5d54a8046e72384eaa7ccbc",
+    "build/archive-images/pharch_01/image.jp2": "6d7a62ed6def5cd46eb8b9cadfd982b38b9b5cb3083549e27fd590bb72fa053a",
+    "build/archive-images/pharch_02/pyramid.tif": "cf9618689810f19826626c10fe6508ef75732f5843a7263405f576b1ec8a3c0c",
+    "build/archive-images/pharch_02/image.jp2": "871bf27c169f426173a4db616c90eb9a2dbb77b3124e5514b595828ebd67e073",
+    "build/archive-images/pharch_03/pyramid.tif": "1ce7fe79d74d0bff6e81dfde15feb8816daba56b2122eb3bb2f0c6bdc31ec071",
+    "build/archive-images/pharch_03/image.jp2": "6c077d4b18d64e87fe66d3e48e794d65458ca65aa3ac8d0a96992e52cabb8863",
+    "build/archive-images/sample-tif-01/pyramid.tif": "6c413d67f65e77ec9797f3c06714aef38a952a816feca2148e567a074a311e7d",
+    "build/archive-images/sample-tif-01/image.jp2": "544e51f760f4e2cfced9723c3e113aa22d0e1b28e18a4e57347331aeb5fd99b9",
+    "build/archive-images/sample-tiff-02/pyramid.tif": "278fece6b81bcca5dac22a4d4060fba8c81f9bc332a834c03f8b10865e88ab63",
+    "build/archive-images/sample-tiff-02/image.jp2": "94bf885553523c659d34a332d62e24e33ed8ded7946da47128cd62e3afe89aec",
+    "build/archive-images/swiss-map-raster500_500_komb_25_2056/pyramid.tif": "1aaa740e2a77693ab805159b1d73557ee004c2a09ecf3fbebe29995e6313e610",
+    "build/archive-images/swiss-map-raster500_500_komb_25_2056/image.jp2": "5758b66414a1f1c143528a8fa78352d5c3d1b3c890463e8a460b89a363cfbe2e"
+  },
+  "runs": [
+    {
+      "cases": [
+        {
+          "case": "tile-half",
+          "channels": 1,
+          "fingerprint": "1826023541350259723",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.573417,
+            "median_ms": 0.272459,
+            "min_ms": 0.25475,
+            "samples_ms": [
+              0.555458,
+              0.272459,
+              0.265083,
+              0.567208,
+              0.567083,
+              0.573417,
+              0.260583,
+              0.259417,
+              0.25475
+            ]
+          },
+          "source_height": 512,
+          "source_width": 512
+        },
+        {
+          "case": "tile-fractional",
+          "channels": 1,
+          "fingerprint": "6161313585623359673",
+          "fractional_window": true,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.985167,
+            "median_ms": 0.621417,
+            "min_ms": 0.608208,
+            "samples_ms": [
+              0.621417,
+              0.611208,
+              0.608416,
+              0.611458,
+              0.608208,
+              0.985167,
+              0.68725,
+              0.887375,
+              0.777833
+            ]
+          },
+          "source_height": 513,
+          "source_width": 513
+        },
+        {
+          "case": "preview-noninteger",
+          "channels": 1,
+          "fingerprint": "16651142104268888063",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 1125,
+          "output_width": 1500,
+          "resize": {
+            "max_ms": 11.020459,
+            "median_ms": 8.752292,
+            "min_ms": 8.361375,
+            "samples_ms": [
+              11.020459,
+              10.518917,
+              9.626583,
+              9.192958,
+              8.752292,
+              8.531833,
+              8.582583,
+              8.508709,
+              8.361375
+            ]
+          },
+          "source_height": 1536,
+          "source_width": 2048
+        },
+        {
+          "case": "thumbnail-eighth",
+          "channels": 1,
+          "fingerprint": "10390542142092570377",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 384,
+          "output_width": 512,
+          "resize": {
+            "max_ms": 8.132667,
+            "median_ms": 8.069375,
+            "min_ms": 7.942583,
+            "samples_ms": [
+              7.956083,
+              8.069375,
+              8.130042,
+              7.97325,
+              7.942583,
+              8.132667,
+              8.090125,
+              8.0945,
+              7.97825
+            ]
+          },
+          "source_height": 3072,
+          "source_width": 4096
+        },
+        {
+          "case": "upscale-double",
+          "channels": 1,
+          "fingerprint": "9539299420168002458",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 768,
+          "output_width": 1024,
+          "resize": {
+            "max_ms": 7.295333,
+            "median_ms": 6.949709,
+            "min_ms": 6.664333,
+            "samples_ms": [
+              7.0655,
+              7.211208,
+              6.913458,
+              6.949709,
+              7.119042,
+              6.664333,
+              6.83175,
+              6.91675,
+              7.295333
+            ]
+          },
+          "source_height": 384,
+          "source_width": 512
+        },
+        {
+          "case": "tile-half",
+          "channels": 3,
+          "fingerprint": "10942829471801443269",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.3695,
+            "median_ms": 0.360334,
+            "min_ms": 0.34325,
+            "samples_ms": [
+              0.343417,
+              0.34325,
+              0.355833,
+              0.35575,
+              0.360334,
+              0.361625,
+              0.3695,
+              0.361541,
+              0.361667
+            ]
+          },
+          "source_height": 512,
+          "source_width": 512
+        },
+        {
+          "case": "tile-fractional",
+          "channels": 3,
+          "fingerprint": "14183519747828807437",
+          "fractional_window": true,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.541416,
+            "median_ms": 0.511875,
+            "min_ms": 0.501541,
+            "samples_ms": [
+              0.531167,
+              0.540333,
+              0.526542,
+              0.541416,
+              0.501541,
+              0.505875,
+              0.511875,
+              0.508708,
+              0.510875
+            ]
+          },
+          "source_height": 513,
+          "source_width": 513
+        },
+        {
+          "case": "preview-noninteger",
+          "channels": 3,
+          "fingerprint": "17329628615733054547",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 1125,
+          "output_width": 1500,
+          "resize": {
+            "max_ms": 12.167583,
+            "median_ms": 11.880334,
+            "min_ms": 11.642292,
+            "samples_ms": [
+              11.923,
+              12.167583,
+              11.831208,
+              11.880334,
+              11.777959,
+              11.678333,
+              11.642292,
+              11.933334,
+              11.934
+            ]
+          },
+          "source_height": 1536,
+          "source_width": 2048
+        },
+        {
+          "case": "thumbnail-eighth",
+          "channels": 3,
+          "fingerprint": "16356004924728735147",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 384,
+          "output_width": 512,
+          "resize": {
+            "max_ms": 10.640542,
+            "median_ms": 10.384125,
+            "min_ms": 10.190917,
+            "samples_ms": [
+              10.433,
+              10.462834,
+              10.239541,
+              10.384125,
+              10.640542,
+              10.39625,
+              10.190917,
+              10.232167,
+              10.236292
+            ]
+          },
+          "source_height": 3072,
+          "source_width": 4096
+        },
+        {
+          "case": "upscale-double",
+          "channels": 3,
+          "fingerprint": "13389422666362895110",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 768,
+          "output_width": 1024,
+          "resize": {
+            "max_ms": 8.945375,
+            "median_ms": 8.87475,
+            "min_ms": 8.702333,
+            "samples_ms": [
+              8.875333,
+              8.881292,
+              8.904291,
+              8.702333,
+              8.713209,
+              8.86125,
+              8.87475,
+              8.945375,
+              8.793708
+            ]
+          },
+          "source_height": 384,
+          "source_width": 512
+        },
+        {
+          "case": "tile-half",
+          "channels": 4,
+          "fingerprint": "672608591429278248",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.442667,
+            "median_ms": 0.442625,
+            "min_ms": 0.416,
+            "samples_ms": [
+              0.417042,
+              0.416,
+              0.430916,
+              0.442667,
+              0.442542,
+              0.442625,
+              0.442625,
+              0.442625,
+              0.442625
+            ]
+          },
+          "source_height": 512,
+          "source_width": 512
+        },
+        {
+          "case": "tile-fractional",
+          "channels": 4,
+          "fingerprint": "11019484649883251493",
+          "fractional_window": true,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.68425,
+            "median_ms": 0.62675,
+            "min_ms": 0.61275,
+            "samples_ms": [
+              0.61275,
+              0.62675,
+              0.622375,
+              0.623375,
+              0.628084,
+              0.626125,
+              0.631375,
+              0.68425,
+              0.642917
+            ]
+          },
+          "source_height": 513,
+          "source_width": 513
+        },
+        {
+          "case": "preview-noninteger",
+          "channels": 4,
+          "fingerprint": "3432960554896704598",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 1125,
+          "output_width": 1500,
+          "resize": {
+            "max_ms": 14.034958,
+            "median_ms": 13.617583,
+            "min_ms": 13.455875,
+            "samples_ms": [
+              13.7135,
+              13.532375,
+              13.617583,
+              14.034958,
+              13.664208,
+              13.467,
+              13.539834,
+              13.455875,
+              13.841834
+            ]
+          },
+          "source_height": 1536,
+          "source_width": 2048
+        },
+        {
+          "case": "thumbnail-eighth",
+          "channels": 4,
+          "fingerprint": "14818356583773413102",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 384,
+          "output_width": 512,
+          "resize": {
+            "max_ms": 11.55125,
+            "median_ms": 11.357083,
+            "min_ms": 11.238666,
+            "samples_ms": [
+              11.333417,
+              11.2815,
+              11.39925,
+              11.531667,
+              11.273125,
+              11.238666,
+              11.357083,
+              11.539583,
+              11.55125
+            ]
+          },
+          "source_height": 3072,
+          "source_width": 4096
+        },
+        {
+          "case": "upscale-double",
+          "channels": 4,
+          "fingerprint": "8691354607092558282",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 768,
+          "output_width": 1024,
+          "resize": {
+            "max_ms": 10.420375,
+            "median_ms": 10.27575,
+            "min_ms": 9.970584,
+            "samples_ms": [
+              10.299459,
+              10.2245,
+              10.27575,
+              10.36075,
+              10.420375,
+              10.150625,
+              9.970584,
+              10.293083,
+              10.234625
+            ]
+          },
+          "source_height": 384,
+          "source_width": 512
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 1.922625,
+            "median_ms": 1.840833,
+            "min_ms": 1.737083,
+            "samples_ms": [
+              1.737083,
+              1.840833,
+              1.901208,
+              1.922625,
+              1.804375,
+              1.895375,
+              1.84075,
+              1.747916,
+              1.861709
+            ]
+          },
+          "decoded_height": 553,
+          "decoded_width": 418,
+          "encode": {
+            "max_ms": 0.309375,
+            "median_ms": 0.290417,
+            "min_ms": 0.274459,
+            "samples_ms": [
+              0.278458,
+              0.284375,
+              0.290417,
+              0.300458,
+              0.285583,
+              0.296917,
+              0.274459,
+              0.309375,
+              0.290667
+            ]
+          },
+          "file": "build/archive-images/pharch_01/pyramid.tif",
+          "fingerprint": "1096044753875958091",
+          "header_once_ms": 5.697292,
+          "jpeg_bytes": 49141,
+          "jpeg_fingerprint": "9489163008284345192",
+          "kind": "pipeline",
+          "level_height": 553,
+          "level_width": 418,
+          "output_height": 338,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 2.9442500000000003,
+            "median_ms": 2.870209,
+            "min_ms": 2.757,
+            "samples_ms": [
+              2.757,
+              2.876708,
+              2.9442500000000003,
+              2.9219169999999997,
+              2.804458,
+              2.9365840000000003,
+              2.8546250000000004,
+              2.809041,
+              2.870209
+            ]
+          },
+          "resize": {
+            "max_ms": 0.752625,
+            "median_ms": 0.741459,
+            "min_ms": 0.698834,
+            "samples_ms": [
+              0.741459,
+              0.7515,
+              0.752625,
+              0.698834,
+              0.7145,
+              0.744292,
+              0.739416,
+              0.75175,
+              0.717833
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 25.0845,
+            "median_ms": 24.532292,
+            "min_ms": 24.252209,
+            "samples_ms": [
+              24.252209,
+              24.473916,
+              24.532292,
+              24.643375,
+              24.377875,
+              24.49325,
+              25.0845,
+              24.907541,
+              24.721958
+            ]
+          },
+          "decoded_height": 2212,
+          "decoded_width": 1671,
+          "encode": {
+            "max_ms": 8.570167,
+            "median_ms": 7.71075,
+            "min_ms": 7.614292,
+            "samples_ms": [
+              7.690166,
+              7.640416,
+              7.837291,
+              7.71075,
+              7.861292,
+              7.707916,
+              7.954417,
+              7.614292,
+              8.570167
+            ]
+          },
+          "file": "build/archive-images/pharch_01/pyramid.tif",
+          "fingerprint": "15316176203803551914",
+          "header_once_ms": 0.056125,
+          "jpeg_bytes": 979650,
+          "jpeg_fingerprint": "2996946872768219766",
+          "kind": "pipeline",
+          "level_height": 2212,
+          "level_width": 1671,
+          "output_height": 1985,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 51.111,
+            "median_ms": 50.201458,
+            "min_ms": 49.47325,
+            "samples_ms": [
+              49.47325,
+              50.204791,
+              50.201458,
+              49.798874999999995,
+              50.803166999999995,
+              49.909541,
+              51.111,
+              50.055958,
+              50.77995799999999
+            ]
+          },
+          "resize": {
+            "max_ms": 18.564,
+            "median_ms": 17.708375,
+            "min_ms": 17.44475,
+            "samples_ms": [
+              17.530875,
+              18.090459,
+              17.831875,
+              17.44475,
+              18.564,
+              17.708375,
+              18.072083,
+              17.534125,
+              17.487833
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 3.057834,
+            "median_ms": 2.984792,
+            "min_ms": 2.906834,
+            "samples_ms": [
+              2.920916,
+              2.984792,
+              2.906834,
+              2.958875,
+              2.997875,
+              3.048042,
+              3.057834,
+              2.916875,
+              2.994625
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 513,
+          "encode": {
+            "max_ms": 0.204708,
+            "median_ms": 0.182291,
+            "min_ms": 0.17675,
+            "samples_ms": [
+              0.192875,
+              0.18175,
+              0.17675,
+              0.187583,
+              0.181458,
+              0.204708,
+              0.187875,
+              0.178375,
+              0.182291
+            ]
+          },
+          "file": "build/archive-images/pharch_01/pyramid.tif",
+          "fingerprint": "12901465246871308689",
+          "header_once_ms": 0.071958,
+          "jpeg_bytes": 30794,
+          "jpeg_fingerprint": "4152893038209502934",
+          "kind": "pipeline",
+          "level_height": 1106,
+          "level_width": 836,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 3.8238330000000005,
+            "median_ms": 3.681,
+            "min_ms": 3.5971670000000002,
+            "samples_ms": [
+              3.641625,
+              3.681,
+              3.5971670000000002,
+              3.652667,
+              3.686583,
+              3.8238330000000005,
+              3.750334,
+              3.602958,
+              3.6863330000000003
+            ]
+          },
+          "resize": {
+            "max_ms": 0.571083,
+            "median_ms": 0.509417,
+            "min_ms": 0.504625,
+            "samples_ms": [
+              0.527834,
+              0.514458,
+              0.513583,
+              0.506209,
+              0.50725,
+              0.571083,
+              0.504625,
+              0.507708,
+              0.509417
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 34.642959,
+            "median_ms": 34.009792,
+            "min_ms": 33.528334,
+            "samples_ms": [
+              34.359208,
+              33.733875,
+              33.801791,
+              34.009792,
+              33.94075,
+              34.498416,
+              34.397,
+              34.642959,
+              33.528334
+            ]
+          },
+          "decoded_height": 553,
+          "decoded_width": 418,
+          "encode": {
+            "max_ms": 0.321875,
+            "median_ms": 0.291458,
+            "min_ms": 0.279375,
+            "samples_ms": [
+              0.285458,
+              0.295291,
+              0.303583,
+              0.279375,
+              0.31225,
+              0.287667,
+              0.321875,
+              0.291458,
+              0.283625
+            ]
+          },
+          "file": "build/archive-images/pharch_01/image.jp2",
+          "fingerprint": "8895765593098321529",
+          "header_once_ms": 8.649042,
+          "jpeg_bytes": 51843,
+          "jpeg_fingerprint": "13571340376371173874",
+          "kind": "pipeline",
+          "level_height": 553,
+          "level_width": 418,
+          "output_height": 338,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 35.652874999999995,
+            "median_ms": 35.005958,
+            "min_ms": 34.528,
+            "samples_ms": [
+              35.345875,
+              34.74825,
+              34.851291,
+              35.005958,
+              35.000458,
+              35.50125,
+              35.452915999999995,
+              35.652874999999995,
+              34.528
+            ]
+          },
+          "resize": {
+            "max_ms": 0.747458,
+            "median_ms": 0.718458,
+            "min_ms": 0.701209,
+            "samples_ms": [
+              0.701209,
+              0.719084,
+              0.745917,
+              0.716791,
+              0.747458,
+              0.715167,
+              0.734041,
+              0.718458,
+              0.716041
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 398.970709,
+            "median_ms": 365.063167,
+            "min_ms": 362.081,
+            "samples_ms": [
+              362.081,
+              362.872584,
+              363.184125,
+              363.070667,
+              368.109042,
+              398.970709,
+              380.241209,
+              366.122041,
+              365.063167
+            ]
+          },
+          "decoded_height": 2212,
+          "decoded_width": 1671,
+          "encode": {
+            "max_ms": 8.3865,
+            "median_ms": 7.706792,
+            "min_ms": 7.551125,
+            "samples_ms": [
+              7.635,
+              7.617708,
+              7.551125,
+              7.858208,
+              7.572042,
+              8.3865,
+              8.290083,
+              7.706792,
+              7.927
+            ]
+          },
+          "file": "build/archive-images/pharch_01/image.jp2",
+          "fingerprint": "15316176203803551914",
+          "header_once_ms": 0.061542,
+          "jpeg_bytes": 979650,
+          "jpeg_fingerprint": "2996946872768219766",
+          "kind": "pipeline",
+          "level_height": 2212,
+          "level_width": 1671,
+          "output_height": 1985,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 426.637875,
+            "median_ms": 390.740333,
+            "min_ms": 387.257333,
+            "samples_ms": [
+              387.257333,
+              388.546417,
+              388.787208,
+              388.5095,
+              393.460625,
+              426.637875,
+              406.636667,
+              391.676458,
+              390.740333
+            ]
+          },
+          "resize": {
+            "max_ms": 19.280666,
+            "median_ms": 17.847625,
+            "min_ms": 17.541333,
+            "samples_ms": [
+              17.541333,
+              18.056125,
+              18.051958,
+              17.580625,
+              17.779541,
+              19.280666,
+              18.105375,
+              17.847625,
+              17.750166
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 51.620125,
+            "median_ms": 50.826458,
+            "min_ms": 50.394083,
+            "samples_ms": [
+              51.312958,
+              50.514167,
+              50.826458,
+              50.799166,
+              50.860375,
+              50.407375,
+              51.382666,
+              51.620125,
+              50.394083
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 513,
+          "encode": {
+            "max_ms": 0.222375,
+            "median_ms": 0.2005,
+            "min_ms": 0.18425,
+            "samples_ms": [
+              0.197375,
+              0.212417,
+              0.198625,
+              0.209,
+              0.197417,
+              0.2005,
+              0.210833,
+              0.222375,
+              0.18425
+            ]
+          },
+          "file": "build/archive-images/pharch_01/image.jp2",
+          "fingerprint": "11752873614916636687",
+          "header_once_ms": 0.073917,
+          "jpeg_bytes": 31578,
+          "jpeg_fingerprint": "6490833389542215498",
+          "kind": "pipeline",
+          "level_height": 1106,
+          "level_width": 836,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 52.394834,
+            "median_ms": 51.527125000000005,
+            "min_ms": 51.11075,
+            "samples_ms": [
+              52.041292000000006,
+              51.251167,
+              51.527125000000005,
+              51.526,
+              51.576125,
+              51.11075,
+              52.122041,
+              52.394834,
+              51.120708
+            ]
+          },
+          "resize": {
+            "max_ms": 0.552334,
+            "median_ms": 0.524583,
+            "min_ms": 0.502042,
+            "samples_ms": [
+              0.530959,
+              0.524583,
+              0.502042,
+              0.517834,
+              0.518333,
+              0.502875,
+              0.528542,
+              0.552334,
+              0.542375
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 1.070834,
+            "median_ms": 1.00175,
+            "min_ms": 0.966292,
+            "samples_ms": [
+              1.014542,
+              0.991459,
+              0.992542,
+              1.00175,
+              1.070834,
+              1.059,
+              1.030292,
+              0.983167,
+              0.966292
+            ]
+          },
+          "decoded_height": 306,
+          "decoded_width": 461,
+          "encode": {
+            "max_ms": 0.147625,
+            "median_ms": 0.13575,
+            "min_ms": 0.127125,
+            "samples_ms": [
+              0.136708,
+              0.138542,
+              0.130542,
+              0.129833,
+              0.147625,
+              0.13925,
+              0.13575,
+              0.127125,
+              0.1275
+            ]
+          },
+          "file": "build/archive-images/pharch_02/pyramid.tif",
+          "fingerprint": "16401710388303905973",
+          "header_once_ms": 5.540875,
+          "jpeg_bytes": 25680,
+          "jpeg_fingerprint": "5564567096709648932",
+          "kind": "pipeline",
+          "level_height": 306,
+          "level_width": 461,
+          "output_height": 169,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 1.6005000000000003,
+            "median_ms": 1.516459,
+            "min_ms": 1.475917,
+            "samples_ms": [
+              1.525125,
+              1.516459,
+              1.503917,
+              1.511458,
+              1.6005000000000003,
+              1.582083,
+              1.550958,
+              1.479417,
+              1.475917
+            ]
+          },
+          "resize": {
+            "max_ms": 0.386458,
+            "median_ms": 0.382041,
+            "min_ms": 0.369125,
+            "samples_ms": [
+              0.373875,
+              0.386458,
+              0.380833,
+              0.379875,
+              0.382041,
+              0.383833,
+              0.384916,
+              0.369125,
+              0.382125
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 14.310917,
+            "median_ms": 13.889667,
+            "min_ms": 13.604542,
+            "samples_ms": [
+              14.028208,
+              13.792458,
+              13.604542,
+              13.851458,
+              13.889667,
+              13.851208,
+              14.210208,
+              14.310917,
+              14.2245
+            ]
+          },
+          "decoded_height": 1222,
+          "decoded_width": 1842,
+          "encode": {
+            "max_ms": 3.95975,
+            "median_ms": 3.831458,
+            "min_ms": 3.648291,
+            "samples_ms": [
+              3.881583,
+              3.95975,
+              3.662916,
+              3.648291,
+              3.777042,
+              3.892959,
+              3.831458,
+              3.959541,
+              3.824625
+            ]
+          },
+          "file": "build/archive-images/pharch_02/pyramid.tif",
+          "fingerprint": "13696124861872025313",
+          "header_once_ms": 0.05075,
+          "jpeg_bytes": 421824,
+          "jpeg_fingerprint": "15464526283763387152",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 995,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 28.377000000000002,
+            "median_ms": 27.588917000000002,
+            "min_ms": 27.056875,
+            "samples_ms": [
+              27.876666,
+              27.538249999999998,
+              27.056875,
+              27.336333,
+              27.588917000000002,
+              27.35625,
+              27.838208,
+              28.377000000000002,
+              28.073000000000004
+            ]
+          },
+          "resize": {
+            "max_ms": 10.106542,
+            "median_ms": 9.836584,
+            "min_ms": 9.612083,
+            "samples_ms": [
+              9.966875,
+              9.786042,
+              9.789417,
+              9.836584,
+              9.922208,
+              9.612083,
+              9.796542,
+              10.106542,
+              10.023875
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 3.636709,
+            "median_ms": 3.577458,
+            "min_ms": 3.475875,
+            "samples_ms": [
+              3.604917,
+              3.558167,
+              3.586375,
+              3.636709,
+              3.60175,
+              3.577458,
+              3.476958,
+              3.567667,
+              3.475875
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.209542,
+            "median_ms": 0.196416,
+            "min_ms": 0.188542,
+            "samples_ms": [
+              0.196416,
+              0.20525,
+              0.204125,
+              0.209542,
+              0.193291,
+              0.200917,
+              0.192291,
+              0.195084,
+              0.188542
+            ]
+          },
+          "file": "build/archive-images/pharch_02/pyramid.tif",
+          "fingerprint": "8598837123170913118",
+          "header_once_ms": 0.066584,
+          "jpeg_bytes": 30831,
+          "jpeg_fingerprint": "12275338145713760072",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 4.416709,
+            "median_ms": 4.30475,
+            "min_ms": 4.2030829999999995,
+            "samples_ms": [
+              4.323125,
+              4.304875,
+              4.316833,
+              4.416709,
+              4.3005830000000005,
+              4.30475,
+              4.206291,
+              4.302459,
+              4.2030829999999995
+            ]
+          },
+          "resize": {
+            "max_ms": 0.570458,
+            "median_ms": 0.537042,
+            "min_ms": 0.505542,
+            "samples_ms": [
+              0.521792,
+              0.541458,
+              0.526333,
+              0.570458,
+              0.505542,
+              0.526375,
+              0.537042,
+              0.539708,
+              0.538666
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 24.293667,
+            "median_ms": 23.716125,
+            "min_ms": 23.439042,
+            "samples_ms": [
+              24.293667,
+              23.744042,
+              24.268125,
+              23.716125,
+              23.601375,
+              23.473375,
+              23.840541,
+              23.439042,
+              23.496
+            ]
+          },
+          "decoded_height": 306,
+          "decoded_width": 461,
+          "encode": {
+            "max_ms": 0.157084,
+            "median_ms": 0.145,
+            "min_ms": 0.14025,
+            "samples_ms": [
+              0.144458,
+              0.146083,
+              0.145,
+              0.144042,
+              0.157084,
+              0.150375,
+              0.141792,
+              0.14025,
+              0.153333
+            ]
+          },
+          "file": "build/archive-images/pharch_02/image.jp2",
+          "fingerprint": "18344522372620370929",
+          "header_once_ms": 2.682333,
+          "jpeg_bytes": 26864,
+          "jpeg_fingerprint": "360873414161587265",
+          "kind": "pipeline",
+          "level_height": 306,
+          "level_width": 461,
+          "output_height": 169,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 24.797125,
+            "median_ms": 24.219,
+            "min_ms": 23.938000000000002,
+            "samples_ms": [
+              24.797125,
+              24.253458000000002,
+              24.788042,
+              24.219,
+              24.117667,
+              23.981583,
+              24.348208,
+              23.938000000000002,
+              24.03025
+            ]
+          },
+          "resize": {
+            "max_ms": 0.380917,
+            "median_ms": 0.359208,
+            "min_ms": 0.357833,
+            "samples_ms": [
+              0.359,
+              0.363333,
+              0.374917,
+              0.358833,
+              0.359208,
+              0.357833,
+              0.365875,
+              0.358708,
+              0.380917
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 357.816875,
+            "median_ms": 338.870042,
+            "min_ms": 328.200542,
+            "samples_ms": [
+              341.027,
+              338.14175,
+              347.798959,
+              338.870042,
+              334.283083,
+              328.992125,
+              328.200542,
+              339.138083,
+              357.816875
+            ]
+          },
+          "decoded_height": 1222,
+          "decoded_width": 1842,
+          "encode": {
+            "max_ms": 4.087334,
+            "median_ms": 3.963958,
+            "min_ms": 3.772125,
+            "samples_ms": [
+              3.963958,
+              3.855083,
+              3.979042,
+              3.984833,
+              3.831042,
+              3.772125,
+              3.845917,
+              4.002917,
+              4.087334
+            ]
+          },
+          "file": "build/archive-images/pharch_02/image.jp2",
+          "fingerprint": "4453040703955328848",
+          "header_once_ms": 0.05625,
+          "jpeg_bytes": 460152,
+          "jpeg_fingerprint": "2165157448174792844",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 995,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 371.988834,
+            "median_ms": 353.02333300000004,
+            "min_ms": 341.521209,
+            "samples_ms": [
+              354.714166,
+              351.71970799999997,
+              361.814292,
+              353.85474999999997,
+              347.56766700000003,
+              342.700292,
+              341.521209,
+              353.02333300000004,
+              371.988834
+            ]
+          },
+          "resize": {
+            "max_ms": 10.999875,
+            "median_ms": 9.882333,
+            "min_ms": 9.453542,
+            "samples_ms": [
+              9.723208,
+              9.722875,
+              10.036291,
+              10.999875,
+              9.453542,
+              9.936042,
+              9.47475,
+              9.882333,
+              10.084625
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 152.724209,
+            "median_ms": 77.804125,
+            "min_ms": 75.451083,
+            "samples_ms": [
+              152.724209,
+              80.762208,
+              78.629042,
+              77.804125,
+              75.814208,
+              76.561792,
+              76.783125,
+              80.485083,
+              75.451083
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.291458,
+            "median_ms": 0.212125,
+            "min_ms": 0.201708,
+            "samples_ms": [
+              0.291458,
+              0.211625,
+              0.215583,
+              0.212125,
+              0.201708,
+              0.21025,
+              0.215083,
+              0.215125,
+              0.211042
+            ]
+          },
+          "file": "build/archive-images/pharch_02/image.jp2",
+          "fingerprint": "17165426993959321320",
+          "header_once_ms": 0.074833,
+          "jpeg_bytes": 31759,
+          "jpeg_fingerprint": "9116004255178898",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 154.24200000000002,
+            "median_ms": 78.557083,
+            "min_ms": 76.18587500000001,
+            "samples_ms": [
+              154.24200000000002,
+              81.514375,
+              79.44979199999999,
+              78.557083,
+              76.52070799999998,
+              77.3085,
+              77.543625,
+              81.240958,
+              76.18587500000001
+            ]
+          },
+          "resize": {
+            "max_ms": 1.226333,
+            "median_ms": 0.54075,
+            "min_ms": 0.504792,
+            "samples_ms": [
+              1.226333,
+              0.540542,
+              0.605167,
+              0.540833,
+              0.504792,
+              0.536458,
+              0.545417,
+              0.54075,
+              0.52375
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "thumbnail",
+          "channels": 1,
+          "decode": {
+            "max_ms": 0.629583,
+            "median_ms": 0.491709,
+            "min_ms": 0.478333,
+            "samples_ms": [
+              0.563,
+              0.491709,
+              0.480834,
+              0.479583,
+              0.478333,
+              0.483833,
+              0.516667,
+              0.550666,
+              0.629583
+            ]
+          },
+          "decoded_height": 438,
+          "decoded_width": 458,
+          "encode": {
+            "max_ms": 0.105084,
+            "median_ms": 0.094375,
+            "min_ms": 0.092666,
+            "samples_ms": [
+              0.094583,
+              0.093833,
+              0.094375,
+              0.093,
+              0.092666,
+              0.095166,
+              0.094375,
+              0.105084,
+              0.103541
+            ]
+          },
+          "file": "build/archive-images/pharch_03/pyramid.tif",
+          "fingerprint": "7413100428399847127",
+          "header_once_ms": 0.947875,
+          "jpeg_bytes": 12883,
+          "jpeg_fingerprint": "11883975332426513284",
+          "kind": "pipeline",
+          "level_height": 438,
+          "level_width": 458,
+          "output_height": 245,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 1.305291,
+            "median_ms": 1.025041,
+            "min_ms": 1.010416,
+            "samples_ms": [
+              1.09375,
+              1.021875,
+              1.022,
+              1.017458,
+              1.010416,
+              1.025041,
+              1.054125,
+              1.105125,
+              1.305291
+            ]
+          },
+          "resize": {
+            "max_ms": 0.572167,
+            "median_ms": 0.444875,
+            "min_ms": 0.436167,
+            "samples_ms": [
+              0.436167,
+              0.436333,
+              0.446791,
+              0.444875,
+              0.439417,
+              0.446042,
+              0.443083,
+              0.449375,
+              0.572167
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "preview",
+          "channels": 1,
+          "decode": {
+            "max_ms": 7.726458,
+            "median_ms": 7.483417,
+            "min_ms": 7.274,
+            "samples_ms": [
+              7.483417,
+              7.377584,
+              7.658917,
+              7.521709,
+              7.495625,
+              7.327125,
+              7.274,
+              7.363375,
+              7.726458
+            ]
+          },
+          "decoded_height": 1751,
+          "decoded_width": 1829,
+          "encode": {
+            "max_ms": 3.376958,
+            "median_ms": 3.298541,
+            "min_ms": 3.240917,
+            "samples_ms": [
+              3.284333,
+              3.298541,
+              3.282458,
+              3.240917,
+              3.374958,
+              3.326375,
+              3.24775,
+              3.376958,
+              3.315958
+            ]
+          },
+          "file": "build/archive-images/pharch_03/pyramid.tif",
+          "fingerprint": "437263789504098420",
+          "header_once_ms": 0.057833,
+          "jpeg_bytes": 505197,
+          "jpeg_fingerprint": "1944789204218121217",
+          "kind": "pipeline",
+          "level_height": 1751,
+          "level_width": 1829,
+          "output_height": 1436,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 21.849708,
+            "median_ms": 21.402458000000003,
+            "min_ms": 20.628625,
+            "samples_ms": [
+              20.900625,
+              21.5545,
+              21.736125,
+              21.340917,
+              21.542915999999998,
+              21.154041,
+              20.628625,
+              21.402458000000003,
+              21.849708
+            ]
+          },
+          "resize": {
+            "max_ms": 10.878375,
+            "median_ms": 10.662125,
+            "min_ms": 10.106875,
+            "samples_ms": [
+              10.132875,
+              10.878375,
+              10.79475,
+              10.578291,
+              10.672333,
+              10.500541,
+              10.106875,
+              10.662125,
+              10.807292
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "tile",
+          "channels": 1,
+          "decode": {
+            "max_ms": 1.398083,
+            "median_ms": 1.318292,
+            "min_ms": 1.253375,
+            "samples_ms": [
+              1.282083,
+              1.333625,
+              1.398083,
+              1.318292,
+              1.280834,
+              1.253375,
+              1.319542,
+              1.320584,
+              1.259416
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.120791,
+            "median_ms": 0.1105,
+            "min_ms": 0.106417,
+            "samples_ms": [
+              0.1085,
+              0.120791,
+              0.114875,
+              0.109875,
+              0.113417,
+              0.108333,
+              0.113917,
+              0.1105,
+              0.106417
+            ]
+          },
+          "file": "build/archive-images/pharch_03/pyramid.tif",
+          "fingerprint": "9625357568638088881",
+          "header_once_ms": 0.080917,
+          "jpeg_bytes": 17616,
+          "jpeg_fingerprint": "8824893869739589817",
+          "kind": "pipeline",
+          "level_height": 1751,
+          "level_width": 1829,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 2.082875,
+            "median_ms": 1.984292,
+            "min_ms": 1.8857499999999998,
+            "samples_ms": [
+              1.9502910000000002,
+              2.018208,
+              2.082875,
+              1.984292,
+              1.919917,
+              1.8857499999999998,
+              1.9882920000000002,
+              2.020125,
+              1.9340000000000002
+            ]
+          },
+          "resize": {
+            "max_ms": 0.589041,
+            "median_ms": 0.559708,
+            "min_ms": 0.524042,
+            "samples_ms": [
+              0.559708,
+              0.563792,
+              0.569917,
+              0.556125,
+              0.525666,
+              0.524042,
+              0.554833,
+              0.589041,
+              0.568167
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "thumbnail",
+          "channels": 1,
+          "decode": {
+            "max_ms": 14.052708,
+            "median_ms": 13.548292,
+            "min_ms": 13.407959,
+            "samples_ms": [
+              13.829541,
+              14.052708,
+              13.670459,
+              13.623041,
+              13.478625,
+              13.498584,
+              13.548292,
+              13.438167,
+              13.407959
+            ]
+          },
+          "decoded_height": 438,
+          "decoded_width": 458,
+          "encode": {
+            "max_ms": 0.108833,
+            "median_ms": 0.104,
+            "min_ms": 0.099417,
+            "samples_ms": [
+              0.106542,
+              0.108792,
+              0.104,
+              0.106625,
+              0.101292,
+              0.099417,
+              0.103125,
+              0.108833,
+              0.102208
+            ]
+          },
+          "file": "build/archive-images/pharch_03/image.jp2",
+          "fingerprint": "4898572496037478400",
+          "header_once_ms": 2.565667,
+          "jpeg_bytes": 15107,
+          "jpeg_fingerprint": "10313774899404516860",
+          "kind": "pipeline",
+          "level_height": 438,
+          "level_width": 458,
+          "output_height": 245,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 14.612333,
+            "median_ms": 14.052625,
+            "min_ms": 13.925999999999998,
+            "samples_ms": [
+              14.358875,
+              14.612333,
+              14.177958999999998,
+              14.148541,
+              13.993959,
+              13.997584,
+              14.052625,
+              13.950042,
+              13.925999999999998
+            ]
+          },
+          "resize": {
+            "max_ms": 0.450833,
+            "median_ms": 0.414042,
+            "min_ms": 0.399583,
+            "samples_ms": [
+              0.422792,
+              0.450833,
+              0.4035,
+              0.418875,
+              0.414042,
+              0.399583,
+              0.401208,
+              0.403042,
+              0.415833
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "preview",
+          "channels": 1,
+          "decode": {
+            "max_ms": 204.210167,
+            "median_ms": 194.63375,
+            "min_ms": 182.925042,
+            "samples_ms": [
+              183.701875,
+              182.925042,
+              194.63375,
+              192.148708,
+              204.210167,
+              202.48225,
+              199.739792,
+              196.099375,
+              187.683708
+            ]
+          },
+          "decoded_height": 1751,
+          "decoded_width": 1829,
+          "encode": {
+            "max_ms": 3.838125,
+            "median_ms": 3.485167,
+            "min_ms": 3.226625,
+            "samples_ms": [
+              3.261875,
+              3.226625,
+              3.583125,
+              3.485167,
+              3.703,
+              3.838125,
+              3.472792,
+              3.754708,
+              3.371166
+            ]
+          },
+          "file": "build/archive-images/pharch_03/image.jp2",
+          "fingerprint": "7681638650513400356",
+          "header_once_ms": 0.045041,
+          "jpeg_bytes": 573829,
+          "jpeg_fingerprint": "15651688737131737583",
+          "kind": "pipeline",
+          "level_height": 1751,
+          "level_width": 1829,
+          "output_height": 1436,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 218.38737500000002,
+            "median_ms": 209.154708,
+            "min_ms": 196.051875,
+            "samples_ms": [
+              197.194667,
+              196.051875,
+              209.154708,
+              206.02224999999999,
+              218.38737500000002,
+              216.7815,
+              213.648167,
+              211.5455,
+              201.93945799999997
+            ]
+          },
+          "resize": {
+            "max_ms": 11.691417,
+            "median_ms": 10.461125,
+            "min_ms": 9.900208,
+            "samples_ms": [
+              10.230917,
+              9.900208,
+              10.937833,
+              10.388375,
+              10.474208,
+              10.461125,
+              10.435583,
+              11.691417,
+              10.884584
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "tile",
+          "channels": 1,
+          "decode": {
+            "max_ms": 30.212666,
+            "median_ms": 28.927375,
+            "min_ms": 28.432917,
+            "samples_ms": [
+              30.212666,
+              29.659166,
+              29.285541,
+              29.424042,
+              28.906084,
+              28.7805,
+              28.660292,
+              28.927375,
+              28.432917
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.129208,
+            "median_ms": 0.121459,
+            "min_ms": 0.113041,
+            "samples_ms": [
+              0.123041,
+              0.121459,
+              0.123375,
+              0.119042,
+              0.11325,
+              0.126375,
+              0.116958,
+              0.129208,
+              0.113041
+            ]
+          },
+          "file": "build/archive-images/pharch_03/image.jp2",
+          "fingerprint": "5772067334232637559",
+          "header_once_ms": 0.065291,
+          "jpeg_bytes": 18738,
+          "jpeg_fingerprint": "15070606276865928363",
+          "kind": "pipeline",
+          "level_height": 1751,
+          "level_width": 1829,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 30.995916,
+            "median_ms": 29.596666,
+            "min_ms": 29.066083,
+            "samples_ms": [
+              30.995916,
+              30.31225,
+              29.942290999999997,
+              30.061834,
+              29.566375,
+              29.454333,
+              29.302125,
+              29.596666,
+              29.066083
+            ]
+          },
+          "resize": {
+            "max_ms": 0.660209,
+            "median_ms": 0.533375,
+            "min_ms": 0.51875,
+            "samples_ms": [
+              0.660209,
+              0.531625,
+              0.533375,
+              0.51875,
+              0.547041,
+              0.547458,
+              0.524875,
+              0.540083,
+              0.520125
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 1.004042,
+            "median_ms": 0.967792,
+            "min_ms": 0.91375,
+            "samples_ms": [
+              0.915333,
+              1.000709,
+              0.967792,
+              0.91375,
+              0.95675,
+              0.978084,
+              0.978208,
+              1.004042,
+              0.920208
+            ]
+          },
+          "decoded_height": 306,
+          "decoded_width": 461,
+          "encode": {
+            "max_ms": 0.138375,
+            "median_ms": 0.12325,
+            "min_ms": 0.1185,
+            "samples_ms": [
+              0.138375,
+              0.12325,
+              0.119209,
+              0.126334,
+              0.123667,
+              0.122541,
+              0.1185,
+              0.132084,
+              0.122083
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/pyramid.tif",
+          "fingerprint": "11826530088340130181",
+          "header_once_ms": 1.364375,
+          "jpeg_bytes": 23034,
+          "jpeg_fingerprint": "9946794848049168095",
+          "kind": "pipeline",
+          "level_height": 306,
+          "level_width": 461,
+          "output_height": 169,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 1.5049170000000003,
+            "median_ms": 1.460959,
+            "min_ms": 1.397208,
+            "samples_ms": [
+              1.4420829999999998,
+              1.5049170000000003,
+              1.460959,
+              1.40625,
+              1.448667,
+              1.4833749999999999,
+              1.462666,
+              1.4982920000000002,
+              1.397208
+            ]
+          },
+          "resize": {
+            "max_ms": 0.388375,
+            "median_ms": 0.36825,
+            "min_ms": 0.354917,
+            "samples_ms": [
+              0.388375,
+              0.380958,
+              0.373958,
+              0.366166,
+              0.36825,
+              0.38275,
+              0.365958,
+              0.362166,
+              0.354917
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 14.841125,
+            "median_ms": 14.448792,
+            "min_ms": 14.260625,
+            "samples_ms": [
+              14.628917,
+              14.506875,
+              14.291958,
+              14.841125,
+              14.260625,
+              14.776959,
+              14.448792,
+              14.306292,
+              14.271167
+            ]
+          },
+          "decoded_height": 1222,
+          "decoded_width": 1842,
+          "encode": {
+            "max_ms": 3.909625,
+            "median_ms": 3.800708,
+            "min_ms": 3.706458,
+            "samples_ms": [
+              3.775375,
+              3.706458,
+              3.780916,
+              3.756708,
+              3.800708,
+              3.909625,
+              3.821375,
+              3.860375,
+              3.852917
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/pyramid.tif",
+          "fingerprint": "12230892396254422295",
+          "header_once_ms": 0.052083,
+          "jpeg_bytes": 337427,
+          "jpeg_fingerprint": "2935980899611147827",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 995,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 28.561625,
+            "median_ms": 28.073791,
+            "min_ms": 27.878292000000002,
+            "samples_ms": [
+              28.204167,
+              27.878292000000002,
+              28.073791,
+              28.46875,
+              28.018749999999997,
+              28.561625,
+              28.192167,
+              27.991792,
+              27.8965
+            ]
+          },
+          "resize": {
+            "max_ms": 10.000917,
+            "median_ms": 9.870917,
+            "min_ms": 9.664959,
+            "samples_ms": [
+              9.799875,
+              9.664959,
+              10.000917,
+              9.870917,
+              9.957417,
+              9.875041,
+              9.922,
+              9.825125,
+              9.772416
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 3.775459,
+            "median_ms": 3.655833,
+            "min_ms": 3.583417,
+            "samples_ms": [
+              3.763709,
+              3.583417,
+              3.597166,
+              3.5845,
+              3.690792,
+              3.712,
+              3.655833,
+              3.775459,
+              3.639917
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.212833,
+            "median_ms": 0.1985,
+            "min_ms": 0.18825,
+            "samples_ms": [
+              0.20375,
+              0.192333,
+              0.193083,
+              0.201375,
+              0.212833,
+              0.1985,
+              0.195041,
+              0.200459,
+              0.18825
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/pyramid.tif",
+          "fingerprint": "16767298186236222378",
+          "header_once_ms": 0.075458,
+          "jpeg_bytes": 30210,
+          "jpeg_fingerprint": "9524150234896623012",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 4.542459000000001,
+            "median_ms": 4.381791,
+            "min_ms": 4.327666999999999,
+            "samples_ms": [
+              4.502625,
+              4.329791999999999,
+              4.3295829999999995,
+              4.327666999999999,
+              4.466292,
+              4.457334,
+              4.381791,
+              4.542459000000001,
+              4.37425
+            ]
+          },
+          "resize": {
+            "max_ms": 0.566541,
+            "median_ms": 0.546083,
+            "min_ms": 0.530917,
+            "samples_ms": [
+              0.535166,
+              0.554042,
+              0.539334,
+              0.541792,
+              0.562667,
+              0.546834,
+              0.530917,
+              0.566541,
+              0.546083
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 25.307875,
+            "median_ms": 23.142666,
+            "min_ms": 22.2015,
+            "samples_ms": [
+              23.259666,
+              23.142666,
+              22.977208,
+              23.037792,
+              22.2015,
+              22.312708,
+              24.815833,
+              24.474584,
+              25.307875
+            ]
+          },
+          "decoded_height": 306,
+          "decoded_width": 461,
+          "encode": {
+            "max_ms": 0.170292,
+            "median_ms": 0.145666,
+            "min_ms": 0.134,
+            "samples_ms": [
+              0.170292,
+              0.149292,
+              0.145459,
+              0.134,
+              0.1365,
+              0.139292,
+              0.145666,
+              0.152958,
+              0.149666
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/image.jp2",
+          "fingerprint": "13086884883071659722",
+          "header_once_ms": 2.645917,
+          "jpeg_bytes": 23786,
+          "jpeg_fingerprint": "6852083262620329681",
+          "kind": "pipeline",
+          "level_height": 306,
+          "level_width": 461,
+          "output_height": 169,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 25.8565,
+            "median_ms": 23.682374999999997,
+            "min_ms": 22.707917000000002,
+            "samples_ms": [
+              23.817458,
+              23.682374999999997,
+              23.478125,
+              23.527209,
+              22.707917000000002,
+              22.808792,
+              25.345583,
+              25.023750000000003,
+              25.8565
+            ]
+          },
+          "resize": {
+            "max_ms": 0.398959,
+            "median_ms": 0.384084,
+            "min_ms": 0.355417,
+            "samples_ms": [
+              0.3875,
+              0.390417,
+              0.355458,
+              0.355417,
+              0.369917,
+              0.356792,
+              0.384084,
+              0.396208,
+              0.398959
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 328.140709,
+            "median_ms": 321.629125,
+            "min_ms": 316.788458,
+            "samples_ms": [
+              328.140709,
+              321.629125,
+              320.9955,
+              322.328417,
+              316.788458,
+              318.471167,
+              327.913333,
+              318.1325,
+              324.26075
+            ]
+          },
+          "decoded_height": 1222,
+          "decoded_width": 1842,
+          "encode": {
+            "max_ms": 4.017334,
+            "median_ms": 3.740417,
+            "min_ms": 3.574583,
+            "samples_ms": [
+              3.770167,
+              3.76125,
+              3.705959,
+              3.575375,
+              3.741041,
+              4.017334,
+              3.740417,
+              3.704625,
+              3.574583
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/image.jp2",
+          "fingerprint": "12397072450605503277",
+          "header_once_ms": 0.064458,
+          "jpeg_bytes": 358671,
+          "jpeg_fingerprint": "17348009252234220967",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 995,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 341.54345900000004,
+            "median_ms": 335.408458,
+            "min_ms": 330.554166,
+            "samples_ms": [
+              341.54345900000004,
+              335.408458,
+              334.412167,
+              335.84616700000004,
+              330.554166,
+              332.48283399999997,
+              341.46925,
+              331.48625000000004,
+              337.642208
+            ]
+          },
+          "resize": {
+            "max_ms": 10.024667,
+            "median_ms": 9.8155,
+            "min_ms": 9.632583,
+            "samples_ms": [
+              9.632583,
+              10.018083,
+              9.710708,
+              9.942375,
+              10.024667,
+              9.994333,
+              9.8155,
+              9.649125,
+              9.806875
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 69.063125,
+            "median_ms": 68.322167,
+            "min_ms": 67.924791,
+            "samples_ms": [
+              68.322167,
+              68.293,
+              68.058834,
+              68.075542,
+              67.924791,
+              68.455416,
+              69.063125,
+              68.484833,
+              68.634333
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.201375,
+            "median_ms": 0.192958,
+            "min_ms": 0.188167,
+            "samples_ms": [
+              0.201375,
+              0.188167,
+              0.197167,
+              0.192542,
+              0.200708,
+              0.189958,
+              0.192958,
+              0.192875,
+              0.198208
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/image.jp2",
+          "fingerprint": "10568775922482469263",
+          "header_once_ms": 0.070125,
+          "jpeg_bytes": 30872,
+          "jpeg_fingerprint": "8850055610158887872",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 69.7595,
+            "median_ms": 69.03370799999999,
+            "min_ms": 68.645916,
+            "samples_ms": [
+              69.03370799999999,
+              68.98512500000001,
+              68.763334,
+              68.7765,
+              68.645916,
+              69.148416,
+              69.7595,
+              69.19149999999999,
+              69.37241599999999
+            ]
+          },
+          "resize": {
+            "max_ms": 0.539875,
+            "median_ms": 0.508416,
+            "min_ms": 0.503042,
+            "samples_ms": [
+              0.510166,
+              0.503958,
+              0.507333,
+              0.508416,
+              0.520417,
+              0.503042,
+              0.503417,
+              0.513792,
+              0.539875
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 0.557,
+            "median_ms": 0.479375,
+            "min_ms": 0.464834,
+            "samples_ms": [
+              0.50575,
+              0.49275,
+              0.486083,
+              0.479375,
+              0.464834,
+              0.467125,
+              0.47475,
+              0.470416,
+              0.557
+            ]
+          },
+          "decoded_height": 216,
+          "decoded_width": 324,
+          "encode": {
+            "max_ms": 0.152584,
+            "median_ms": 0.135459,
+            "min_ms": 0.132958,
+            "samples_ms": [
+              0.139708,
+              0.137667,
+              0.13425,
+              0.134042,
+              0.133667,
+              0.135459,
+              0.132958,
+              0.152584,
+              0.142459
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/pyramid.tif",
+          "fingerprint": "8805794918999188283",
+          "header_once_ms": 5.553375,
+          "jpeg_bytes": 28404,
+          "jpeg_fingerprint": "4093786232141412415",
+          "kind": "pipeline",
+          "level_height": 216,
+          "level_width": 324,
+          "output_height": 170,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 0.990584,
+            "median_ms": 0.912333,
+            "min_ms": 0.893417,
+            "samples_ms": [
+              0.937791,
+              0.9235,
+              0.912333,
+              0.905667,
+              0.906292,
+              0.893417,
+              0.8989170000000001,
+              0.9341250000000001,
+              0.990584
+            ]
+          },
+          "resize": {
+            "max_ms": 0.311125,
+            "median_ms": 0.29225,
+            "min_ms": 0.290833,
+            "samples_ms": [
+              0.292333,
+              0.293083,
+              0.292,
+              0.29225,
+              0.307791,
+              0.290833,
+              0.291209,
+              0.311125,
+              0.291125
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 33.161584,
+            "median_ms": 31.139541,
+            "min_ms": 30.693875,
+            "samples_ms": [
+              30.693875,
+              31.139541,
+              33.161584,
+              31.028875,
+              32.292708,
+              31.573833,
+              31.0915,
+              30.967209,
+              31.19475
+            ]
+          },
+          "decoded_height": 1728,
+          "decoded_width": 2592,
+          "encode": {
+            "max_ms": 4.501709,
+            "median_ms": 4.26225,
+            "min_ms": 4.123916,
+            "samples_ms": [
+              4.123916,
+              4.4285,
+              4.501709,
+              4.341791,
+              4.273125,
+              4.175458,
+              4.222709,
+              4.26225,
+              4.180167
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/pyramid.tif",
+          "fingerprint": "3817840889654638356",
+          "header_once_ms": 0.067125,
+          "jpeg_bytes": 584948,
+          "jpeg_fingerprint": "9358538604676170589",
+          "kind": "pipeline",
+          "level_height": 1728,
+          "level_width": 2592,
+          "output_height": 1000,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 51.360583999999996,
+            "median_ms": 48.81575,
+            "min_ms": 48.039291,
+            "samples_ms": [
+              48.039291,
+              48.681708,
+              51.360583999999996,
+              48.81575,
+              49.947583,
+              48.994333,
+              48.580792,
+              48.403709,
+              48.845084
+            ]
+          },
+          "resize": {
+            "max_ms": 13.697291,
+            "median_ms": 13.266583,
+            "min_ms": 13.113667,
+            "samples_ms": [
+              13.2215,
+              13.113667,
+              13.697291,
+              13.445084,
+              13.38175,
+              13.245042,
+              13.266583,
+              13.17425,
+              13.470167
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 4.073,
+            "median_ms": 3.974958,
+            "min_ms": 3.842917,
+            "samples_ms": [
+              4.001416,
+              4.0255,
+              4.043833,
+              3.842917,
+              3.870917,
+              3.918916,
+              4.073,
+              3.961125,
+              3.974958
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.188291,
+            "median_ms": 0.185,
+            "min_ms": 0.170834,
+            "samples_ms": [
+              0.188291,
+              0.185791,
+              0.187917,
+              0.170834,
+              0.182375,
+              0.187792,
+              0.177333,
+              0.175583,
+              0.185
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/pyramid.tif",
+          "fingerprint": "9304004304666319808",
+          "header_once_ms": 0.080792,
+          "jpeg_bytes": 23936,
+          "jpeg_fingerprint": "1766018953336347312",
+          "kind": "pipeline",
+          "level_height": 1728,
+          "level_width": 2592,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 4.7885,
+            "median_ms": 4.670707999999999,
+            "min_ms": 4.535584,
+            "samples_ms": [
+              4.711791,
+              4.738916,
+              4.7885,
+              4.535584,
+              4.599042000000001,
+              4.648708,
+              4.788416000000001,
+              4.670707999999999,
+              4.667707999999999
+            ]
+          },
+          "resize": {
+            "max_ms": 0.55675,
+            "median_ms": 0.534,
+            "min_ms": 0.50775,
+            "samples_ms": [
+              0.522084,
+              0.527625,
+              0.55675,
+              0.521833,
+              0.54575,
+              0.542,
+              0.538083,
+              0.534,
+              0.50775
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 17.827833,
+            "median_ms": 17.178709,
+            "min_ms": 16.806375,
+            "samples_ms": [
+              17.827833,
+              17.178709,
+              17.007959,
+              17.3235,
+              16.979834,
+              16.806375,
+              17.32925,
+              16.977792,
+              17.335166
+            ]
+          },
+          "decoded_height": 216,
+          "decoded_width": 324,
+          "encode": {
+            "max_ms": 0.186917,
+            "median_ms": 0.153292,
+            "min_ms": 0.149542,
+            "samples_ms": [
+              0.152208,
+              0.186917,
+              0.167541,
+              0.168,
+              0.150792,
+              0.153125,
+              0.159125,
+              0.149542,
+              0.153292
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/image.jp2",
+          "fingerprint": "16764340883335667568",
+          "header_once_ms": 0.362958,
+          "jpeg_bytes": 31525,
+          "jpeg_fingerprint": "1017889443450604629",
+          "kind": "pipeline",
+          "level_height": 216,
+          "level_width": 324,
+          "output_height": 170,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 18.27775,
+            "median_ms": 17.650792000000003,
+            "min_ms": 17.242167,
+            "samples_ms": [
+              18.27775,
+              17.650792000000003,
+              17.476,
+              17.796249999999997,
+              17.409542,
+              17.242167,
+              17.776833999999997,
+              17.413167,
+              17.76725
+            ]
+          },
+          "resize": {
+            "max_ms": 0.30475,
+            "median_ms": 0.285833,
+            "min_ms": 0.278792,
+            "samples_ms": [
+              0.297709,
+              0.285166,
+              0.3005,
+              0.30475,
+              0.278916,
+              0.282667,
+              0.288459,
+              0.285833,
+              0.278792
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 587.669417,
+            "median_ms": 566.711042,
+            "min_ms": 556.901084,
+            "samples_ms": [
+              557.902209,
+              566.711042,
+              566.221125,
+              577.10475,
+              587.669417,
+              564.11075,
+              556.901084,
+              582.154167,
+              585.1985
+            ]
+          },
+          "decoded_height": 1728,
+          "decoded_width": 2592,
+          "encode": {
+            "max_ms": 4.497084,
+            "median_ms": 4.311917,
+            "min_ms": 4.258459,
+            "samples_ms": [
+              4.258459,
+              4.369833,
+              4.311917,
+              4.258541,
+              4.497084,
+              4.303041,
+              4.273708,
+              4.483958,
+              4.385208
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/image.jp2",
+          "fingerprint": "11827148875606112224",
+          "header_once_ms": 0.046917,
+          "jpeg_bytes": 621329,
+          "jpeg_fingerprint": "17349452145334966779",
+          "kind": "pipeline",
+          "level_height": 1728,
+          "level_width": 2592,
+          "output_height": 1000,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 605.6495839999999,
+            "median_ms": 584.131167,
+            "min_ms": 574.1136670000001,
+            "samples_ms": [
+              575.2207089999999,
+              584.131167,
+              583.907292,
+              595.122041,
+              605.6495839999999,
+              581.430291,
+              574.1136670000001,
+              600.242333,
+              603.353833
+            ]
+          },
+          "resize": {
+            "max_ms": 13.770125,
+            "median_ms": 13.37425,
+            "min_ms": 12.938875,
+            "samples_ms": [
+              13.060041,
+              13.050292,
+              13.37425,
+              13.75875,
+              13.483083,
+              13.0165,
+              12.938875,
+              13.604208,
+              13.770125
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 63.399875,
+            "median_ms": 59.10725,
+            "min_ms": 58.687459,
+            "samples_ms": [
+              63.399875,
+              59.288,
+              59.10725,
+              60.154,
+              58.78825,
+              58.687459,
+              58.692083,
+              59.378625,
+              58.803291
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.202083,
+            "median_ms": 0.186792,
+            "min_ms": 0.180834,
+            "samples_ms": [
+              0.184792,
+              0.199208,
+              0.185041,
+              0.184833,
+              0.180834,
+              0.202083,
+              0.199416,
+              0.193042,
+              0.186792
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/image.jp2",
+          "fingerprint": "5121967003725155666",
+          "header_once_ms": 0.071792,
+          "jpeg_bytes": 24685,
+          "jpeg_fingerprint": "257183100581531906",
+          "kind": "pipeline",
+          "level_height": 1728,
+          "level_width": 2592,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 64.133375,
+            "median_ms": 59.822790999999995,
+            "min_ms": 59.401542,
+            "samples_ms": [
+              64.133375,
+              60.03574999999999,
+              59.822790999999995,
+              60.843375,
+              59.502917,
+              59.401542,
+              59.432916,
+              60.079459,
+              59.497749999999996
+            ]
+          },
+          "resize": {
+            "max_ms": 0.548708,
+            "median_ms": 0.5305,
+            "min_ms": 0.504542,
+            "samples_ms": [
+              0.548708,
+              0.548542,
+              0.5305,
+              0.504542,
+              0.533833,
+              0.512,
+              0.541417,
+              0.507792,
+              0.507667
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 0.479166,
+            "median_ms": 0.443042,
+            "min_ms": 0.434083,
+            "samples_ms": [
+              0.479166,
+              0.468792,
+              0.47125,
+              0.462291,
+              0.439375,
+              0.43725,
+              0.434083,
+              0.443042,
+              0.438292
+            ]
+          },
+          "decoded_height": 198,
+          "decoded_width": 283,
+          "encode": {
+            "max_ms": 0.161417,
+            "median_ms": 0.153625,
+            "min_ms": 0.151334,
+            "samples_ms": [
+              0.160708,
+              0.158292,
+              0.154375,
+              0.153625,
+              0.152958,
+              0.151667,
+              0.161417,
+              0.152709,
+              0.151334
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/pyramid.tif",
+          "fingerprint": "13123755522990885705",
+          "header_once_ms": 6.218791,
+          "jpeg_bytes": 36301,
+          "jpeg_fingerprint": "3884300161979355400",
+          "kind": "pipeline",
+          "level_height": 198,
+          "level_width": 283,
+          "output_height": 178,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 0.9149579999999999,
+            "median_ms": 0.876292,
+            "min_ms": 0.868792,
+            "samples_ms": [
+              0.9149579999999999,
+              0.9055,
+              0.905666,
+              0.896166,
+              0.873291,
+              0.869084,
+              0.8746250000000001,
+              0.876292,
+              0.868792
+            ]
+          },
+          "resize": {
+            "max_ms": 0.280958,
+            "median_ms": 0.280041,
+            "min_ms": 0.275084,
+            "samples_ms": [
+              0.275084,
+              0.278416,
+              0.280041,
+              0.28025,
+              0.280958,
+              0.280167,
+              0.279125,
+              0.280541,
+              0.279166
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 26.322542,
+            "median_ms": 24.348375,
+            "min_ms": 24.092875,
+            "samples_ms": [
+              24.348375,
+              24.494,
+              24.418166,
+              24.188708,
+              24.092875,
+              24.304125,
+              24.344667,
+              24.886667,
+              26.322542
+            ]
+          },
+          "decoded_height": 1580,
+          "decoded_width": 2260,
+          "encode": {
+            "max_ms": 6.145708,
+            "median_ms": 5.774625,
+            "min_ms": 5.638959,
+            "samples_ms": [
+              5.71375,
+              5.774625,
+              5.756458,
+              5.804958,
+              5.86225,
+              5.7415,
+              5.638959,
+              6.145708,
+              5.85125
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/pyramid.tif",
+          "fingerprint": "18370754042444686703",
+          "header_once_ms": 0.087125,
+          "jpeg_bytes": 1309196,
+          "jpeg_fingerprint": "9400208026771820574",
+          "kind": "pipeline",
+          "level_height": 1580,
+          "level_width": 2260,
+          "output_height": 1048,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 44.145666999999996,
+            "median_ms": 41.757583000000004,
+            "min_ms": 41.309583,
+            "samples_ms": [
+              41.857042,
+              41.77075,
+              41.757583000000004,
+              41.393833,
+              41.309583,
+              41.377375,
+              41.409792,
+              43.069874999999996,
+              44.145666999999996
+            ]
+          },
+          "resize": {
+            "max_ms": 12.0375,
+            "median_ms": 11.502125,
+            "min_ms": 11.33175,
+            "samples_ms": [
+              11.794917,
+              11.502125,
+              11.582959,
+              11.400167,
+              11.354458,
+              11.33175,
+              11.426166,
+              12.0375,
+              11.971875
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 2.331417,
+            "median_ms": 2.286709,
+            "min_ms": 2.244375,
+            "samples_ms": [
+              2.279708,
+              2.318417,
+              2.331417,
+              2.271542,
+              2.300417,
+              2.2615,
+              2.244375,
+              2.286709,
+              2.289125
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.294791,
+            "median_ms": 0.276333,
+            "min_ms": 0.269,
+            "samples_ms": [
+              0.274916,
+              0.294791,
+              0.284125,
+              0.269,
+              0.276333,
+              0.280459,
+              0.291083,
+              0.274208,
+              0.274541
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/pyramid.tif",
+          "fingerprint": "15579934728879105819",
+          "header_once_ms": 0.105167,
+          "jpeg_bytes": 76858,
+          "jpeg_fingerprint": "2175807804309079627",
+          "kind": "pipeline",
+          "level_height": 6320,
+          "level_width": 9040,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 3.1328750000000003,
+            "median_ms": 3.072083,
+            "min_ms": 3.048625,
+            "samples_ms": [
+              3.079416,
+              3.1328750000000003,
+              3.1259580000000002,
+              3.0580000000000003,
+              3.084708,
+              3.048625,
+              3.0547919999999995,
+              3.0702920000000002,
+              3.072083
+            ]
+          },
+          "resize": {
+            "max_ms": 0.524792,
+            "median_ms": 0.510416,
+            "min_ms": 0.506666,
+            "samples_ms": [
+              0.524792,
+              0.519667,
+              0.510416,
+              0.517458,
+              0.507958,
+              0.506666,
+              0.519334,
+              0.509375,
+              0.508417
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 104.671375,
+            "median_ms": 103.955791,
+            "min_ms": 103.673917,
+            "samples_ms": [
+              104.070375,
+              103.955333,
+              103.801625,
+              104.490667,
+              104.057833,
+              104.671375,
+              103.884458,
+              103.955791,
+              103.673917
+            ]
+          },
+          "decoded_height": 395,
+          "decoded_width": 565,
+          "encode": {
+            "max_ms": 0.209916,
+            "median_ms": 0.192042,
+            "min_ms": 0.188917,
+            "samples_ms": [
+              0.209916,
+              0.199042,
+              0.189417,
+              0.192042,
+              0.191,
+              0.202125,
+              0.191208,
+              0.199333,
+              0.188917
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/image.jp2",
+          "fingerprint": "5931265391768065883",
+          "header_once_ms": 0.259167,
+          "jpeg_bytes": 42597,
+          "jpeg_fingerprint": "6835801736315487468",
+          "kind": "pipeline",
+          "level_height": 395,
+          "level_width": 565,
+          "output_height": 178,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 105.36345899999999,
+            "median_ms": 104.638583,
+            "min_ms": 104.34004200000001,
+            "samples_ms": [
+              104.76495800000001,
+              104.629958,
+              104.46375,
+              105.166167,
+              104.717875,
+              105.36345899999999,
+              104.542416,
+              104.638583,
+              104.34004200000001
+            ]
+          },
+          "resize": {
+            "max_ms": 0.489959,
+            "median_ms": 0.477208,
+            "min_ms": 0.46675,
+            "samples_ms": [
+              0.484667,
+              0.475583,
+              0.472708,
+              0.483458,
+              0.469042,
+              0.489959,
+              0.46675,
+              0.483459,
+              0.477208
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 842.565042,
+            "median_ms": 802.785959,
+            "min_ms": 780.165875,
+            "samples_ms": [
+              780.165875,
+              783.66525,
+              790.131542,
+              802.785959,
+              842.565042,
+              837.875834,
+              802.854625,
+              791.6125,
+              830.815458
+            ]
+          },
+          "decoded_height": 1580,
+          "decoded_width": 2260,
+          "encode": {
+            "max_ms": 6.835,
+            "median_ms": 6.3255,
+            "min_ms": 6.052583,
+            "samples_ms": [
+              6.195458,
+              6.216417,
+              6.052583,
+              6.496083,
+              6.63375,
+              6.431792,
+              6.3255,
+              6.835,
+              6.12425
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/image.jp2",
+          "fingerprint": "9056676626934777920",
+          "header_once_ms": 0.064666,
+          "jpeg_bytes": 1478001,
+          "jpeg_fingerprint": "9994541169758864156",
+          "kind": "pipeline",
+          "level_height": 1580,
+          "level_width": 2260,
+          "output_height": 1048,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 860.9773749999999,
+            "median_ms": 820.7436670000001,
+            "min_ms": 797.8664580000001,
+            "samples_ms": [
+              797.8664580000001,
+              801.367917,
+              807.669792,
+              821.1171250000001,
+              860.9773749999999,
+              856.399709,
+              820.7436670000001,
+              810.58475,
+              848.566917
+            ]
+          },
+          "resize": {
+            "max_ms": 12.13725,
+            "median_ms": 11.627209,
+            "min_ms": 11.485667,
+            "samples_ms": [
+              11.505125,
+              11.48625,
+              11.485667,
+              11.835083,
+              11.778583,
+              12.092083,
+              11.563542,
+              12.13725,
+              11.627209
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 95.140209,
+            "median_ms": 93.154041,
+            "min_ms": 88.717291,
+            "samples_ms": [
+              95.007792,
+              94.196458,
+              95.140209,
+              93.154041,
+              94.348167,
+              92.381542,
+              90.913833,
+              89.422708,
+              88.717291
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.308792,
+            "median_ms": 0.299792,
+            "min_ms": 0.2905,
+            "samples_ms": [
+              0.302291,
+              0.308792,
+              0.2905,
+              0.302709,
+              0.296291,
+              0.303084,
+              0.294042,
+              0.2985,
+              0.299792
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/image.jp2",
+          "fingerprint": "12473100997556177006",
+          "header_once_ms": 0.084292,
+          "jpeg_bytes": 77573,
+          "jpeg_fingerprint": "17849160012843700913",
+          "kind": "pipeline",
+          "level_height": 6320,
+          "level_width": 9040,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 95.9395,
+            "median_ms": 93.999125,
+            "min_ms": 89.538208,
+            "samples_ms": [
+              95.86774999999999,
+              95.046458,
+              95.9395,
+              93.999125,
+              95.246125,
+              93.217209,
+              91.713875,
+              90.255958,
+              89.538208
+            ]
+          },
+          "resize": {
+            "max_ms": 0.601667,
+            "median_ms": 0.53475,
+            "min_ms": 0.506,
+            "samples_ms": [
+              0.557667,
+              0.541208,
+              0.508791,
+              0.542375,
+              0.601667,
+              0.532583,
+              0.506,
+              0.53475,
+              0.521125
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        }
+      ],
+      "compiler": "Apple LLVM 21.0.0 (clang-2100.3.34.2)",
+      "ndebug": true,
+      "repetitions": 9,
+      "schema": 1,
+      "warmups": 2
+    },
+    {
+      "cases": [
+        {
+          "case": "tile-half",
+          "channels": 1,
+          "fingerprint": "1826023541350259723",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.291,
+            "median_ms": 0.265125,
+            "min_ms": 0.262291,
+            "samples_ms": [
+              0.269667,
+              0.265125,
+              0.26825,
+              0.291,
+              0.267709,
+              0.263959,
+              0.262291,
+              0.265041,
+              0.262458
+            ]
+          },
+          "source_height": 512,
+          "source_width": 512
+        },
+        {
+          "case": "tile-fractional",
+          "channels": 1,
+          "fingerprint": "6161313585623359673",
+          "fractional_window": true,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.735917,
+            "median_ms": 0.560708,
+            "min_ms": 0.555625,
+            "samples_ms": [
+              0.555625,
+              0.560708,
+              0.558834,
+              0.561792,
+              0.560542,
+              0.55775,
+              0.580667,
+              0.649042,
+              0.735917
+            ]
+          },
+          "source_height": 513,
+          "source_width": 513
+        },
+        {
+          "case": "preview-noninteger",
+          "channels": 1,
+          "fingerprint": "16651142104268888063",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 1125,
+          "output_width": 1500,
+          "resize": {
+            "max_ms": 13.941375,
+            "median_ms": 9.38,
+            "min_ms": 9.059625,
+            "samples_ms": [
+              9.38,
+              9.684542,
+              9.059625,
+              9.184708,
+              9.214083,
+              9.389625,
+              9.368125,
+              13.941375,
+              12.645042
+            ]
+          },
+          "source_height": 1536,
+          "source_width": 2048
+        },
+        {
+          "case": "thumbnail-eighth",
+          "channels": 1,
+          "fingerprint": "10390542142092570377",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 384,
+          "output_width": 512,
+          "resize": {
+            "max_ms": 10.721959,
+            "median_ms": 8.919125,
+            "min_ms": 8.802708,
+            "samples_ms": [
+              10.721959,
+              10.148041,
+              10.487833,
+              9.576125,
+              8.904833,
+              8.919125,
+              8.906042,
+              8.851333,
+              8.802708
+            ]
+          },
+          "source_height": 3072,
+          "source_width": 4096
+        },
+        {
+          "case": "upscale-double",
+          "channels": 1,
+          "fingerprint": "9539299420168002458",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 768,
+          "output_width": 1024,
+          "resize": {
+            "max_ms": 7.953875,
+            "median_ms": 7.328875,
+            "min_ms": 6.987667,
+            "samples_ms": [
+              7.450958,
+              7.953875,
+              6.987667,
+              7.285459,
+              7.398417,
+              7.328875,
+              7.229583,
+              7.141916,
+              7.352708
+            ]
+          },
+          "source_height": 384,
+          "source_width": 512
+        },
+        {
+          "case": "tile-half",
+          "channels": 3,
+          "fingerprint": "10942829471801443269",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.919209,
+            "median_ms": 0.3645,
+            "min_ms": 0.335958,
+            "samples_ms": [
+              0.353416,
+              0.358166,
+              0.3925,
+              0.365458,
+              0.336875,
+              0.335958,
+              0.919209,
+              0.465459,
+              0.3645
+            ]
+          },
+          "source_height": 512,
+          "source_width": 512
+        },
+        {
+          "case": "tile-fractional",
+          "channels": 3,
+          "fingerprint": "14183519747828807437",
+          "fractional_window": true,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.575584,
+            "median_ms": 0.546833,
+            "min_ms": 0.533417,
+            "samples_ms": [
+              0.5695,
+              0.575584,
+              0.561333,
+              0.534,
+              0.549208,
+              0.533417,
+              0.534125,
+              0.540375,
+              0.546833
+            ]
+          },
+          "source_height": 513,
+          "source_width": 513
+        },
+        {
+          "case": "preview-noninteger",
+          "channels": 3,
+          "fingerprint": "17329628615733054547",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 1125,
+          "output_width": 1500,
+          "resize": {
+            "max_ms": 13.899375,
+            "median_ms": 13.714,
+            "min_ms": 12.147292,
+            "samples_ms": [
+              12.147292,
+              12.698667,
+              12.737334,
+              13.793959,
+              13.714,
+              13.598959,
+              13.767208,
+              13.842084,
+              13.899375
+            ]
+          },
+          "source_height": 1536,
+          "source_width": 2048
+        },
+        {
+          "case": "thumbnail-eighth",
+          "channels": 3,
+          "fingerprint": "16356004924728735147",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 384,
+          "output_width": 512,
+          "resize": {
+            "max_ms": 12.04175,
+            "median_ms": 11.536708,
+            "min_ms": 11.190083,
+            "samples_ms": [
+              11.686125,
+              12.04175,
+              11.292792,
+              11.47725,
+              11.536708,
+              11.263166,
+              11.637292,
+              11.733875,
+              11.190083
+            ]
+          },
+          "source_height": 3072,
+          "source_width": 4096
+        },
+        {
+          "case": "upscale-double",
+          "channels": 3,
+          "fingerprint": "13389422666362895110",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 768,
+          "output_width": 1024,
+          "resize": {
+            "max_ms": 9.444417,
+            "median_ms": 9.292417,
+            "min_ms": 9.122167,
+            "samples_ms": [
+              9.292417,
+              9.444417,
+              9.3065,
+              9.24225,
+              9.30375,
+              9.28475,
+              9.122167,
+              9.213667,
+              9.320333
+            ]
+          },
+          "source_height": 384,
+          "source_width": 512
+        },
+        {
+          "case": "tile-half",
+          "channels": 4,
+          "fingerprint": "672608591429278248",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.447834,
+            "median_ms": 0.410792,
+            "min_ms": 0.395292,
+            "samples_ms": [
+              0.445417,
+              0.447834,
+              0.439667,
+              0.410792,
+              0.417792,
+              0.396084,
+              0.408042,
+              0.396167,
+              0.395292
+            ]
+          },
+          "source_height": 512,
+          "source_width": 512
+        },
+        {
+          "case": "tile-fractional",
+          "channels": 4,
+          "fingerprint": "11019484649883251493",
+          "fractional_window": true,
+          "kind": "synthetic",
+          "output_height": 256,
+          "output_width": 256,
+          "resize": {
+            "max_ms": 0.654708,
+            "median_ms": 0.648542,
+            "min_ms": 0.647875,
+            "samples_ms": [
+              0.650333,
+              0.654708,
+              0.648542,
+              0.647875,
+              0.647875,
+              0.654333,
+              0.648167,
+              0.651292,
+              0.648
+            ]
+          },
+          "source_height": 513,
+          "source_width": 513
+        },
+        {
+          "case": "preview-noninteger",
+          "channels": 4,
+          "fingerprint": "3432960554896704598",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 1125,
+          "output_width": 1500,
+          "resize": {
+            "max_ms": 14.300125,
+            "median_ms": 13.954125,
+            "min_ms": 13.831375,
+            "samples_ms": [
+              13.877041,
+              13.932875,
+              14.029375,
+              13.954125,
+              13.831375,
+              14.073167,
+              14.300125,
+              13.98625,
+              13.94075
+            ]
+          },
+          "source_height": 1536,
+          "source_width": 2048
+        },
+        {
+          "case": "thumbnail-eighth",
+          "channels": 4,
+          "fingerprint": "14818356583773413102",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 384,
+          "output_width": 512,
+          "resize": {
+            "max_ms": 11.864583,
+            "median_ms": 11.655084,
+            "min_ms": 11.420666,
+            "samples_ms": [
+              11.655084,
+              11.563625,
+              11.670417,
+              11.840875,
+              11.674917,
+              11.645667,
+              11.616292,
+              11.420666,
+              11.864583
+            ]
+          },
+          "source_height": 3072,
+          "source_width": 4096
+        },
+        {
+          "case": "upscale-double",
+          "channels": 4,
+          "fingerprint": "8691354607092558282",
+          "fractional_window": false,
+          "kind": "synthetic",
+          "output_height": 768,
+          "output_width": 1024,
+          "resize": {
+            "max_ms": 10.60675,
+            "median_ms": 10.412542,
+            "min_ms": 10.256583,
+            "samples_ms": [
+              10.565167,
+              10.60675,
+              10.322041,
+              10.383792,
+              10.42775,
+              10.510417,
+              10.256583,
+              10.412542,
+              10.348709
+            ]
+          },
+          "source_height": 384,
+          "source_width": 512
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 107.160459,
+            "median_ms": 106.396,
+            "min_ms": 105.8325,
+            "samples_ms": [
+              106.184125,
+              105.8325,
+              106.066417,
+              106.542375,
+              106.030833,
+              106.404791,
+              106.396,
+              106.828459,
+              107.160459
+            ]
+          },
+          "decoded_height": 395,
+          "decoded_width": 565,
+          "encode": {
+            "max_ms": 0.210125,
+            "median_ms": 0.197292,
+            "min_ms": 0.185041,
+            "samples_ms": [
+              0.196791,
+              0.188625,
+              0.210125,
+              0.202208,
+              0.185041,
+              0.195458,
+              0.204208,
+              0.197292,
+              0.201625
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/image.jp2",
+          "fingerprint": "5931265391768065883",
+          "header_once_ms": 3.281583,
+          "jpeg_bytes": 42597,
+          "jpeg_fingerprint": "6835801736315487468",
+          "kind": "pipeline",
+          "level_height": 395,
+          "level_width": 565,
+          "output_height": 178,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 107.83900000000001,
+            "median_ms": 107.078875,
+            "min_ms": 106.492542,
+            "samples_ms": [
+              106.880083,
+              106.492542,
+              106.76916700000001,
+              107.232667,
+              106.682208,
+              107.07941600000001,
+              107.078875,
+              107.533792,
+              107.83900000000001
+            ]
+          },
+          "resize": {
+            "max_ms": 0.508041,
+            "median_ms": 0.479167,
+            "min_ms": 0.466334,
+            "samples_ms": [
+              0.499167,
+              0.471417,
+              0.492625,
+              0.488084,
+              0.466334,
+              0.479167,
+              0.478667,
+              0.508041,
+              0.476916
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 837.143208,
+            "median_ms": 784.0175,
+            "min_ms": 781.85825,
+            "samples_ms": [
+              787.511166,
+              783.73075,
+              837.143208,
+              783.493875,
+              781.85825,
+              785.616459,
+              786.496584,
+              782.938542,
+              784.0175
+            ]
+          },
+          "decoded_height": 1580,
+          "decoded_width": 2260,
+          "encode": {
+            "max_ms": 6.823833,
+            "median_ms": 6.142708,
+            "min_ms": 6.065,
+            "samples_ms": [
+              6.126084,
+              6.148166,
+              6.123291,
+              6.218667,
+              6.142708,
+              6.065,
+              6.23875,
+              6.066208,
+              6.823833
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/image.jp2",
+          "fingerprint": "9056676626934777920",
+          "header_once_ms": 0.064583,
+          "jpeg_bytes": 1478001,
+          "jpeg_fingerprint": "9994541169758864156",
+          "kind": "pipeline",
+          "level_height": 1580,
+          "level_width": 2260,
+          "output_height": 1048,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 855.0164159999999,
+            "median_ms": 802.3459580000001,
+            "min_ms": 799.39675,
+            "samples_ms": [
+              805.22475,
+              801.2120829999999,
+              855.0164159999999,
+              801.014542,
+              799.39675,
+              803.1325420000001,
+              804.226292,
+              800.7215829999999,
+              802.3459580000001
+            ]
+          },
+          "resize": {
+            "max_ms": 11.749917,
+            "median_ms": 11.490958,
+            "min_ms": 11.302,
+            "samples_ms": [
+              11.5875,
+              11.333167,
+              11.749917,
+              11.302,
+              11.395792,
+              11.451083,
+              11.490958,
+              11.716833,
+              11.504625
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 91.902125,
+            "median_ms": 87.708625,
+            "min_ms": 87.390959,
+            "samples_ms": [
+              87.390959,
+              87.412208,
+              91.902125,
+              89.429583,
+              87.708625,
+              87.974209,
+              87.468667,
+              87.468291,
+              88.361625
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.318292,
+            "median_ms": 0.294334,
+            "min_ms": 0.2815,
+            "samples_ms": [
+              0.292125,
+              0.2815,
+              0.318292,
+              0.28325,
+              0.294958,
+              0.29475,
+              0.294334,
+              0.289625,
+              0.294542
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/image.jp2",
+          "fingerprint": "12473100997556177006",
+          "header_once_ms": 0.08625,
+          "jpeg_bytes": 77573,
+          "jpeg_fingerprint": "17849160012843700913",
+          "kind": "pipeline",
+          "level_height": 6320,
+          "level_width": 9040,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 92.7775,
+            "median_ms": 88.53145799999999,
+            "min_ms": 88.187125,
+            "samples_ms": [
+              88.187125,
+              88.195625,
+              92.7775,
+              90.24816599999998,
+              88.53145799999999,
+              88.78979199999999,
+              88.283084,
+              88.261708,
+              89.16037500000002
+            ]
+          },
+          "resize": {
+            "max_ms": 0.557083,
+            "median_ms": 0.520083,
+            "min_ms": 0.501917,
+            "samples_ms": [
+              0.504041,
+              0.501917,
+              0.557083,
+              0.535333,
+              0.527875,
+              0.520833,
+              0.520083,
+              0.503792,
+              0.504208
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 0.495875,
+            "median_ms": 0.425459,
+            "min_ms": 0.413667,
+            "samples_ms": [
+              0.44225,
+              0.440875,
+              0.425459,
+              0.421,
+              0.41975,
+              0.413667,
+              0.424458,
+              0.434917,
+              0.495875
+            ]
+          },
+          "decoded_height": 198,
+          "decoded_width": 283,
+          "encode": {
+            "max_ms": 0.175083,
+            "median_ms": 0.149167,
+            "min_ms": 0.146583,
+            "samples_ms": [
+              0.153083,
+              0.148,
+              0.151708,
+              0.149167,
+              0.148375,
+              0.146583,
+              0.149041,
+              0.175083,
+              0.157791
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/pyramid.tif",
+          "fingerprint": "13123755522990885705",
+          "header_once_ms": 5.527792,
+          "jpeg_bytes": 36301,
+          "jpeg_fingerprint": "3884300161979355400",
+          "kind": "pipeline",
+          "level_height": 198,
+          "level_width": 283,
+          "output_height": 178,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 0.916666,
+            "median_ms": 0.843791,
+            "min_ms": 0.831042,
+            "samples_ms": [
+              0.8559169999999999,
+              0.8493750000000001,
+              0.840625,
+              0.8372090000000001,
+              0.837833,
+              0.831042,
+              0.843791,
+              0.904375,
+              0.916666
+            ]
+          },
+          "resize": {
+            "max_ms": 0.294375,
+            "median_ms": 0.267042,
+            "min_ms": 0.2605,
+            "samples_ms": [
+              0.260584,
+              0.2605,
+              0.263458,
+              0.267042,
+              0.269708,
+              0.270792,
+              0.270292,
+              0.294375,
+              0.263
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 25.07375,
+            "median_ms": 24.613542,
+            "min_ms": 24.260834,
+            "samples_ms": [
+              24.384458,
+              24.91775,
+              24.613542,
+              24.616708,
+              24.445166,
+              24.415959,
+              25.07375,
+              24.771625,
+              24.260834
+            ]
+          },
+          "decoded_height": 1580,
+          "decoded_width": 2260,
+          "encode": {
+            "max_ms": 6.01025,
+            "median_ms": 5.797167,
+            "min_ms": 5.65125,
+            "samples_ms": [
+              6.01025,
+              5.68775,
+              5.803333,
+              5.793708,
+              5.76275,
+              5.797167,
+              5.834416,
+              5.65125,
+              5.827125
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/pyramid.tif",
+          "fingerprint": "18370754042444686703",
+          "header_once_ms": 0.0805,
+          "jpeg_bytes": 1309196,
+          "jpeg_fingerprint": "9400208026771820574",
+          "kind": "pipeline",
+          "level_height": 1580,
+          "level_width": 2260,
+          "output_height": 1048,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 43.090709000000004,
+            "median_ms": 41.837167,
+            "min_ms": 41.603292,
+            "samples_ms": [
+              41.927042,
+              43.090709000000004,
+              41.795458,
+              41.795625,
+              41.699833,
+              41.837167,
+              42.406040999999995,
+              41.933583,
+              41.603292
+            ]
+          },
+          "resize": {
+            "max_ms": 12.485209,
+            "median_ms": 11.510708,
+            "min_ms": 11.378583,
+            "samples_ms": [
+              11.532334,
+              12.485209,
+              11.378583,
+              11.385209,
+              11.491917,
+              11.624041,
+              11.497875,
+              11.510708,
+              11.515333
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 2.366542,
+            "median_ms": 2.312667,
+            "min_ms": 2.29525,
+            "samples_ms": [
+              2.360458,
+              2.31025,
+              2.327416,
+              2.29525,
+              2.310417,
+              2.299625,
+              2.335042,
+              2.366542,
+              2.312667
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.290709,
+            "median_ms": 0.278208,
+            "min_ms": 0.267042,
+            "samples_ms": [
+              0.28075,
+              0.280917,
+              0.271709,
+              0.290709,
+              0.278208,
+              0.280375,
+              0.271916,
+              0.267042,
+              0.277458
+            ]
+          },
+          "file": "build/archive-images/swiss-map-raster500_500_komb_25_2056/pyramid.tif",
+          "fingerprint": "15579934728879105819",
+          "header_once_ms": 0.106833,
+          "jpeg_bytes": 76858,
+          "jpeg_fingerprint": "2175807804309079627",
+          "kind": "pipeline",
+          "level_height": 6320,
+          "level_width": 9040,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 3.159417,
+            "median_ms": 3.113208,
+            "min_ms": 3.099709,
+            "samples_ms": [
+              3.1494999999999997,
+              3.105875,
+              3.139625,
+              3.099709,
+              3.1152500000000005,
+              3.1119589999999997,
+              3.113208,
+              3.159417,
+              3.1000829999999997
+            ]
+          },
+          "resize": {
+            "max_ms": 0.5405,
+            "median_ms": 0.514708,
+            "min_ms": 0.50625,
+            "samples_ms": [
+              0.508292,
+              0.514708,
+              0.5405,
+              0.51375,
+              0.526625,
+              0.531959,
+              0.50625,
+              0.525833,
+              0.509958
+            ]
+          },
+          "source_height": 12640,
+          "source_width": 18080
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 17.277583,
+            "median_ms": 16.950625,
+            "min_ms": 16.772083,
+            "samples_ms": [
+              17.077,
+              17.146834,
+              16.879125,
+              17.277583,
+              16.950625,
+              16.837375,
+              16.953208,
+              16.790834,
+              16.772083
+            ]
+          },
+          "decoded_height": 216,
+          "decoded_width": 324,
+          "encode": {
+            "max_ms": 0.170125,
+            "median_ms": 0.155167,
+            "min_ms": 0.152458,
+            "samples_ms": [
+              0.170125,
+              0.166542,
+              0.15575,
+              0.1535,
+              0.152458,
+              0.158291,
+              0.152709,
+              0.155167,
+              0.15375
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/image.jp2",
+          "fingerprint": "16764340883335667568",
+          "header_once_ms": 0.076375,
+          "jpeg_bytes": 31525,
+          "jpeg_fingerprint": "1017889443450604629",
+          "kind": "pipeline",
+          "level_height": 216,
+          "level_width": 324,
+          "output_height": 170,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 17.702875000000002,
+            "median_ms": 17.377792000000003,
+            "min_ms": 17.204416,
+            "samples_ms": [
+              17.546,
+              17.619833999999997,
+              17.3105,
+              17.702875000000002,
+              17.381957999999997,
+              17.267916,
+              17.377792000000003,
+              17.224209,
+              17.204416
+            ]
+          },
+          "resize": {
+            "max_ms": 0.306458,
+            "median_ms": 0.278208,
+            "min_ms": 0.271792,
+            "samples_ms": [
+              0.298875,
+              0.306458,
+              0.275625,
+              0.271792,
+              0.278875,
+              0.27225,
+              0.271875,
+              0.278208,
+              0.278583
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 586.258542,
+            "median_ms": 568.306875,
+            "min_ms": 557.230291,
+            "samples_ms": [
+              558.424209,
+              557.230291,
+              570.31275,
+              586.258542,
+              582.35975,
+              568.306875,
+              566.186541,
+              579.274333,
+              566.418708
+            ]
+          },
+          "decoded_height": 1728,
+          "decoded_width": 2592,
+          "encode": {
+            "max_ms": 4.515166,
+            "median_ms": 4.399625,
+            "min_ms": 4.210042,
+            "samples_ms": [
+              4.210042,
+              4.265208,
+              4.399625,
+              4.515166,
+              4.434875,
+              4.279083,
+              4.500584,
+              4.412833,
+              4.358875
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/image.jp2",
+          "fingerprint": "11827148875606112224",
+          "header_once_ms": 0.044667,
+          "jpeg_bytes": 621329,
+          "jpeg_fingerprint": "17349452145334966779",
+          "kind": "pipeline",
+          "level_height": 1728,
+          "level_width": 2592,
+          "output_height": 1000,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 604.383583,
+            "median_ms": 585.6542910000001,
+            "min_ms": 574.493958,
+            "samples_ms": [
+              575.9028340000001,
+              574.493958,
+              587.905917,
+              604.383583,
+              599.889584,
+              585.6542910000001,
+              584.143125,
+              597.1122079999999,
+              583.9920830000001
+            ]
+          },
+          "resize": {
+            "max_ms": 13.609875,
+            "median_ms": 13.2145,
+            "min_ms": 12.998459,
+            "samples_ms": [
+              13.268583,
+              12.998459,
+              13.193542,
+              13.609875,
+              13.094959,
+              13.068333,
+              13.456,
+              13.425042,
+              13.2145
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 64.331417,
+            "median_ms": 60.760125,
+            "min_ms": 59.933625,
+            "samples_ms": [
+              61.185083,
+              60.439667,
+              60.81825,
+              60.760125,
+              61.586208,
+              64.331417,
+              60.430459,
+              59.933625,
+              60.195334
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.211584,
+            "median_ms": 0.192667,
+            "min_ms": 0.187625,
+            "samples_ms": [
+              0.194416,
+              0.203583,
+              0.191834,
+              0.187625,
+              0.204333,
+              0.211584,
+              0.191083,
+              0.192667,
+              0.19025
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/image.jp2",
+          "fingerprint": "5121967003725155666",
+          "header_once_ms": 0.071875,
+          "jpeg_bytes": 24685,
+          "jpeg_fingerprint": "257183100581531906",
+          "kind": "pipeline",
+          "level_height": 1728,
+          "level_width": 2592,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 65.085792,
+            "median_ms": 61.455791,
+            "min_ms": 60.641542,
+            "samples_ms": [
+              61.888915999999995,
+              61.197250000000004,
+              61.546917,
+              61.455791,
+              62.387833,
+              65.085792,
+              61.137667,
+              60.641542,
+              60.908042
+            ]
+          },
+          "resize": {
+            "max_ms": 0.597292,
+            "median_ms": 0.522458,
+            "min_ms": 0.508041,
+            "samples_ms": [
+              0.509417,
+              0.554,
+              0.536833,
+              0.508041,
+              0.597292,
+              0.542791,
+              0.516125,
+              0.51525,
+              0.522458
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 0.522208,
+            "median_ms": 0.479375,
+            "min_ms": 0.472584,
+            "samples_ms": [
+              0.522208,
+              0.497375,
+              0.48475,
+              0.481,
+              0.476375,
+              0.479375,
+              0.478458,
+              0.472584,
+              0.478459
+            ]
+          },
+          "decoded_height": 216,
+          "decoded_width": 324,
+          "encode": {
+            "max_ms": 0.162333,
+            "median_ms": 0.131875,
+            "min_ms": 0.131166,
+            "samples_ms": [
+              0.141042,
+              0.135833,
+              0.133375,
+              0.131875,
+              0.13125,
+              0.131166,
+              0.131292,
+              0.13125,
+              0.162333
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/pyramid.tif",
+          "fingerprint": "8805794918999188283",
+          "header_once_ms": 0.092916,
+          "jpeg_bytes": 28404,
+          "jpeg_fingerprint": "4093786232141412415",
+          "kind": "pipeline",
+          "level_height": 216,
+          "level_width": 324,
+          "output_height": 170,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 0.9635,
+            "median_ms": 0.914167,
+            "min_ms": 0.905417,
+            "samples_ms": [
+              0.9635,
+              0.9323750000000001,
+              0.9168750000000001,
+              0.914167,
+              0.906375,
+              0.9097080000000001,
+              0.910125,
+              0.905417,
+              0.9397500000000001
+            ]
+          },
+          "resize": {
+            "max_ms": 0.301583,
+            "median_ms": 0.299167,
+            "min_ms": 0.29875,
+            "samples_ms": [
+              0.30025,
+              0.299167,
+              0.29875,
+              0.301292,
+              0.29875,
+              0.299167,
+              0.300375,
+              0.301583,
+              0.298958
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 32.245,
+            "median_ms": 31.887791,
+            "min_ms": 31.225541,
+            "samples_ms": [
+              31.225541,
+              31.715958,
+              31.887791,
+              31.392,
+              32.245,
+              32.104875,
+              31.658833,
+              32.187167,
+              32.038291
+            ]
+          },
+          "decoded_height": 1728,
+          "decoded_width": 2592,
+          "encode": {
+            "max_ms": 4.450583,
+            "median_ms": 4.307666,
+            "min_ms": 4.217125,
+            "samples_ms": [
+              4.307666,
+              4.394708,
+              4.217125,
+              4.29975,
+              4.254958,
+              4.393166,
+              4.347083,
+              4.289208,
+              4.450583
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/pyramid.tif",
+          "fingerprint": "3817840889654638356",
+          "header_once_ms": 0.078208,
+          "jpeg_bytes": 584948,
+          "jpeg_fingerprint": "9358538604676170589",
+          "kind": "pipeline",
+          "level_height": 1728,
+          "level_width": 2592,
+          "output_height": 1000,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 50.011083000000006,
+            "median_ms": 49.42633300000001,
+            "min_ms": 48.525666,
+            "samples_ms": [
+              48.525666,
+              49.330916,
+              49.42633300000001,
+              48.674791,
+              49.818292,
+              49.965208,
+              49.145458,
+              49.693583000000004,
+              50.011083000000006
+            ]
+          },
+          "resize": {
+            "max_ms": 13.522209,
+            "median_ms": 13.22025,
+            "min_ms": 12.983041,
+            "samples_ms": [
+              12.992459,
+              13.22025,
+              13.321417,
+              12.983041,
+              13.318334,
+              13.467167,
+              13.139542,
+              13.217208,
+              13.522209
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 4.193375,
+            "median_ms": 3.993375,
+            "min_ms": 3.904542,
+            "samples_ms": [
+              4.076292,
+              4.193375,
+              4.012541,
+              4.087708,
+              3.907834,
+              3.993375,
+              3.916541,
+              3.904542,
+              3.969042
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.202542,
+            "median_ms": 0.180208,
+            "min_ms": 0.174875,
+            "samples_ms": [
+              0.193875,
+              0.180208,
+              0.174875,
+              0.177334,
+              0.185625,
+              0.176834,
+              0.181,
+              0.202542,
+              0.180167
+            ]
+          },
+          "file": "build/archive-images/sample-tiff-02/pyramid.tif",
+          "fingerprint": "9304004304666319808",
+          "header_once_ms": 0.092334,
+          "jpeg_bytes": 23936,
+          "jpeg_fingerprint": "1766018953336347312",
+          "kind": "pipeline",
+          "level_height": 1728,
+          "level_width": 2592,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 4.922667,
+            "median_ms": 4.7151250000000005,
+            "min_ms": 4.616834,
+            "samples_ms": [
+              4.808708,
+              4.922667,
+              4.720291,
+              4.792542,
+              4.616834,
+              4.7151250000000005,
+              4.649458,
+              4.632792,
+              4.680584
+            ]
+          },
+          "resize": {
+            "max_ms": 0.551917,
+            "median_ms": 0.532875,
+            "min_ms": 0.523375,
+            "samples_ms": [
+              0.538541,
+              0.549084,
+              0.532875,
+              0.5275,
+              0.523375,
+              0.544916,
+              0.551917,
+              0.525708,
+              0.531375
+            ]
+          },
+          "source_height": 3456,
+          "source_width": 5184
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 23.385333,
+            "median_ms": 22.712959,
+            "min_ms": 22.376833,
+            "samples_ms": [
+              23.385333,
+              23.206625,
+              22.43,
+              22.517291,
+              22.376833,
+              22.825458,
+              22.712959,
+              22.969166,
+              22.634042
+            ]
+          },
+          "decoded_height": 306,
+          "decoded_width": 461,
+          "encode": {
+            "max_ms": 0.144792,
+            "median_ms": 0.137458,
+            "min_ms": 0.133667,
+            "samples_ms": [
+              0.137292,
+              0.143875,
+              0.137458,
+              0.138709,
+              0.134667,
+              0.133667,
+              0.141292,
+              0.136958,
+              0.144792
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/image.jp2",
+          "fingerprint": "13086884883071659722",
+          "header_once_ms": 0.072042,
+          "jpeg_bytes": 23786,
+          "jpeg_fingerprint": "6852083262620329681",
+          "kind": "pipeline",
+          "level_height": 306,
+          "level_width": 461,
+          "output_height": 169,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 23.891167,
+            "median_ms": 23.237542,
+            "min_ms": 22.869708000000003,
+            "samples_ms": [
+              23.891167,
+              23.724125,
+              22.923083,
+              23.04225,
+              22.869708000000003,
+              23.314583,
+              23.237542,
+              23.469333000000002,
+              23.159917
+            ]
+          },
+          "resize": {
+            "max_ms": 0.38625,
+            "median_ms": 0.368542,
+            "min_ms": 0.355458,
+            "samples_ms": [
+              0.368542,
+              0.373625,
+              0.355625,
+              0.38625,
+              0.358208,
+              0.355458,
+              0.383291,
+              0.363209,
+              0.381083
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 319.403542,
+            "median_ms": 313.296958,
+            "min_ms": 311.162375,
+            "samples_ms": [
+              314.896583,
+              313.296958,
+              311.66025,
+              314.016458,
+              313.175125,
+              316.345917,
+              311.162375,
+              311.333125,
+              319.403542
+            ]
+          },
+          "decoded_height": 1222,
+          "decoded_width": 1842,
+          "encode": {
+            "max_ms": 3.833708,
+            "median_ms": 3.694333,
+            "min_ms": 3.610584,
+            "samples_ms": [
+              3.699584,
+              3.666042,
+              3.667625,
+              3.833708,
+              3.720041,
+              3.694333,
+              3.642792,
+              3.733833,
+              3.610584
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/image.jp2",
+          "fingerprint": "12397072450605503277",
+          "header_once_ms": 0.05125,
+          "jpeg_bytes": 358671,
+          "jpeg_fingerprint": "17348009252234220967",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 995,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 332.79954200000003,
+            "median_ms": 326.81208300000003,
+            "min_ms": 324.529,
+            "samples_ms": [
+              328.36516700000004,
+              326.81208300000003,
+              325.143583,
+              327.663166,
+              326.73770799999994,
+              329.74099999999993,
+              324.529,
+              324.730958,
+              332.79954200000003
+            ]
+          },
+          "resize": {
+            "max_ms": 9.849083,
+            "median_ms": 9.785416,
+            "min_ms": 9.664,
+            "samples_ms": [
+              9.769,
+              9.849083,
+              9.815708,
+              9.813,
+              9.842542,
+              9.70075,
+              9.723833,
+              9.664,
+              9.785416
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 70.934375,
+            "median_ms": 69.632833,
+            "min_ms": 68.433625,
+            "samples_ms": [
+              68.972625,
+              70.547708,
+              70.934375,
+              69.632833,
+              68.632292,
+              70.130875,
+              70.687,
+              69.101208,
+              68.433625
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.21675,
+            "median_ms": 0.202666,
+            "min_ms": 0.191625,
+            "samples_ms": [
+              0.191625,
+              0.207333,
+              0.208375,
+              0.21675,
+              0.201875,
+              0.198459,
+              0.199833,
+              0.205375,
+              0.202666
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/image.jp2",
+          "fingerprint": "10568775922482469263",
+          "header_once_ms": 0.072583,
+          "jpeg_bytes": 30872,
+          "jpeg_fingerprint": "8850055610158887872",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 71.68620800000001,
+            "median_ms": 70.38016600000002,
+            "min_ms": 69.156375,
+            "samples_ms": [
+              69.67699999999999,
+              71.290458,
+              71.68620800000001,
+              70.38016600000002,
+              69.34045900000001,
+              70.842417,
+              71.422958,
+              69.835542,
+              69.156375
+            ]
+          },
+          "resize": {
+            "max_ms": 0.543458,
+            "median_ms": 0.528959,
+            "min_ms": 0.506292,
+            "samples_ms": [
+              0.51275,
+              0.535417,
+              0.543458,
+              0.530583,
+              0.506292,
+              0.513083,
+              0.536125,
+              0.528959,
+              0.520084
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 0.948709,
+            "median_ms": 0.891708,
+            "min_ms": 0.88375,
+            "samples_ms": [
+              0.948709,
+              0.920209,
+              0.907833,
+              0.896875,
+              0.888709,
+              0.886667,
+              0.891708,
+              0.888458,
+              0.88375
+            ]
+          },
+          "decoded_height": 306,
+          "decoded_width": 461,
+          "encode": {
+            "max_ms": 0.127375,
+            "median_ms": 0.11925,
+            "min_ms": 0.118333,
+            "samples_ms": [
+              0.127375,
+              0.124209,
+              0.120166,
+              0.11925,
+              0.119,
+              0.118625,
+              0.119417,
+              0.119125,
+              0.118333
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/pyramid.tif",
+          "fingerprint": "11826530088340130181",
+          "header_once_ms": 0.075333,
+          "jpeg_bytes": 23034,
+          "jpeg_fingerprint": "9946794848049168095",
+          "kind": "pipeline",
+          "level_height": 306,
+          "level_width": 461,
+          "output_height": 169,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 1.456209,
+            "median_ms": 1.3908749999999999,
+            "min_ms": 1.382333,
+            "samples_ms": [
+              1.456209,
+              1.427209,
+              1.410708,
+              1.39575,
+              1.387542,
+              1.386042,
+              1.3908749999999999,
+              1.387375,
+              1.382333
+            ]
+          },
+          "resize": {
+            "max_ms": 0.382791,
+            "median_ms": 0.380125,
+            "min_ms": 0.379625,
+            "samples_ms": [
+              0.380125,
+              0.382791,
+              0.382709,
+              0.379625,
+              0.379833,
+              0.38075,
+              0.37975,
+              0.379792,
+              0.38025
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 15.541208,
+            "median_ms": 13.59075,
+            "min_ms": 13.4535,
+            "samples_ms": [
+              13.640458,
+              13.59075,
+              13.628375,
+              13.454958,
+              13.488458,
+              13.515916,
+              13.4535,
+              15.541208,
+              13.961209
+            ]
+          },
+          "decoded_height": 1222,
+          "decoded_width": 1842,
+          "encode": {
+            "max_ms": 3.963625,
+            "median_ms": 3.644,
+            "min_ms": 3.545917,
+            "samples_ms": [
+              3.574625,
+              3.545917,
+              3.586917,
+              3.71675,
+              3.618083,
+              3.644,
+              3.868584,
+              3.963625,
+              3.879792
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/pyramid.tif",
+          "fingerprint": "12230892396254422295",
+          "header_once_ms": 0.052625,
+          "jpeg_bytes": 337427,
+          "jpeg_fingerprint": "2935980899611147827",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 995,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 29.421667,
+            "median_ms": 27.082708,
+            "min_ms": 26.798208,
+            "samples_ms": [
+              27.082708,
+              26.798208,
+              27.108708999999998,
+              26.836875000000003,
+              26.948625,
+              26.814541,
+              27.674042,
+              29.421667,
+              27.890542000000003
+            ]
+          },
+          "resize": {
+            "max_ms": 10.351958,
+            "median_ms": 9.867625,
+            "min_ms": 9.654625,
+            "samples_ms": [
+              9.867625,
+              9.661541,
+              9.893417,
+              9.665167,
+              9.842084,
+              9.654625,
+              10.351958,
+              9.916834,
+              10.049541
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 3.805125,
+            "median_ms": 3.595458,
+            "min_ms": 3.508667,
+            "samples_ms": [
+              3.525083,
+              3.805125,
+              3.721,
+              3.716958,
+              3.5905,
+              3.57825,
+              3.595458,
+              3.668833,
+              3.508667
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.202709,
+            "median_ms": 0.194792,
+            "min_ms": 0.180458,
+            "samples_ms": [
+              0.192083,
+              0.200541,
+              0.202709,
+              0.198458,
+              0.192833,
+              0.200916,
+              0.194792,
+              0.184791,
+              0.180458
+            ]
+          },
+          "file": "build/archive-images/sample-tif-01/pyramid.tif",
+          "fingerprint": "16767298186236222378",
+          "header_once_ms": 0.080459,
+          "jpeg_bytes": 30210,
+          "jpeg_fingerprint": "9524150234896623012",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 4.5275,
+            "median_ms": 4.332208,
+            "min_ms": 4.205166999999999,
+            "samples_ms": [
+              4.254958,
+              4.5275,
+              4.473833999999999,
+              4.450333,
+              4.331875,
+              4.295083000000001,
+              4.332208,
+              4.402207999999999,
+              4.205166999999999
+            ]
+          },
+          "resize": {
+            "max_ms": 0.550125,
+            "median_ms": 0.537792,
+            "min_ms": 0.515917,
+            "samples_ms": [
+              0.537792,
+              0.521834,
+              0.550125,
+              0.534917,
+              0.548542,
+              0.515917,
+              0.541958,
+              0.548584,
+              0.516042
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "thumbnail",
+          "channels": 1,
+          "decode": {
+            "max_ms": 13.734834,
+            "median_ms": 13.498375,
+            "min_ms": 13.302417,
+            "samples_ms": [
+              13.498375,
+              13.734834,
+              13.646333,
+              13.697375,
+              13.399125,
+              13.329166,
+              13.547416,
+              13.302417,
+              13.328708
+            ]
+          },
+          "decoded_height": 438,
+          "decoded_width": 458,
+          "encode": {
+            "max_ms": 0.130166,
+            "median_ms": 0.10125,
+            "min_ms": 0.099,
+            "samples_ms": [
+              0.10275,
+              0.100958,
+              0.10125,
+              0.0995,
+              0.099,
+              0.108583,
+              0.099458,
+              0.103666,
+              0.130166
+            ]
+          },
+          "file": "build/archive-images/pharch_03/image.jp2",
+          "fingerprint": "4898572496037478400",
+          "header_once_ms": 0.075708,
+          "jpeg_bytes": 15107,
+          "jpeg_fingerprint": "10313774899404516860",
+          "kind": "pipeline",
+          "level_height": 438,
+          "level_width": 458,
+          "output_height": 245,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 14.235292,
+            "median_ms": 14.019041999999999,
+            "min_ms": 13.824125,
+            "samples_ms": [
+              14.019041999999999,
+              14.235292,
+              14.155167,
+              14.230542,
+              13.899167,
+              13.867208,
+              14.037041,
+              13.824125,
+              13.864833
+            ]
+          },
+          "resize": {
+            "max_ms": 0.433667,
+            "median_ms": 0.407584,
+            "min_ms": 0.390167,
+            "samples_ms": [
+              0.417917,
+              0.3995,
+              0.407584,
+              0.433667,
+              0.401042,
+              0.429459,
+              0.390167,
+              0.418042,
+              0.405959
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "preview",
+          "channels": 1,
+          "decode": {
+            "max_ms": 185.672875,
+            "median_ms": 179.854458,
+            "min_ms": 179.457666,
+            "samples_ms": [
+              185.672875,
+              180.37,
+              179.457666,
+              179.832583,
+              179.744709,
+              179.79525,
+              179.854458,
+              180.591958,
+              184.589916
+            ]
+          },
+          "decoded_height": 1751,
+          "decoded_width": 1829,
+          "encode": {
+            "max_ms": 3.341958,
+            "median_ms": 3.284667,
+            "min_ms": 3.220292,
+            "samples_ms": [
+              3.284667,
+              3.33475,
+              3.314625,
+              3.240375,
+              3.340292,
+              3.276833,
+              3.2565,
+              3.220292,
+              3.341958
+            ]
+          },
+          "file": "build/archive-images/pharch_03/image.jp2",
+          "fingerprint": "7681638650513400356",
+          "header_once_ms": 0.036167,
+          "jpeg_bytes": 573829,
+          "jpeg_fingerprint": "15651688737131737583",
+          "kind": "pipeline",
+          "level_height": 1751,
+          "level_width": 1829,
+          "output_height": 1436,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 199.168292,
+            "median_ms": 193.314666,
+            "min_ms": 192.972041,
+            "samples_ms": [
+              199.168292,
+              193.98925000000003,
+              192.972041,
+              193.277125,
+              192.987042,
+              193.30579100000003,
+              193.314666,
+              193.925958,
+              198.216541
+            ]
+          },
+          "resize": {
+            "max_ms": 10.284667,
+            "median_ms": 10.204167,
+            "min_ms": 9.902041,
+            "samples_ms": [
+              10.21075,
+              10.2845,
+              10.19975,
+              10.204167,
+              9.902041,
+              10.233708,
+              10.203708,
+              10.113708,
+              10.284667
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "tile",
+          "channels": 1,
+          "decode": {
+            "max_ms": 28.500167,
+            "median_ms": 27.945667,
+            "min_ms": 27.612792,
+            "samples_ms": [
+              28.500167,
+              28.349666,
+              28.329666,
+              28.022292,
+              27.945667,
+              27.754916,
+              27.827542,
+              27.727833,
+              27.612792
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.124667,
+            "median_ms": 0.11425,
+            "min_ms": 0.110042,
+            "samples_ms": [
+              0.11975,
+              0.112167,
+              0.124667,
+              0.110209,
+              0.115792,
+              0.11775,
+              0.110917,
+              0.11425,
+              0.110042
+            ]
+          },
+          "file": "build/archive-images/pharch_03/image.jp2",
+          "fingerprint": "5772067334232637559",
+          "header_once_ms": 0.067708,
+          "jpeg_bytes": 18738,
+          "jpeg_fingerprint": "15070606276865928363",
+          "kind": "pipeline",
+          "level_height": 1751,
+          "level_width": 1829,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 29.188959,
+            "median_ms": 28.592709,
+            "min_ms": 28.258958999999997,
+            "samples_ms": [
+              29.188959,
+              28.981375,
+              29.00075,
+              28.651334000000002,
+              28.592709,
+              28.381416,
+              28.454792,
+              28.407125,
+              28.258958999999997
+            ]
+          },
+          "resize": {
+            "max_ms": 0.569042,
+            "median_ms": 0.53125,
+            "min_ms": 0.50875,
+            "samples_ms": [
+              0.569042,
+              0.519542,
+              0.546417,
+              0.518833,
+              0.53125,
+              0.50875,
+              0.516333,
+              0.565042,
+              0.536125
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "thumbnail",
+          "channels": 1,
+          "decode": {
+            "max_ms": 0.508458,
+            "median_ms": 0.45675,
+            "min_ms": 0.445625,
+            "samples_ms": [
+              0.504875,
+              0.508458,
+              0.460792,
+              0.455542,
+              0.452,
+              0.448333,
+              0.45675,
+              0.445625,
+              0.464
+            ]
+          },
+          "decoded_height": 438,
+          "decoded_width": 458,
+          "encode": {
+            "max_ms": 0.098167,
+            "median_ms": 0.089166,
+            "min_ms": 0.086834,
+            "samples_ms": [
+              0.091334,
+              0.087125,
+              0.086834,
+              0.089166,
+              0.087417,
+              0.087542,
+              0.092416,
+              0.09075,
+              0.098167
+            ]
+          },
+          "file": "build/archive-images/pharch_03/pyramid.tif",
+          "fingerprint": "7413100428399847127",
+          "header_once_ms": 0.069209,
+          "jpeg_bytes": 12883,
+          "jpeg_fingerprint": "11883975332426513284",
+          "kind": "pipeline",
+          "level_height": 438,
+          "level_width": 458,
+          "output_height": 245,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 1.036167,
+            "median_ms": 0.972042,
+            "min_ms": 0.958209,
+            "samples_ms": [
+              1.036167,
+              1.00325,
+              0.958209,
+              0.963333,
+              0.95875,
+              0.9606250000000001,
+              0.9861660000000001,
+              0.972042,
+              1.0006249999999999
+            ]
+          },
+          "resize": {
+            "max_ms": 0.439958,
+            "median_ms": 0.42475,
+            "min_ms": 0.407667,
+            "samples_ms": [
+              0.439958,
+              0.407667,
+              0.410583,
+              0.418625,
+              0.419333,
+              0.42475,
+              0.437,
+              0.435667,
+              0.438458
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "preview",
+          "channels": 1,
+          "decode": {
+            "max_ms": 8.1055,
+            "median_ms": 7.883458,
+            "min_ms": 6.959417,
+            "samples_ms": [
+              6.959417,
+              7.296708,
+              7.604417,
+              7.970709,
+              7.920125,
+              8.1055,
+              8.005666,
+              7.568541,
+              7.883458
+            ]
+          },
+          "decoded_height": 1751,
+          "decoded_width": 1829,
+          "encode": {
+            "max_ms": 3.687584,
+            "median_ms": 3.356833,
+            "min_ms": 3.213667,
+            "samples_ms": [
+              3.213667,
+              3.687584,
+              3.460333,
+              3.316375,
+              3.356833,
+              3.652584,
+              3.330125,
+              3.49575,
+              3.302375
+            ]
+          },
+          "file": "build/archive-images/pharch_03/pyramid.tif",
+          "fingerprint": "437263789504098420",
+          "header_once_ms": 0.055709,
+          "jpeg_bytes": 505197,
+          "jpeg_fingerprint": "1944789204218121217",
+          "kind": "pipeline",
+          "level_height": 1751,
+          "level_width": 1829,
+          "output_height": 1436,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 23.857499999999998,
+            "median_ms": 22.165417,
+            "min_ms": 20.876292,
+            "samples_ms": [
+              20.876292,
+              22.353042000000002,
+              21.849207999999997,
+              21.886584000000003,
+              22.535249999999998,
+              23.857499999999998,
+              22.498665999999997,
+              21.912458,
+              22.165417
+            ]
+          },
+          "resize": {
+            "max_ms": 12.099416,
+            "median_ms": 10.979584,
+            "min_ms": 10.5995,
+            "samples_ms": [
+              10.703208,
+              11.36875,
+              10.784458,
+              10.5995,
+              11.258292,
+              12.099416,
+              11.162875,
+              10.848167,
+              10.979584
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "tile",
+          "channels": 1,
+          "decode": {
+            "max_ms": 1.429166,
+            "median_ms": 1.394833,
+            "min_ms": 1.345125,
+            "samples_ms": [
+              1.347042,
+              1.345125,
+              1.394833,
+              1.394167,
+              1.4005,
+              1.418625,
+              1.393875,
+              1.418458,
+              1.429166
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.12075,
+            "median_ms": 0.11625,
+            "min_ms": 0.110208,
+            "samples_ms": [
+              0.117209,
+              0.110208,
+              0.12075,
+              0.116584,
+              0.110417,
+              0.118375,
+              0.11625,
+              0.113917,
+              0.110417
+            ]
+          },
+          "file": "build/archive-images/pharch_03/pyramid.tif",
+          "fingerprint": "9625357568638088881",
+          "header_once_ms": 0.070042,
+          "jpeg_bytes": 17616,
+          "jpeg_fingerprint": "8824893869739589817",
+          "kind": "pipeline",
+          "level_height": 1751,
+          "level_width": 1829,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 2.1473329999999997,
+            "median_ms": 2.0985840000000002,
+            "min_ms": 2.012667,
+            "samples_ms": [
+              2.030417,
+              2.012667,
+              2.091291,
+              2.114834,
+              2.0985840000000002,
+              2.099167,
+              2.073833,
+              2.1102499999999997,
+              2.1473329999999997
+            ]
+          },
+          "resize": {
+            "max_ms": 0.60775,
+            "median_ms": 0.575708,
+            "min_ms": 0.557334,
+            "samples_ms": [
+              0.566166,
+              0.557334,
+              0.575708,
+              0.604083,
+              0.587667,
+              0.562167,
+              0.563708,
+              0.577875,
+              0.60775
+            ]
+          },
+          "source_height": 3502,
+          "source_width": 3658
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 26.702166,
+            "median_ms": 25.705375,
+            "min_ms": 24.995083,
+            "samples_ms": [
+              26.600333,
+              26.702166,
+              25.251625,
+              26.396584,
+              25.637,
+              26.110541,
+              25.705375,
+              24.995083,
+              25.247792
+            ]
+          },
+          "decoded_height": 306,
+          "decoded_width": 461,
+          "encode": {
+            "max_ms": 0.174667,
+            "median_ms": 0.159166,
+            "min_ms": 0.153166,
+            "samples_ms": [
+              0.168791,
+              0.174667,
+              0.153875,
+              0.153166,
+              0.165083,
+              0.161,
+              0.156792,
+              0.159166,
+              0.156833
+            ]
+          },
+          "file": "build/archive-images/pharch_02/image.jp2",
+          "fingerprint": "18344522372620370929",
+          "header_once_ms": 0.074625,
+          "jpeg_bytes": 26864,
+          "jpeg_fingerprint": "360873414161587265",
+          "kind": "pipeline",
+          "level_height": 306,
+          "level_width": 461,
+          "output_height": 169,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 27.287582999999998,
+            "median_ms": 26.248874999999998,
+            "min_ms": 25.543666,
+            "samples_ms": [
+              27.190208,
+              27.287582999999998,
+              25.8045,
+              26.92925,
+              26.21,
+              26.690250000000002,
+              26.248874999999998,
+              25.543666,
+              25.788999999999998
+            ]
+          },
+          "resize": {
+            "max_ms": 0.421084,
+            "median_ms": 0.399,
+            "min_ms": 0.3795,
+            "samples_ms": [
+              0.421084,
+              0.41075,
+              0.399,
+              0.3795,
+              0.407917,
+              0.418709,
+              0.386708,
+              0.389417,
+              0.384375
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 361.38875,
+            "median_ms": 336.661792,
+            "min_ms": 327.875792,
+            "samples_ms": [
+              345.988791,
+              329.107,
+              332.809292,
+              327.875792,
+              328.864167,
+              361.38875,
+              339.493417,
+              351.06575,
+              336.661792
+            ]
+          },
+          "decoded_height": 1222,
+          "decoded_width": 1842,
+          "encode": {
+            "max_ms": 4.077917,
+            "median_ms": 3.903792,
+            "min_ms": 3.776709,
+            "samples_ms": [
+              3.998958,
+              3.903792,
+              3.824458,
+              3.890167,
+              3.9745,
+              4.077917,
+              3.857375,
+              4.062333,
+              3.776709
+            ]
+          },
+          "file": "build/archive-images/pharch_02/image.jp2",
+          "fingerprint": "4453040703955328848",
+          "header_once_ms": 0.066334,
+          "jpeg_bytes": 460152,
+          "jpeg_fingerprint": "2165157448174792844",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 995,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 376.50750000000005,
+            "median_ms": 350.17504199999996,
+            "min_ms": 341.379042,
+            "samples_ms": [
+              359.862458,
+              343.02587500000004,
+              346.20779200000004,
+              341.379042,
+              342.39354199999997,
+              376.50750000000005,
+              353.188167,
+              364.85075,
+              350.17504199999996
+            ]
+          },
+          "resize": {
+            "max_ms": 11.040833,
+            "median_ms": 9.736541,
+            "min_ms": 9.554875,
+            "samples_ms": [
+              9.874709,
+              10.015083,
+              9.574042,
+              9.613083,
+              9.554875,
+              11.040833,
+              9.837375,
+              9.722667,
+              9.736541
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 74.3845,
+            "median_ms": 72.042375,
+            "min_ms": 71.567542,
+            "samples_ms": [
+              72.632208,
+              72.042375,
+              74.3845,
+              72.826875,
+              72.115833,
+              71.567542,
+              71.606375,
+              71.978375,
+              71.811833
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.207875,
+            "median_ms": 0.198208,
+            "min_ms": 0.191458,
+            "samples_ms": [
+              0.202375,
+              0.191458,
+              0.203584,
+              0.206542,
+              0.207875,
+              0.197291,
+              0.198208,
+              0.195959,
+              0.192834
+            ]
+          },
+          "file": "build/archive-images/pharch_02/image.jp2",
+          "fingerprint": "17165426993959321320",
+          "header_once_ms": 0.065209,
+          "jpeg_bytes": 31759,
+          "jpeg_fingerprint": "9116004255178898",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 75.10420900000001,
+            "median_ms": 72.738208,
+            "min_ms": 72.27070800000001,
+            "samples_ms": [
+              73.35791700000001,
+              72.738208,
+              75.10420900000001,
+              73.562667,
+              72.830833,
+              72.27070800000001,
+              72.321958,
+              72.728375,
+              72.5095
+            ]
+          },
+          "resize": {
+            "max_ms": 0.554041,
+            "median_ms": 0.516125,
+            "min_ms": 0.504375,
+            "samples_ms": [
+              0.523334,
+              0.504375,
+              0.516125,
+              0.52925,
+              0.507125,
+              0.505875,
+              0.517375,
+              0.554041,
+              0.504833
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 1.095709,
+            "median_ms": 0.992875,
+            "min_ms": 0.959917,
+            "samples_ms": [
+              0.998667,
+              0.982292,
+              1.03275,
+              1.021167,
+              0.992875,
+              0.97625,
+              0.964666,
+              0.959917,
+              1.095709
+            ]
+          },
+          "decoded_height": 306,
+          "decoded_width": 461,
+          "encode": {
+            "max_ms": 0.148709,
+            "median_ms": 0.133125,
+            "min_ms": 0.125541,
+            "samples_ms": [
+              0.133125,
+              0.148709,
+              0.142583,
+              0.137334,
+              0.131417,
+              0.127416,
+              0.125708,
+              0.125541,
+              0.145875
+            ]
+          },
+          "file": "build/archive-images/pharch_02/pyramid.tif",
+          "fingerprint": "16401710388303905973",
+          "header_once_ms": 0.085541,
+          "jpeg_bytes": 25680,
+          "jpeg_fingerprint": "5564567096709648932",
+          "kind": "pipeline",
+          "level_height": 306,
+          "level_width": 461,
+          "output_height": 169,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 1.625375,
+            "median_ms": 1.510667,
+            "min_ms": 1.4653749999999999,
+            "samples_ms": [
+              1.5153329999999998,
+              1.510667,
+              1.55125,
+              1.558542,
+              1.504375,
+              1.483666,
+              1.470333,
+              1.4653749999999999,
+              1.625375
+            ]
+          },
+          "resize": {
+            "max_ms": 0.400041,
+            "median_ms": 0.38,
+            "min_ms": 0.375917,
+            "samples_ms": [
+              0.383541,
+              0.379666,
+              0.375917,
+              0.400041,
+              0.380083,
+              0.38,
+              0.379959,
+              0.379917,
+              0.383791
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 13.708541,
+            "median_ms": 13.573042,
+            "min_ms": 13.334042,
+            "samples_ms": [
+              13.670084,
+              13.708541,
+              13.523875,
+              13.577083,
+              13.548917,
+              13.334042,
+              13.573042,
+              13.543167,
+              13.704625
+            ]
+          },
+          "decoded_height": 1222,
+          "decoded_width": 1842,
+          "encode": {
+            "max_ms": 3.948458,
+            "median_ms": 3.776625,
+            "min_ms": 3.697792,
+            "samples_ms": [
+              3.776625,
+              3.697792,
+              3.746833,
+              3.856375,
+              3.79475,
+              3.823875,
+              3.948458,
+              3.767083,
+              3.728125
+            ]
+          },
+          "file": "build/archive-images/pharch_02/pyramid.tif",
+          "fingerprint": "13696124861872025313",
+          "header_once_ms": 0.056375,
+          "jpeg_bytes": 421824,
+          "jpeg_fingerprint": "15464526283763387152",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 995,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 27.447,
+            "median_ms": 27.056333000000002,
+            "min_ms": 26.804417,
+            "samples_ms": [
+              27.12875,
+              27.056333000000002,
+              26.947208,
+              27.006083,
+              26.920292,
+              26.804417,
+              27.447,
+              27.141375,
+              27.310792
+            ]
+          },
+          "resize": {
+            "max_ms": 9.9255,
+            "median_ms": 9.6765,
+            "min_ms": 9.572625,
+            "samples_ms": [
+              9.682041,
+              9.65,
+              9.6765,
+              9.572625,
+              9.576625,
+              9.6465,
+              9.9255,
+              9.831125,
+              9.878042
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 4.231834,
+            "median_ms": 3.754208,
+            "min_ms": 3.592292,
+            "samples_ms": [
+              3.852375,
+              3.808125,
+              3.592292,
+              3.757875,
+              4.231834,
+              3.754208,
+              3.614709,
+              3.691666,
+              3.6805
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 512,
+          "encode": {
+            "max_ms": 0.210042,
+            "median_ms": 0.203291,
+            "min_ms": 0.193625,
+            "samples_ms": [
+              0.203334,
+              0.208,
+              0.197208,
+              0.1955,
+              0.210042,
+              0.2035,
+              0.193625,
+              0.203291,
+              0.198167
+            ]
+          },
+          "file": "build/archive-images/pharch_02/pyramid.tif",
+          "fingerprint": "8598837123170913118",
+          "header_once_ms": 0.0605,
+          "jpeg_bytes": 30831,
+          "jpeg_fingerprint": "12275338145713760072",
+          "kind": "pipeline",
+          "level_height": 1222,
+          "level_width": 1842,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 5.046917,
+            "median_ms": 4.494167,
+            "min_ms": 4.349,
+            "samples_ms": [
+              4.612959,
+              4.561166,
+              4.349,
+              4.494167,
+              5.046917,
+              4.498833,
+              4.351834,
+              4.4401660000000005,
+              4.4125
+            ]
+          },
+          "resize": {
+            "max_ms": 0.605041,
+            "median_ms": 0.545041,
+            "min_ms": 0.533833,
+            "samples_ms": [
+              0.55725,
+              0.545041,
+              0.5595,
+              0.540792,
+              0.605041,
+              0.541125,
+              0.5435,
+              0.545209,
+              0.533833
+            ]
+          },
+          "source_height": 2444,
+          "source_width": 3684
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 34.138666,
+            "median_ms": 33.329167,
+            "min_ms": 33.195083,
+            "samples_ms": [
+              33.849834,
+              33.424916,
+              33.195083,
+              33.247959,
+              33.8305,
+              34.138666,
+              33.329167,
+              33.227792,
+              33.275
+            ]
+          },
+          "decoded_height": 553,
+          "decoded_width": 418,
+          "encode": {
+            "max_ms": 0.2955,
+            "median_ms": 0.287791,
+            "min_ms": 0.276542,
+            "samples_ms": [
+              0.287916,
+              0.286834,
+              0.289167,
+              0.287791,
+              0.276542,
+              0.2955,
+              0.279834,
+              0.288791,
+              0.278292
+            ]
+          },
+          "file": "build/archive-images/pharch_01/image.jp2",
+          "fingerprint": "8895765593098321529",
+          "header_once_ms": 0.081708,
+          "jpeg_bytes": 51843,
+          "jpeg_fingerprint": "13571340376371173874",
+          "kind": "pipeline",
+          "level_height": 553,
+          "level_width": 418,
+          "output_height": 338,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 35.176125,
+            "median_ms": 34.276542,
+            "min_ms": 34.15262499999999,
+            "samples_ms": [
+              34.846625,
+              34.413875000000004,
+              34.15262499999999,
+              34.244375,
+              34.7885,
+              35.176125,
+              34.276542,
+              34.23575,
+              34.220459
+            ]
+          },
+          "resize": {
+            "max_ms": 0.741959,
+            "median_ms": 0.702125,
+            "min_ms": 0.667167,
+            "samples_ms": [
+              0.708875,
+              0.702125,
+              0.668375,
+              0.708625,
+              0.681458,
+              0.741959,
+              0.667541,
+              0.719167,
+              0.667167
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 419.322292,
+            "median_ms": 397.551792,
+            "min_ms": 370.859417,
+            "samples_ms": [
+              418.473041,
+              419.322292,
+              392.21925,
+              370.859417,
+              375.521416,
+              391.900542,
+              406.676083,
+              397.551792,
+              397.966083
+            ]
+          },
+          "decoded_height": 2212,
+          "decoded_width": 1671,
+          "encode": {
+            "max_ms": 11.03,
+            "median_ms": 8.468084,
+            "min_ms": 7.868667,
+            "samples_ms": [
+              11.03,
+              9.092291,
+              8.468084,
+              7.868667,
+              8.158083,
+              8.639583,
+              8.612333,
+              8.3105,
+              8.281708
+            ]
+          },
+          "file": "build/archive-images/pharch_01/image.jp2",
+          "fingerprint": "15316176203803551914",
+          "header_once_ms": 0.048333,
+          "jpeg_bytes": 979650,
+          "jpeg_fingerprint": "2996946872768219766",
+          "kind": "pipeline",
+          "level_height": 2212,
+          "level_width": 1671,
+          "output_height": 1985,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 450.276875,
+            "median_ms": 424.87791699999997,
+            "min_ms": 396.985292,
+            "samples_ms": [
+              450.276875,
+              447.72724999999997,
+              418.994959,
+              396.985292,
+              402.23183299999994,
+              419.54533299999997,
+              433.739333,
+              424.87791699999997,
+              424.915208
+            ]
+          },
+          "resize": {
+            "max_ms": 20.773834,
+            "median_ms": 18.667417,
+            "min_ms": 18.257208,
+            "samples_ms": [
+              20.773834,
+              19.312667,
+              18.307625,
+              18.257208,
+              18.552334,
+              19.005208,
+              18.450917,
+              19.015625,
+              18.667417
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 54.229208,
+            "median_ms": 50.192584,
+            "min_ms": 49.373042,
+            "samples_ms": [
+              54.229208,
+              51.2435,
+              50.212583,
+              49.602416,
+              49.961917,
+              50.192584,
+              49.658292,
+              49.373042,
+              51.013666
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 513,
+          "encode": {
+            "max_ms": 0.215833,
+            "median_ms": 0.204667,
+            "min_ms": 0.197417,
+            "samples_ms": [
+              0.214375,
+              0.204584,
+              0.203375,
+              0.209708,
+              0.205833,
+              0.204667,
+              0.197417,
+              0.20225,
+              0.215833
+            ]
+          },
+          "file": "build/archive-images/pharch_01/image.jp2",
+          "fingerprint": "11752873614916636687",
+          "header_once_ms": 0.073458,
+          "jpeg_bytes": 31578,
+          "jpeg_fingerprint": "6490833389542215498",
+          "kind": "pipeline",
+          "level_height": 1106,
+          "level_width": 836,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 55.000417,
+            "median_ms": 50.925959,
+            "min_ms": 50.107791999999996,
+            "samples_ms": [
+              55.000417,
+              51.96558399999999,
+              50.934875000000005,
+              50.331666,
+              50.687957999999995,
+              50.925959,
+              50.388667000000005,
+              50.107791999999996,
+              51.775916
+            ]
+          },
+          "resize": {
+            "max_ms": 0.556834,
+            "median_ms": 0.528708,
+            "min_ms": 0.5175,
+            "samples_ms": [
+              0.556834,
+              0.5175,
+              0.518917,
+              0.519542,
+              0.520208,
+              0.528708,
+              0.532958,
+              0.5325,
+              0.546417
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "thumbnail",
+          "channels": 3,
+          "decode": {
+            "max_ms": 1.919833,
+            "median_ms": 1.828417,
+            "min_ms": 1.777041,
+            "samples_ms": [
+              1.866209,
+              1.81325,
+              1.800375,
+              1.919833,
+              1.828417,
+              1.893167,
+              1.834792,
+              1.790875,
+              1.777041
+            ]
+          },
+          "decoded_height": 553,
+          "decoded_width": 418,
+          "encode": {
+            "max_ms": 0.330291,
+            "median_ms": 0.285917,
+            "min_ms": 0.273792,
+            "samples_ms": [
+              0.289542,
+              0.277667,
+              0.330291,
+              0.297167,
+              0.285917,
+              0.287209,
+              0.284834,
+              0.276959,
+              0.273792
+            ]
+          },
+          "file": "build/archive-images/pharch_01/pyramid.tif",
+          "fingerprint": "1096044753875958091",
+          "header_once_ms": 0.077291,
+          "jpeg_bytes": 49141,
+          "jpeg_fingerprint": "9489163008284345192",
+          "kind": "pipeline",
+          "level_height": 553,
+          "level_width": 418,
+          "output_height": 338,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 2.962875,
+            "median_ms": 2.854042,
+            "min_ms": 2.797583,
+            "samples_ms": [
+              2.874667,
+              2.832083,
+              2.848958,
+              2.962875,
+              2.854042,
+              2.9218339999999996,
+              2.858292,
+              2.810584,
+              2.797583
+            ]
+          },
+          "resize": {
+            "max_ms": 0.74675,
+            "median_ms": 0.741166,
+            "min_ms": 0.718292,
+            "samples_ms": [
+              0.718916,
+              0.741166,
+              0.718292,
+              0.745875,
+              0.739708,
+              0.741458,
+              0.738666,
+              0.74275,
+              0.74675
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "preview",
+          "channels": 3,
+          "decode": {
+            "max_ms": 30.975375,
+            "median_ms": 26.383625,
+            "min_ms": 25.566375,
+            "samples_ms": [
+              30.975375,
+              27.171834,
+              26.673917,
+              26.066458,
+              26.07975,
+              29.5235,
+              26.146667,
+              26.383625,
+              25.566375
+            ]
+          },
+          "decoded_height": 2212,
+          "decoded_width": 1671,
+          "encode": {
+            "max_ms": 9.296,
+            "median_ms": 8.147833,
+            "min_ms": 7.97875,
+            "samples_ms": [
+              9.25375,
+              8.151041,
+              8.139416,
+              8.085208,
+              9.296,
+              8.170541,
+              8.147833,
+              8.063625,
+              7.97875
+            ]
+          },
+          "file": "build/archive-images/pharch_01/pyramid.tif",
+          "fingerprint": "15316176203803551914",
+          "header_once_ms": 0.060209,
+          "jpeg_bytes": 979650,
+          "jpeg_fingerprint": "2996946872768219766",
+          "kind": "pipeline",
+          "level_height": 2212,
+          "level_width": 1671,
+          "output_height": 1985,
+          "output_width": 1500,
+          "render_core": {
+            "max_ms": 64.891959,
+            "median_ms": 53.31608299999999,
+            "min_ms": 51.535542,
+            "samples_ms": [
+              64.891959,
+              56.262750000000004,
+              53.31608299999999,
+              52.639208,
+              55.924875,
+              56.197083,
+              52.63525,
+              52.430542,
+              51.535542
+            ]
+          },
+          "resize": {
+            "max_ms": 24.662834,
+            "median_ms": 18.50275,
+            "min_ms": 17.983292,
+            "samples_ms": [
+              24.662834,
+              20.939875,
+              18.50275,
+              18.487542,
+              20.549125,
+              18.503042,
+              18.34075,
+              17.983292,
+              17.990417
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        },
+        {
+          "case": "tile",
+          "channels": 3,
+          "decode": {
+            "max_ms": 3.161458,
+            "median_ms": 3.102833,
+            "min_ms": 3.00575,
+            "samples_ms": [
+              3.150667,
+              3.093125,
+              3.161458,
+              3.14775,
+              3.00575,
+              3.02525,
+              3.102833,
+              3.114125,
+              3.059958
+            ]
+          },
+          "decoded_height": 512,
+          "decoded_width": 513,
+          "encode": {
+            "max_ms": 0.212542,
+            "median_ms": 0.196041,
+            "min_ms": 0.188833,
+            "samples_ms": [
+              0.196041,
+              0.199917,
+              0.195583,
+              0.212542,
+              0.193209,
+              0.188833,
+              0.195084,
+              0.1975,
+              0.210583
+            ]
+          },
+          "file": "build/archive-images/pharch_01/pyramid.tif",
+          "fingerprint": "12901465246871308689",
+          "header_once_ms": 0.127,
+          "jpeg_bytes": 30794,
+          "jpeg_fingerprint": "4152893038209502934",
+          "kind": "pipeline",
+          "level_height": 1106,
+          "level_width": 836,
+          "output_height": 256,
+          "output_width": 256,
+          "render_core": {
+            "max_ms": 3.903333,
+            "median_ms": 3.831,
+            "min_ms": 3.722625,
+            "samples_ms": [
+              3.8875830000000002,
+              3.817667,
+              3.903333,
+              3.8971669999999996,
+              3.722625,
+              3.746083,
+              3.831,
+              3.8515829999999998,
+              3.802416
+            ]
+          },
+          "resize": {
+            "max_ms": 0.546292,
+            "median_ms": 0.533083,
+            "min_ms": 0.523666,
+            "samples_ms": [
+              0.540875,
+              0.524625,
+              0.546292,
+              0.536875,
+              0.523666,
+              0.532,
+              0.533083,
+              0.539958,
+              0.531875
+            ]
+          },
+          "source_height": 2212,
+          "source_width": 1671
+        }
+      ],
+      "compiler": "Apple LLVM 21.0.0 (clang-2100.3.34.2)",
+      "ndebug": true,
+      "repetitions": 9,
+      "schema": 1,
+      "warmups": 2
+    }
+  ]
+}

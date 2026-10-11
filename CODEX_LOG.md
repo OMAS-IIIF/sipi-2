@@ -1,3 +1,39 @@
+### Update 2026-10-12 00:34
+- Decisions: Retain axis-weight reuse and stop further optimization for now. TIFF preview gains are clear; thumbnail and JP2 total gains must be qualified.
+- Implementation: Imported remote archive report; verified same binaries/source and all twelve ARM corpus hashes, complete ABBA cases/samples, recomputed comparisons and medians. All 1,836 pixel and 1,296 JPEG outputs match. Recorded stage attribution and limitations; no runtime changes.
+- Open: Deploy the optimized version through the normal release workflow when desired; no new image or deployment in this step.
+- Risks/Assumptions: Single-worker warm local render core on generic x86 VM, not HTTP throughput. TIFF preview resize 1.26×/core 9.3% less time; tile resize 1.29×/core 3.2% less. TIFF thumbnails mixed (one slower input), aggregate 2.1% not robust. JP2 core gains 0.5–1.5%, decode dominates; unchanged stages also fluctuate. No general hardware/format ranking.
+
+### Update 2026-10-12 00:27
+- Decisions: Reuse the existing AMD64 benchmark image and transfer only the six prepared TIFF/JP2 pairs, outside the media repository. Preserve exact ARM comparison inputs.
+- Implementation: Added a standard-library packager validating baseline hashes, checksum manifest and read-only Docker launcher for all twelve images. Created the 483.8 MiB transfer archive and archive checksum in build/resize-docker; documented copy/extract/run/return commands.
+- Open: User runs the full archive comparison on media.home.org and returns resize-home-images.json for stage attribution.
+- Risks/Assumptions: All twelve packaged file hashes independently verified from archive; shell syntax and launcher argument/checksum-failure behavior pass. Existing AMD64 image completes a four-run TIFF/JP2 pair smoke with 21 matching cases; emulated timings are excluded from performance claims. No new Docker image, production data changes, deployment or remote execution.
+
+### Update 2026-10-12 00:23
+- Decisions: Retain axis-weight reuse based on positive Home x86 VM results; defer explicit SIMD and distinguish synthetic speedup from server throughput.
+- Implementation: Imported the unmodified remote JSON, verified exact binary/source identity against the prepared image, ABBA case/sample completeness, all 540 measured output fingerprints and recomputed medians/comparisons. Added measured report and context links; no runtime changes.
+- Open: Optional six-pair archive TIFF/JP2 render-core measurement on the VM.
+- Risks/Assumptions: Guest presents generic QEMU/AuthenticAMD CPU despite user-described Intel host, with no AVX/AVX2; physical host cannot be inferred. RGB reduction 1.09–1.24×, enlargement 2.34×; gray thumbnail gain varies between pairs. Synthetic single-worker timings exclude codecs/HTTP/cache. No deployment or VM configuration changes.
+
+### Update 2026-10-12 00:19
+- Decisions: Package an offline AMD64 scaling comparison with identical toolchain/dependencies and a frozen pre-axis reference; keep the server runtime target unchanged. No registry push or remote deployment.
+- Implementation: Added opt-in Docker build/runtime stages, historical source provenance, serial ABBA Python runner with fingerprint/case validation and CPU/cgroup/input/binary/source evidence, regression tests and transfer/run documentation. Built and exported `build/resize-docker/resize-axis-amd64.tar.gz` (about 44 MiB).
+- Open: Transfer the archive to media.home.org and run natively; synthetic inputs need no files, optional real-image pairs use a separate read-only mount. Native Intel results remain outstanding.
+- Risks/Assumptions: Three comparison regression tests pass. Native synthetic and TIFF runner smoke passes; AMD64 read-only/network-disabled/non-root container smoke completes four runs with all 15 cases matching. Mac emulation timings are not performance evidence. Shared VM/host load and exposed CPU flags affect results. Full source unchanged in this step; diff check clean.
+
+### Update 2026-10-12 00:08
+- Decisions: Reuse compact axis supports without changing the filter, contribution order or working-memory contract; defer SIMD and channel specialization.
+- Implementation: Cached horizontal supports (40 bytes/column on this build) within the remaining budget, vertical support once per row, on-demand fallback for tight budgets. Added 4,000 deterministic layout/window/budget cases and an ABBA Release benchmark report with raw samples and hashes.
+- Open: Optional native x86 measurement before further optimization. No version bump, Docker build or deployment performed.
+- Risks/Assumptions: Warm local ARM64 single-thread render core, not HTTP throughput. TIFF resize gains 1.35×/1.20×/1.07× for thumbnails/previews/tiles; total core about 12%/6%/0% shorter. JP2 remains decoder-bound. All 1,836 pixel and 1,296 JPEG fingerprints match; 4,000 old/new and cached/fallback cases pass. Full Debug and Release suites each pass 71/71; ASan/UBSan pass. No Intel/AMD performance claim.
+
+### Update 2026-10-12 00:00
+- Decisions: Establish a Release baseline before optimizing scaling; defer rotation and explicit SIMD. Use production read-level selection and separate decode/resize/JPEG timing rather than full-resolution-only estimates.
+- Implementation: Added excluded-from-all resize-benchmark with gray/RGB/RGBA kernels, fractional crops and enlargement; measured six archive TIFF/JP2 pairs in forward/reverse order with 2 warmups and 9 samples. Saved raw samples, fingerprints, input/source hashes, environment and report; inspected compiler vectorization without changing flags/runtime.
+- Open: Prototype bounded reusable axis data/channel-specialized loops, verify quality/memory limits, compare to this baseline, and measure on real x86 before Intel/AMD claims. No Docker image or deployment change needed.
+- Risks/Assumptions: Apple M5 Max native single-threaded warm local sources, default JPEG 90/444; no auth/HTTP/S3/result cache or rotation. 918 measured outputs stable across runs; six focused Release resampling/reader/encoder tests pass. TIFF resize share 14.4–33.5%, JP2 0.8–2.7%; not a server throughput benchmark. Diff check clean.
+
 ### Update 2026-10-11 22:40
 - Decisions: Preserve original Lua cache-loader errors and distinguish fixed native cache failure reasons. Do not share loader diagnostics with waiting requests or retain them in cache entries.
 - Implementation: Added a trivial loader-failure marker to unwind native owners before rethrowing the existing Lua error object; forward bounded fixed native diagnostics only after leaving catch scopes. Added explicit TTL/result/size/nesting messages, documentation and tests for error identity, loader recovery, exact wait timeout and end-to-end secret masking through a loader failure.

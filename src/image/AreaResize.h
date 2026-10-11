@@ -16,11 +16,15 @@ class ResizeError : public std::runtime_error { public: using std::runtime_error
  * alpha has black RGB; identity retains all source bytes, including hidden color.
  * Intermediate premultiplication uses double, not a quantized 8-bit raster.
  * This is NOT linear-light resampling: no transfer function/profile is assumed.
- * ICC bytes move unchanged. No scaling intermediate or contribution table exists.
+ * ICC bytes move unchanged. No intermediate raster is allocated. Horizontal
+ * sample supports/edge weights are cached once when the working budget permits;
+ * otherwise they are computed on demand. Vertical supports are computed per row.
  *
  * Takes ownership by value; pass std::move to avoid an input copy. Identity returns
  * the original storage. The budget bounds source + output pixel bytes + ICC bytes
- * (identity needs only source + ICC), excluding vector capacity/allocator overhead.
+ * plus the optional horizontal support table (identity needs only source + ICC),
+ * excluding vector capacity/allocator overhead. Lack of table space selects the
+ * on-demand path and does not reject an otherwise valid request.
  * Malformed rasters, enlargement and exceeded budgets throw ResizeError before
  * output allocation. Allocation failures may propagate. No shared mutable state.
  */
@@ -42,7 +46,8 @@ class ResizeError : public std::runtime_error { public: using std::runtime_error
  * raster. Alpha is weighted before color interpolation; filtering stays in stored
  * channel values. ICC/sRGB declarations and layout are preserved.
  * Pure downscaling delegates to downsample_area unchanged. Same ownership and
- * source + output + ICC budget, checked before allocation; no contribution tables.
+ * source + output + ICC budget with optional horizontal supports using only the
+ * remaining budget, checked before allocation. Tight budgets use on-demand supports.
  * This function performs no IIIF permission checks; those belong to SizePolicy.
  */
 [[nodiscard]] RasterImage8 resize_image(RasterImage8 image, const PixelWindow& window,

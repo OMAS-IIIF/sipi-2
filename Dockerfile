@@ -28,6 +28,29 @@ RUN --mount=type=cache,target=/root/.conan2,sharing=locked \
     ldd /out/sipi-2 | awk '/=> \/root\/\.conan2/ {print $3}' | xargs -r -I '{}' cp -L '{}' /out/lib/ && \
     find /out -type f -exec strip --strip-unneeded '{}' +
 
+# Opt-in offline comparison. The normal runtime target below stays the default.
+FROM build AS resize-benchmark-build
+RUN --mount=type=cache,target=/root/.conan2,sharing=locked \
+    cmake --build build/Release --target resize-benchmark --parallel ${BUILD_JOBS} && \
+    mkdir -p /benchmark/lib && cp build/Release/resize-benchmark /benchmark/after && \
+    sha256sum src/image/AreaResize.cpp benchmarks/reference/AreaResize-before-axis.cpp \
+      benchmarks/ResizeBenchmark.cpp conan.lock > /benchmark/source-sha256.txt && \
+    cp benchmarks/reference/AreaResize-before-axis.cpp src/image/AreaResize.cpp && \
+    touch src/image/AreaResize.cpp && \
+    cmake --build build/Release --target resize-benchmark --parallel ${BUILD_JOBS} && \
+    cp build/Release/resize-benchmark /benchmark/before && \
+    ldd /benchmark/after | awk '/=> \/root\/\.conan2/ {print $3}' | xargs -r -I '{}' cp -L '{}' /benchmark/lib/ && \
+    find /benchmark -type f ! -name '*.txt' -exec strip --strip-unneeded '{}' +
+
+FROM ubuntu:24.04 AS resize-benchmark
+RUN apt-get update && apt-get install -y --no-install-recommends python3 libstdc++6 libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=resize-benchmark-build /benchmark/ /opt/benchmark/
+COPY benchmarks/compare_resize.py /opt/benchmark/compare_resize.py
+ENV LD_LIBRARY_PATH=/opt/benchmark/lib PYTHONDONTWRITEBYTECODE=1
+USER 10001:10001
+ENTRYPOINT ["python3", "/opt/benchmark/compare_resize.py"]
+
 FROM ubuntu:24.04 AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 libgomp1 \
     && rm -rf /var/lib/apt/lists/* \

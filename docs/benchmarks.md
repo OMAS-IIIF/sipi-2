@@ -1,5 +1,9 @@
 # Reproducible local tile workload
 
+For isolated resampling and decode/resize/JPEG stage attribution, see the
+[2026-10-11 scaling baseline](benchmarks/2026-10-11-resize.md) and the
+[2026-10-12 cached-weight comparison](benchmarks/2026-10-12-axis-weights.md).
+
 For the four-server Docker comparison, see [server comparison](server-comparison.md).
 
 This benchmark evaluates IIIF worker concurrency, not general TIFF-versus-JPEG 2000
@@ -247,3 +251,12 @@ run concurrently. Output never overwrites an existing directory. Binary hashes
 identify the measured versions; an old executable may still depend on its original
 Conan libraries, so this preserved binary is local test evidence, not a deployment
 artifact. See [measured results](benchmarks/2026-10-08-s3-buffer.md).
+
+## Portable offline scaling comparison
+
+See [the Docker workflow](benchmarks/resize-docker.md) to run the paired
+pre-optimization/current kernels on an Intel/AMD VM without installing build tools.
+
+Recorded native VM run: [2026-10-12 Home x86 scaling](benchmarks/2026-10-12-x86-resize.md).
+
+Archive follow-up: [2026-10-12 Home x86 TIFF/JP2 render core](benchmarks/2026-10-12-x86-archive-resize.md).

@@ -43,6 +43,45 @@ struct WeightedPixel {
     }
 };
 
+/** One output sample's support. Only the two edges can have partial weights;
+ * every interior sample has the same weight. A linear filter has at most two
+ * samples. Keep the original multiplication and accumulation order per pixel. */
+struct AxisWeights {
+    std::uint64_t first, last;
+    double first_weight, last_weight, interior_weight;
+
+    [[nodiscard]] double weight(std::uint64_t pixel) const {
+        if (pixel == first) return first_weight;
+        if (pixel == last) return last_weight;
+        return interior_weight;
+    }
+};
+
+/** Horizontal supports are reused by every output row. Cache them only within
+ * the remaining working-memory budget; tight budgets retain on-demand operation.
+ * Vertical supports are computed once per row and need no table. */
+template<class MakeWeights>
+std::vector<AxisWeights> horizontal_weights(std::uint32_t count, std::size_t spare,
+                                            MakeWeights make) {
+    if (count > spare / sizeof(AxisWeights)) return {};
+    std::vector<AxisWeights> weights(count);
+    for (std::uint32_t x = 0; x < count; ++x) weights[x] = make(x);
+    return weights;
+}
+
+/** Full-image area weights remain integers in units of target pixels, converted
+ * to double exactly where the original kernel converted each overlap. */
+AxisWeights integer_weights(std::uint32_t source, std::uint32_t target, std::uint32_t i) {
+    const auto left = static_cast<std::uint64_t>(i) * source;
+    const auto right = (static_cast<std::uint64_t>(i) + 1) * source;
+    const auto first = left / target, last = (right - 1) / target;
+    const auto weight = [&](std::uint64_t pixel) {
+        return static_cast<double>(std::min(right, (pixel + 1) * target) -
+                                   std::max(left, pixel * target));
+    };
+    return {first, last, weight(first), weight(last), static_cast<double>(target)};
+}
+
 }
 
 RasterImage8 downsample_area(RasterImage8 image, std::uint32_t width, std::uint32_t height,
@@ -57,6 +96,9 @@ RasterImage8 downsample_area(RasterImage8 image, std::uint32_t width, std::uint3
         (!identity && output_bytes > max_working_bytes - input_bytes - image.icc_profile.size()))
         throw ResizeError("Resize working memory exceeds limit");
     if (identity) return image;
+    const auto make_horizontal = [&](std::uint32_t x) { return integer_weights(image.width, width, x); };
+    const auto horizontal = horizontal_weights(width,
+        max_working_bytes - input_bytes - output_bytes - image.icc_profile.size(), make_horizontal);
     RasterImage8 output{width, height, std::vector<std::uint8_t>(output_bytes), std::move(image.icc_profile), image.layout, image.srgb_intent};
     // Use integer coordinates in units of 1/target_dimension source pixels.
     // Source pixel boundaries are multiples of target_dimension; target pixel
@@ -64,17 +106,14 @@ RasterImage8 downsample_area(RasterImage8 image, std::uint32_t width, std::uint3
     // have exact integer weights, with no floating-point boundary decisions.
     const double area = static_cast<double>(image.width) * image.height;
     for (std::uint32_t y = 0; y < height; ++y) {
-        const auto top = static_cast<std::uint64_t>(y) * image.height;
-        const auto bottom = (static_cast<std::uint64_t>(y) + 1) * image.height;
+        const auto vertical = integer_weights(image.height, height, y);
         for (std::uint32_t x = 0; x < width; ++x) {
-            const auto left = static_cast<std::uint64_t>(x) * image.width;
-            const auto right = (static_cast<std::uint64_t>(x) + 1) * image.width;
+            const auto support = horizontal.empty() ? make_horizontal(x) : horizontal[x];
             WeightedPixel sum;
-            for (auto sy = top / height; sy <= (bottom - 1) / height; ++sy) {
-                const auto wy = std::min(bottom, (sy + 1) * height) - std::max(top, sy * height);
-                for (auto sx = left / width; sx <= (right - 1) / width; ++sx) {
-                    const auto wx = std::min(right, (sx + 1) * width) - std::max(left, sx * width);
-                    const double weight = static_cast<double>(wx) * static_cast<double>(wy);
+            for (auto sy = vertical.first; sy <= vertical.last; ++sy) {
+                const double wy = vertical.weight(sy);
+                for (auto sx = support.first; sx <= support.last; ++sx) {
+                    const double weight = support.weight(sx) * wy;
                     const auto index = static_cast<std::size_t>(sy * image.width + sx) * channels;
                     sum.add(image.pixels.data() + index, weight, channels);
                 }
@@ -119,6 +158,12 @@ double overlap(std::uint64_t pixel, const Boundary& left, const Boundary& right)
         ? static_cast<double>(right.remainder) / static_cast<double>(right.denominator) : 1.0;
     return end - start;
 }
+AxisWeights area_weights(const PixelInterval& interval, std::uint32_t i, std::uint32_t count) {
+    const auto left = boundary(interval, i, count);
+    const auto right = boundary(interval, i + 1, count);
+    const auto last = right.ceiling() - 1;
+    return {left.pixel, last, overlap(left.pixel, left, right), overlap(last, left, right), 1.0};
+}
 } // namespace
 
 RasterImage8 downsample_area(RasterImage8 image, const PixelWindow& window,
@@ -139,19 +184,20 @@ RasterImage8 downsample_area(RasterImage8 image, const PixelWindow& window,
     if (input_bytes > max_working_bytes || image.icc_profile.size() > max_working_bytes - input_bytes ||
         output_bytes > max_working_bytes - input_bytes - image.icc_profile.size())
         throw ResizeError("Resize working memory exceeds limit");
+    const auto make_horizontal = [&](std::uint32_t x) { return area_weights(window.horizontal, x, width); };
+    const auto horizontal = horizontal_weights(width,
+        max_working_bytes - input_bytes - output_bytes - image.icc_profile.size(), make_horizontal);
     RasterImage8 output{width, height, std::vector<std::uint8_t>(output_bytes), std::move(image.icc_profile), image.layout, image.srgb_intent};
     for (std::uint32_t y = 0; y < height; ++y) {
-        const auto top = boundary(window.vertical, y, height);
-        const auto bottom = boundary(window.vertical, y + 1, height);
+        const auto vertical = area_weights(window.vertical, y, height);
         for (std::uint32_t x = 0; x < width; ++x) {
-            const auto left = boundary(window.horizontal, x, width);
-            const auto right = boundary(window.horizontal, x + 1, width);
+            const auto support = horizontal.empty() ? make_horizontal(x) : horizontal[x];
             WeightedPixel sum;
             double area = 0;
-            for (auto sy = top.pixel; sy < bottom.ceiling(); ++sy) {
-                const auto wy = overlap(sy, top, bottom);
-                for (auto sx = left.pixel; sx < right.ceiling(); ++sx) {
-                    const double weight = wy * overlap(sx, left, right);
+            for (auto sy = vertical.first; sy <= vertical.last; ++sy) {
+                const double wy = vertical.weight(sy);
+                for (auto sx = support.first; sx <= support.last; ++sx) {
+                    const double weight = wy * support.weight(sx);
                     const auto index = static_cast<std::size_t>(sy * image.width + sx) * channels;
                     area += weight;
                     sum.add(image.pixels.data() + index, weight, channels);
@@ -164,26 +210,13 @@ RasterImage8 downsample_area(RasterImage8 image, const PixelWindow& window,
     return output;
 }
 namespace {
-/** Constant-space support for one output coordinate. Area weights retain exact
- * rational boundaries; growing axes need only the two nearest pixel centers. */
-struct AxisFilter {
-    std::uint64_t first, last;
-    Boundary left{}, right{};
-    bool linear = false;
-    double fraction = 0;
-
-    double weight(std::uint64_t pixel) const {
-        if (!linear) return overlap(pixel, left, right);
-        if (first == last) return 1;
-        return pixel == first ? 1 - fraction : fraction;
-    }
-};
-AxisFilter filter_axis(const PixelInterval& interval, std::uint32_t index,
+/** Growing axes use clamped source-pixel centers; shrinking axes retain area
+ * weights. Both fit the same compact support without a second pixel buffer. */
+AxisWeights filter_axis(const PixelInterval& interval, std::uint32_t index,
                        std::uint32_t count) {
-    const auto left = boundary(interval, index, count);
-    const auto right = boundary(interval, index + 1, count);
     if (interval.extent_numerator >= std::uint64_t{count} * interval.denominator)
-        return {left.pixel, right.ceiling() - 1, left, right};
+        return area_weights(interval, index, count);
+    const auto left = boundary(interval, index, count);
 
     const auto crop_first = interval.offset_numerator / interval.denominator;
     const auto crop_end = interval.offset_numerator + interval.extent_numerator;
@@ -195,7 +228,9 @@ AxisFilter filter_axis(const PixelInterval& interval, std::uint32_t index,
     const double clamped = std::clamp(center, static_cast<double>(crop_first),
                                              static_cast<double>(crop_last));
     const auto first = static_cast<std::uint64_t>(std::floor(clamped));
-    return {first, std::min(first + 1, crop_last), {}, {}, true, clamped - first};
+    const auto last = std::min(first + 1, crop_last);
+    const double fraction = clamped - first;
+    return {first, last, first == last ? 1.0 : 1.0 - fraction, fraction, 0.0};
 }
 } // namespace
 
@@ -214,12 +249,15 @@ RasterImage8 resize_image(RasterImage8 image, const PixelWindow& window,
     if (input_bytes > max_working_bytes || image.icc_profile.size() > max_working_bytes - input_bytes ||
         output_bytes > max_working_bytes - input_bytes - image.icc_profile.size())
         throw ResizeError("Resize working memory exceeds limit");
+    const auto make_horizontal = [&](std::uint32_t x) { return filter_axis(window.horizontal, x, width); };
+    const auto weights = horizontal_weights(width,
+        max_working_bytes - input_bytes - output_bytes - image.icc_profile.size(), make_horizontal);
     RasterImage8 output{width, height, std::vector<std::uint8_t>(output_bytes),
                         std::move(image.icc_profile), image.layout, image.srgb_intent};
     for (std::uint32_t y = 0; y < height; ++y) {
         const auto vertical = filter_axis(window.vertical, y, height);
         for (std::uint32_t x = 0; x < width; ++x) {
-            const auto horizontal = filter_axis(window.horizontal, x, width);
+            const auto horizontal = weights.empty() ? make_horizontal(x) : weights[x];
             WeightedPixel sum;
             double total = 0;
             for (auto sy = vertical.first; sy <= vertical.last; ++sy) {
