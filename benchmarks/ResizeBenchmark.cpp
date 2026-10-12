@@ -95,7 +95,7 @@ Json::Value synthetic(const char* name, PixelLayout layout, unsigned sw, unsigne
 Json::Value pipeline(const std::filesystem::path& path, const char* name,
                      bool crop, unsigned target, int repetitions) {
     LocalFileSource source(path);
-    const bool jp2 = path.extension()==".jp2";
+    const bool jp2 = (path.extension()==".jp2" || path.extension()==".jph");
     unsigned w, h, level_w, level_h;
     PixelWindow window;
     std::function<RasterImage8()> decode;

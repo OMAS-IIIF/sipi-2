@@ -6,6 +6,8 @@
  * Own all codec handles; single-threaded, bounded to 300 million source pixels.
  */
 #include <grok.h>
+#include "imgformats/J2kReadPlan.h"
+#include "storage/LocalFileSource.h"
 #include <lcms2.h>
 #include <tiffio.h>
 #include <algorithm>
@@ -132,6 +134,57 @@ Raster normalize(const std::filesystem::path& source, const std::filesystem::pat
               << alpha_min << ' ' << alpha_max << ' ' << tagged << '\n';
     return raster;
 }
+/** Read our already normalized reference verbatim: no second ICC transform or
+ * quantization. Strictly limited to the offline reference layout produced here. */
+Raster read_reference(const std::filesystem::path& source) {
+    Tiff file(TIFFOpen(source.c_str(), "r"), TIFFClose);
+    require(bool(file), "Cannot open reference TIFF");
+    std::uint32_t w=0,h=0,icc_size=0; void* icc=nullptr;
+    std::uint16_t bits=0,samples=0,photo=0,planar=0,orientation=0,format=0;
+    TIFFGetField(file.get(),TIFFTAG_IMAGEWIDTH,&w); TIFFGetField(file.get(),TIFFTAG_IMAGELENGTH,&h);
+    TIFFGetFieldDefaulted(file.get(),TIFFTAG_BITSPERSAMPLE,&bits);
+    TIFFGetFieldDefaulted(file.get(),TIFFTAG_SAMPLESPERPIXEL,&samples);
+    TIFFGetFieldDefaulted(file.get(),TIFFTAG_PHOTOMETRIC,&photo);
+    TIFFGetFieldDefaulted(file.get(),TIFFTAG_PLANARCONFIG,&planar);
+    TIFFGetFieldDefaulted(file.get(),TIFFTAG_ORIENTATION,&orientation);
+    TIFFGetFieldDefaulted(file.get(),TIFFTAG_SAMPLEFORMAT,&format);
+    require(w && h && std::uint64_t(w)*h<=300000000 && bits==8 &&
+        ((samples==1 && photo==PHOTOMETRIC_MINISBLACK) || (samples==3 && photo==PHOTOMETRIC_RGB)) &&
+        planar==PLANARCONFIG_CONTIG && orientation==ORIENTATION_TOPLEFT && format==SAMPLEFORMAT_UINT &&
+        !TIFFIsTiled(file.get()) && TIFFNumberOfDirectories(file.get())==1,
+        "Expected prepared 8-bit gray/RGB strip reference");
+    require(TIFFGetField(file.get(),TIFFTAG_ICCPROFILE,&icc_size,&icc) && icc_size<=16*1024*1024,
+        "Missing or oversized reference ICC");
+    Raster raster{w,h,samples,Bytes(std::size_t(w)*h*samples),
+        Bytes(static_cast<std::uint8_t*>(icc),static_cast<std::uint8_t*>(icc)+icc_size)};
+    require(TIFFScanlineSize64(file.get())==std::uint64_t(w)*samples,"Unexpected reference row size");
+    for(unsigned y=0;y<h;++y)
+        require(TIFFReadScanline(file.get(),raster.pixels.data()+std::size_t(y)*w*samples,y,0)>=0,
+            "Cannot read reference row");
+    return raster;
+}
+/** Verify every full-resolution sample and ICC through the production reader.
+ * Decode tile-sized windows so the 229 MP reference needs no full decoded copy.
+ * This is outside all benchmark timings and uses the same Grok implementation,
+ * not an independent HT decoder conformance check. */
+void verify_ht(const std::filesystem::path& path, const Raster& reference) {
+    sipi::LocalFileSource source(path);
+    const auto m=sipi::read_j2k_metadata(source);
+    require(m.width==reference.w && m.height==reference.h && m.icc_profile==reference.profile,
+        "HT dimensions or ICC differ from reference");
+    for(unsigned y=0;y<reference.h;y+=1024) for(unsigned x=0;x<reference.w;x+=1024) {
+        const auto w=std::min(1024u,reference.w-x), h=std::min(1024u,reference.h-y);
+        const auto plan=sipi::plan_j2k_read(m,{{x,y,w,h},w,h});
+        const auto pixels=sipi::read_j2k_region(source,m,plan);
+        require(plan.reduction==0 && pixels.width==w && pixels.height==h &&
+            pixels.channel_count()==reference.channels,"Unexpected HT validation raster");
+        for(unsigned row=0;row<h;++row)
+            require(std::equal(pixels.pixels.begin()+std::size_t(row)*w*reference.channels,
+                pixels.pixels.begin()+std::size_t(row+1)*w*reference.channels,
+                reference.pixels.begin()+(std::size_t(y+row)*reference.w+x)*reference.channels),
+                "HT pixels differ from normalized reference");
+    }
+}
 /** Ceil-sized 2x2 mean; odd edges average only the existing samples, half-up. */
 Raster reduce(const Raster& input) {
     Raster out{(input.w+1)/2,(input.h+1)/2,input.channels,{},input.profile};
@@ -178,7 +231,7 @@ void write_tiff(const std::filesystem::path& path, Raster image, bool pyramid) {
     }
 }
 /** Encode the same full-resolution pixels, including ICC, with reversible RGB MCT. */
-void write_jp2(const std::filesystem::path& path,const Raster& raster) {
+void write_jp2(const std::filesystem::path& path,const Raster& raster, bool ht=false) {
     std::vector<grk_image_comp> components(raster.channels);
     for(auto& c:components) {c.w=raster.w;c.h=raster.h;c.prec=8;c.dx=c.dy=1;}
     const auto destroy=[](grk_image* p){if(p)grk_object_unref(&p->obj);};
@@ -195,6 +248,7 @@ void write_jp2(const std::filesystem::path& path,const Raster& raster) {
     grk_stream_params stream{};stream.buf=bytes.data();stream.buf_len=bytes.size();
     grk_cparameters params{};grk_compress_set_default_params(&params);
     params.cod_format=GRK_FMT_JP2;params.numresolution=6;params.irreversible=false;
+    if(ht) params.cblk_sty=GRK_CBLKSTY_HT_ONLY;
     params.mct=raster.channels==3 ? 1 : 0; // reversible RGB decorrelation, no color loss
     params.tile_size_on=true;params.t_width=params.t_height=1024;
     const std::unique_ptr<grk_object,decltype(&grk_object_unref)> codec(grk_compress_init(&stream,&params,image.get()),grk_object_unref);
@@ -204,16 +258,36 @@ void write_jp2(const std::filesystem::path& path,const Raster& raster) {
 }
 }
 int main(int argc,char** argv) {
-    if(argc!=3){std::cerr<<"Usage: prepare-archive-image SOURCE_TIFF NEW_DIRECTORY\n";return 2;}
-    grk_initialize(nullptr,1,nullptr);
+    const bool ht=argc==4 && std::string(argv[1])=="--htj2k-reference";
+    const bool verify=argc==4 && std::string(argv[1])=="--verify-htj2k-reference";
+    if(argc!=3 && !ht && !verify) {
+        std::cerr<<"Usage: prepare-archive-image SOURCE_TIFF NEW_DIRECTORY\n"
+                 <<"       prepare-archive-image --htj2k-reference REFERENCE_TIFF NEW_DIRECTORY\n"
+                 <<"       prepare-archive-image --verify-htj2k-reference REFERENCE_TIFF JPH\n";
+        return 2;
+    }
+    // Verification runs in its own process: only the production reader owns
+    // Grok's global runtime there. Encoding owns initialization/teardown here.
+    if(!verify) grk_initialize(nullptr,1,nullptr);
     try {
-        const std::filesystem::path out(argv[2]);
+        if(verify) {
+            const auto raster=read_reference(argv[2]);
+            verify_ht(argv[3],raster);
+            std::cout<<"Verified all "<<raster.w<<'x'<<raster.h<<" pixels and ICC\n";
+            return 0;
+        }
+        const std::filesystem::path out(argv[ht ? 3 : 2]);
         require(std::filesystem::create_directory(out),"Output directory must be new");
-        const auto raster=normalize(argv[1],out);
-        write_tiff(out/"reference.tif",raster,false);
-        write_tiff(out/"pyramid.tif",raster,true);
-        write_jp2(out/"image.jp2",raster);
+        if(ht) {
+            const auto raster=read_reference(argv[2]);
+            write_jp2(out/"image.jph",raster,true);
+        } else {
+            const auto raster=normalize(argv[1],out);
+            write_tiff(out/"reference.tif",raster,false);
+            write_tiff(out/"pyramid.tif",raster,true);
+            write_jp2(out/"image.jp2",raster);
+        }
         std::cout<<"libtiff="<<TIFFLIB_VERSION<<" lcms="<<cmsGetEncodedCMMversion()<<" grok="<<grk_version()<<'\n';
-    }catch(const std::exception& e){std::cerr<<e.what()<<'\n';grk_deinitialize();return 1;}
+    }catch(const std::exception& e){std::cerr<<e.what()<<'\n';if(!verify) grk_deinitialize();return 1;}
     grk_deinitialize();
 }

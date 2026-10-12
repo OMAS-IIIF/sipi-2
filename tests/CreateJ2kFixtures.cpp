@@ -9,9 +9,17 @@
 #include <string>
 #include <vector>
 
-/** Generate deterministic, lossless JP2/J2K fixtures without external images.
+/** Explicit encoder choices keep negative-layout and HT fixtures readable. */
+struct FixtureOptions {
+    bool jp2 = true, gray = false, offset = false, tagged = false;
+    unsigned precision = 8;
+    bool is_signed = false, ycc = false, ht = false;
+};
+
+/** Generate deterministic, lossless JP2/J2K/JPH/JHC fixtures without external images.
  * Encoder use is test-only and does not expose a JPEG 2000 output API. */
-void write_fixture(const std::filesystem::path& path, bool jp2, bool gray, bool offset, bool tagged = false, unsigned precision = 8, bool is_signed = false, bool ycc = false) {
+void write_fixture(const std::filesystem::path& path, FixtureOptions options = {}) {
+    const auto [jp2, gray, offset, tagged, precision, is_signed, ycc, ht] = options;
     std::vector<grk_image_comp> components(gray ? 1 : 3);
     for (auto& c : components) {
         c.w = 37; c.h = 23; c.prec = static_cast<uint8_t>(precision); c.sgnd = is_signed; c.dx = c.dy = 1;
@@ -46,12 +54,47 @@ void write_fixture(const std::filesystem::path& path, bool jp2, bool gray, bool 
     grk_compress_set_default_params(&params);
     params.cod_format = jp2 ? GRK_FMT_JP2 : GRK_FMT_J2K;
     params.numresolution = 3;
+    if (ht) params.cblk_sty = GRK_CBLKSTY_HT_ONLY;
     params.tile_size_on = true; params.t_width = 32; params.t_height = 16;
     const std::unique_ptr<grk_object, decltype(&grk_object_unref)> codec(
         grk_compress_init(&stream, &params, image.get()), grk_object_unref);
     if (!codec) throw std::runtime_error("Cannot initialize fixture encoding");
     const auto size = grk_compress(codec.get(), nullptr);
     if (!size || size > bytes.size()) throw std::runtime_error("Cannot encode fixture");
+    if (ht) {
+        // Verify actual JPH branding and HT marker fields, not just the filename
+        // or requested encoder option. Walk the small fixture's main header.
+        const auto word = [&](std::size_t pos) -> unsigned {
+            if (pos + 2 > size) throw std::runtime_error("Truncated fixture marker");
+            return (unsigned(bytes[pos]) << 8) | bytes[pos+1];
+        };
+        std::size_t start = 0;
+        if (jp2) {
+            if (size < 24 || !std::equal(bytes.begin()+20, bytes.begin()+24, "jph "))
+                throw std::runtime_error("HT fixture is not JPH branded");
+            while (start + 8 <= size) {
+                const auto length = (std::uint32_t(word(start)) << 16) | word(start+2);
+                if (std::equal(bytes.begin()+start+4, bytes.begin()+start+8, "jp2c")) {
+                    start += 8; break;
+                }
+                if (length < 8 || length > size-start) throw std::runtime_error("Invalid fixture box");
+                start += length;
+            }
+        }
+        if (word(start) != 0xff4f) throw std::runtime_error("Missing fixture SOC");
+        bool capability = false, style = false, profile = false;
+        for (auto pos = start+2; pos+4 <= size;) {
+            const auto marker = word(pos);
+            if (marker == 0xff90) break; // First tile starts after the main header.
+            const auto length = word(pos+2);
+            if (length < 2 || length > size-pos-2) throw std::runtime_error("Invalid fixture segment");
+            if (marker == 0xff51) profile = (word(pos+4) & 0x4000) != 0;
+            if (marker == 0xff50) capability = true;
+            if (marker == 0xff52 && length >= 12) style = (bytes[pos+12] & 0x40) != 0;
+            pos += 2 + length;
+        }
+        if (!capability || !style || !profile) throw std::runtime_error("Fixture is not HT coded");
+    }
     std::ofstream file(path, std::ios::binary);
     file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(size));
     if (!file) throw std::runtime_error("Cannot write fixture");
@@ -62,14 +105,20 @@ int main(int argc, char** argv) {
     try {
         const std::filesystem::path root(argv[1]);
         std::filesystem::create_directories(root);
-        write_fixture(root/"source.jp2", true, false, false);
-        write_fixture(root/"source.j2k", false, true, false);
-        write_fixture(root/"offset.jp2", true, false, true);
-        write_fixture(root/"profile.jp2", true, false, false, true);
-        write_fixture(root/"rgb-unknown.j2k", false, false, false);
-        write_fixture(root/"sixteen.jp2", true, false, false, false, 16);
-        write_fixture(root/"signed.jp2", true, false, false, false, 16, true);
-        write_fixture(root/"ycc.jp2", true, false, false, false, 8, false, true);
+        write_fixture(root/"source.jp2");
+        write_fixture(root/"source.j2k", {.jp2=false, .gray=true});
+        write_fixture(root/"offset.jp2", {.offset=true});
+        write_fixture(root/"profile.jp2", {.tagged=true});
+        write_fixture(root/"rgb-unknown.j2k", {.jp2=false});
+        write_fixture(root/"sixteen.jp2", {.precision=16});
+        write_fixture(root/"signed.jp2", {.precision=16, .is_signed=true});
+        write_fixture(root/"ycc.jp2", {.ycc=true});
+        write_fixture(root/"source.jph", {.ht=true});
+        write_fixture(root/"source.jhc", {.jp2=false, .gray=true, .ht=true});
+        write_fixture(root/"offset.jph", {.offset=true, .ht=true});
+        write_fixture(root/"profile.jph", {.tagged=true, .ht=true});
+        write_fixture(root/"rgb-unknown.jhc", {.jp2=false, .ht=true});
+        write_fixture(root/"sixteen.jph", {.precision=16, .ht=true});
         // Corrupt only the final tile's SOD marker, preserving the main header
         // and file length. A crop wholly inside the first tile should still work.
         std::ifstream input(root/"source.jp2",std::ios::binary);

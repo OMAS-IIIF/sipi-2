@@ -1,3 +1,15 @@
+### Update 2026-10-12 22:31
+- Decisions: Compare lossless HTJ2K with the unchanged six classic JP2/LZW TIFF pairs; retain source normalization/ICC, wavelet geometry and single-worker settings. No repository conversion or runtime changes.
+- Implementation: Extended offline preparation with verbatim reference input, HT encoding and separate full-pixel/ICC verification; added JPH benchmark input, byte-level coding inspection and two-order comparison runner. All 280,961,064 source pixels verified. Completed 1,242 timed outputs/972 JPEG outputs with stable fingerprints and exact JP2/JPH request equivalence. Saved report/raw JSON and updated context/docs.
+- Open: Three-format x86 VM run needs an updated benchmark harness/image; S3 I/O and lossy/independent HT fixtures remain separate. No Docker build/push or deployment.
+- Risks/Assumptions: Native M5 Max warm local render core, not HTTP throughput; same Grok used for HT encode/decode validation. HT core vs JP2 about 2.24× thumbnail, 6.44× preview, 7.74× tile; files 6–14% larger. TIFF remains faster in every tested image/request and uses different lower-level filtering. Four preparation and two comparison tests pass; historical source/reference hashes and coding parameters checked. Diff check clean.
+
+### Update 2026-10-12 22:22
+- Decisions: Use the existing Grok 20.4.15 reader for HTJ2K/JPH repository input; no new codec, format-specific pipeline, runtime option or dependency upgrade. Keep 8-bit gray/RGB and raw-color ambiguity rules.
+- Implementation: Added named fixture options and genuine HT fixtures with independent JPH/SIZ/CAP/COD marker checks. Extended metadata, exact crop, reduced-window, ICC, unsupported-layout, HTTP, concurrent worker/cache and MinIO/S3 coverage. Documented input scope and existing-runtime availability in README/master context/JPEG 2000 guide.
+- Open: Matched archive HTJ2K/J2K/TIFF benchmarks and independent-encoder/lossy corpus tests; no performance/conformance claim yet. No image build, repository conversion or deployment performed.
+- Risks/Assumptions: Fixtures use the pinned Grok encoder; passing them is not full Part-15 interoperability certification. An initial S3 restriction test assumed RGB; updated its pixel slicing for grayscale HT input. All 71 Debug and 71 Release CTests then pass, including local MinIO integration. Byte-signature detection and production reader code unchanged. Diff check clean.
+
 ### Update 2026-10-12 00:34
 - Decisions: Retain axis-weight reuse and stop further optimization for now. TIFF preview gains are clear; thumbnail and JP2 total gains must be qualified.
 - Implementation: Imported remote archive report; verified same binaries/source and all twelve ARM corpus hashes, complete ABBA cases/samples, recomputed comparisons and medians. All 1,836 pixel and 1,296 JPEG outputs match. Recorded stage attribution and limitations; no runtime changes.

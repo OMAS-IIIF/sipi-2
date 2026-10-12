@@ -70,8 +70,8 @@ def server(args, variables=None):
 
 s3('PUT')
 try:
-    for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif', 'alpha-pyramid.tif', 'gray-pyramid.tif', 'strip-rgba.tif', 'source.jp2', 'source.j2k', 'offset.jp2'):
-        s3('PUT', key, fixtures / (key if key in ('pyramid.tif','alpha-pyramid.tif', 'gray-pyramid.tif', 'strip-rgba.tif', 'source.jp2', 'source.j2k', 'offset.jp2') else 'tiled.tif'))
+    for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif', 'alpha-pyramid.tif', 'gray-pyramid.tif', 'strip-rgba.tif', 'source.jp2', 'source.j2k', 'offset.jp2', 'source.jph', 'source.jhc', 'offset.jph'):
+        s3('PUT', key, fixtures / (key if key in ('pyramid.tif','alpha-pyramid.tif', 'gray-pyramid.tif', 'strip-rgba.tif', 'source.jp2', 'source.j2k', 'offset.jp2', 'source.jph', 'source.jhc', 'offset.jph') else 'tiled.tif'))
     for name in ('rgb.jpg', 'icc.jpg', 'orientation.jpg', 'broken.jpg'):
         s3('PUT', name, jpeg_fixtures / name)
     for name in ('rgb.png', 'icc.png', 'rgba.png', 'adam7-large.png', 'srgb.png', 'srgb-gray.png', 'sixteen.png', 'bad-crc.png'):
@@ -109,7 +109,7 @@ try:
           if r.prefix[1]~='public' then return {decision='deny'} end
           return {decision='allow',resolution={max_width=20,max_height=20}}
         end""")
-        paths=['/'+name+'/full/max/0/default.png' for name in ('tiled.tif','pyramid.tif','source.jp2','offset.jp2')]
+        paths=['/'+name+'/full/max/0/default.png' for name in ('tiled.tif','pyramid.tif','source.jp2','offset.jp2', 'source.jph', 'source.jhc', 'offset.jph')]
         args=['--preflight-script',str(restricted)]
         with server(['--iiif-root',str(fixtures),*args]) as local:
             references=[get(local,'/public'+path) for path in paths]
@@ -124,7 +124,9 @@ try:
                 assert w<=20 and h<=20
                 part=get(remote,'/public'+path.replace('/full/max/','/1,1,3,2/max/'))
                 assert part[0]==200
-                assert decode_png(part[2])[2]==b''.join(pixels[(y*w+1)*3:(y*w+4)*3] for y in (1,2))
+                channels = len(pixels) // (w*h)
+                assert channels in (1,3)
+                assert decode_png(part[2])[2]==b''.join(pixels[(y*w+1)*channels:(y*w+4)*channels] for y in (1,2))
             assert get(remote,paths[0])[0]==403
             # A warm reduced source/result must not survive a changed S3 validator.
             s3('PUT','tiled.tif',fixtures/'gray.tif')
@@ -165,11 +167,11 @@ try:
             assert get(local,'/gray-pyramid.tif/full/max/0/default.webp')[0]==500
             strip_paths += ['/strip-rgba.tif/3,4,19,8/7,3/0/default.'+fmt for fmt in ('png','jpg','webp')]
             j2k_paths = ['/'+name+'/1,1,35,21/7,4/0/default.'+fmt
-                         for name in ('source.jp2','source.j2k','offset.jp2') for fmt in ('png','jpg','webp')]
+                         for name in ('source.jp2','source.j2k','offset.jp2', 'source.jph', 'source.jhc', 'offset.jph') for fmt in ('png','jpg','webp')]
             j2k_paths += [path.replace('/0/', '/!90/') for path in j2k_paths]
             j2k_paths += [path.replace('/0/', '/!37.5/') for path in j2k_paths if '/0/' in path]
             j2k_paths += ['/'+name+'/1,1,10,10/^20,15/0/default.png'
-                          for name in ('source.jp2','source.j2k','offset.jp2')]
+                          for name in ('source.jp2','source.j2k','offset.jp2', 'source.jph', 'source.jhc', 'offset.jph')]
             strip_paths += ['/'+name+'/1,1,10,10/^20,5/0/default.png'
                             for name in ('tiled.tif','pyramid.tif','alpha-pyramid.tif','gray-pyramid.tif','strip-rgba.tif')]
             expected_j2k = {path:get(local,path) for path in j2k_paths}
@@ -220,7 +222,7 @@ try:
             for path in ('/tiled.tif', '/museum/tiled.tif', '/museum/alias', '/local'):
                 result = get(remote, path + crop)
                 assert result[0] == 200 and result[2] == expected[2], (path, result[0])
-            for name in ('source.jp2', 'source.j2k', 'offset.jp2'):
+            for name in ('source.jp2', 'source.j2k', 'offset.jp2', 'source.jph', 'source.jhc', 'offset.jph'):
                 status, _, body = get(remote, '/museum/'+name+'/info.json')
                 info = json.loads(body)
                 assert status == 200 and (info['width'], info['height']) == (37, 23)
@@ -283,7 +285,7 @@ try:
             assert get(denied, '/deny/info.json')[0] == 403
 finally:
     s3('DELETE','watermark.png')
-    for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif', 'alpha-pyramid.tif', 'gray-pyramid.tif', 'strip-rgba.tif', 'source.jp2', 'source.j2k', 'offset.jp2'):
+    for key in ('tiled.tif', 'museum/selected.tif', 'pyramid.tif', 'alpha-pyramid.tif', 'gray-pyramid.tif', 'strip-rgba.tif', 'source.jp2', 'source.j2k', 'offset.jp2', 'source.jph', 'source.jhc', 'offset.jph'):
         s3('DELETE', key)
     for name in ('rgb.jpg', 'icc.jpg', 'orientation.jpg', 'broken.jpg'):
         s3('DELETE', name)

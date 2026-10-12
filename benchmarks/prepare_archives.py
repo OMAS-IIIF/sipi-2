@@ -54,7 +54,9 @@ def jp2_header(path):
             if size < header or start+size > end:
                 raise ValueError('Invalid JP2 box length')
             payload = data[start+header:start+size]
-            if kind == b'jp2h':
+            if kind == b'ftyp':
+                result['brand'] = payload[:4].decode('ascii')
+            elif kind == b'jp2h':
                 boxes(start+header, start+size)
             elif kind == b'colr':
                 result['colour_method'] = payload[0]
@@ -76,15 +78,18 @@ def jp2_header(path):
                         raise ValueError('Invalid JPEG2000 marker length')
                     segment = payload[cursor:cursor+2+length]
                     if marker == b'\xff\x51':
+                        result['rsiz'] = int.from_bytes(segment[4:6], 'big')
                         count = int.from_bytes(segment[38:40], 'big')
                         result['bits'] = [(segment[40+3*c] & 127)+1 for c in range(count)]
                         result['signed'] = [bool(segment[40+3*c] & 128) for c in range(count)]
                         result['tile_size'] = list(struct.unpack_from('>II', segment, 22))
+                    elif marker == b'\xff\x50':
+                        result['cap'] = segment[4:].hex()
                     elif marker == b'\xff\x52':
                         result.update(progression=segment[5], layers=int.from_bytes(segment[6:8], 'big'),
                                       mct=segment[8], resolutions=segment[9]+1,
                                       codeblock=[2**(segment[10]+2), 2**(segment[11]+2)],
-                                      reversible_5_3=segment[13]==1)
+                                      block_style=segment[12], reversible_5_3=segment[13]==1)
                     cursor += length+2
             start += size
     boxes(0, len(data))

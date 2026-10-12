@@ -1,5 +1,18 @@
 # SIPI-2 project context
 
+## HTJ2K repository input (2026-10-12)
+
+The existing pinned Grok 20.4.15 runtime already handles HTJ2K/JPH through the
+common JPEG 2000 reader and ByteSource. Added explicit HT-encoded fixture marker
+checks and local/HTTP/S3 regressions, without a new codec or runtime option. The
+8-bit gray/RGB contract remains unchanged; raw RGB is ambiguous and rejected.
+See `docs/jpeg2000-input.md`. Native ARM64 lossless archive comparison now shows
+about 6.4× preview/7.7× tile render-core speedup over classic JP2, with 6–14% larger
+files; pyramidal TIFF remains faster. Full reference pixels/ICC and matched JP2/JPH
+render outputs verified. See `docs/benchmarks/2026-10-12-htj2k.md` for scope and raw
+evidence. Next: current-code three-format x86 comparison, independent/lossy fixtures
+and separate S3 I/O evaluation. No production code or deployment change.
+
 ## Portable scaling experiment (2026-10-12)
 
 The opt-in Docker target `resize-benchmark` packages before/after resamplers built

@@ -12,7 +12,7 @@ void require(bool ok,const char* message) { if (!ok) throw std::runtime_error(me
 int main(int argc,char** argv) {
     try {
         require(argc==2,"fixture directory required");
-        for (const auto* name : {"source.jp2","source.j2k","offset.jp2","profile.jp2","metadata-box.jp2"}) {
+        for (const auto* name : {"source.jp2","source.j2k","offset.jp2","profile.jp2","metadata-box.jp2","source.jph","source.jhc","offset.jph","profile.jph"}) {
 
             sipi::LocalFileSource source(std::filesystem::path(argv[1])/name);
             const auto m = sipi::read_j2k_metadata(source);
@@ -73,7 +73,7 @@ int main(int argc,char** argv) {
                 require(pixels.width == dims.first && pixels.height == dims.second,"reduced dimensions");
             }
         }
-        for (const auto* name : {"rgb-unknown.j2k","sixteen.jp2","signed.jp2","ycc.jp2"}) {
+        for (const auto* name : {"rgb-unknown.j2k","sixteen.jp2","signed.jp2","ycc.jp2","rgb-unknown.jhc","sixteen.jph"}) {
             sipi::LocalFileSource source(std::filesystem::path(argv[1])/name);
             const auto m = sipi::read_j2k_metadata(source);
             require(!sipi::supports_j2k_pixels(m),"unsupported metadata layout");

@@ -12,7 +12,8 @@ import tempfile
 import unittest
 
 from PIL import Image
-from prepare_archives import verify, file_sha
+from prepare_archives import verify, file_sha, jp2_header
+from htj2k_compare import validate_coding
 
 HELPER = Path(sys.argv.pop(1)).resolve()
 
@@ -47,6 +48,33 @@ class PreparationTests(unittest.TestCase):
             verify(root/'out')
             with Image.open(root/'out/reference.tif') as reference:
                 self.assertEqual(list(reference.tobytes()[:4]),[0,1,128,255])
+
+    def test_ht_reference_preserves_pixels_and_profile(self):
+        for mode, color in (('RGB',(20,30,40)), ('L',123)):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory)
+                Image.new(mode,(513,259),color).save(root/'source.tif')
+                subprocess.run([HELPER,root/'source.tif',root/'classic'],check=True,capture_output=True)
+                reference=root/'classic/reference.tif'
+                digest=file_sha(reference)
+                subprocess.run([HELPER,'--htj2k-reference',reference,root/'ht'],check=True,capture_output=True)
+                image=root/'ht/image.jph'
+                validate_coding(jp2_header(root/'classic/image.jp2'),jp2_header(image))
+                subprocess.run([HELPER,'--verify-htj2k-reference',reference,image],check=True,capture_output=True)
+                self.assertEqual(file_sha(reference),digest)
+                before=file_sha(image)
+                repeated=subprocess.run([HELPER,'--htj2k-reference',reference,root/'ht'],capture_output=True)
+                self.assertNotEqual(repeated.returncode,0)
+                self.assertEqual(file_sha(image),before)
+                # Same shape/profile but different pixels must fail verification.
+                with Image.open(reference) as original:
+                    changed=original.copy()
+                    profile=original.info['icc_profile']
+                changed.putpixel((0,0),(21,30,40) if mode=='RGB' else 124)
+                changed.save(root/'changed.tif',icc_profile=profile)
+                bad=subprocess.run([HELPER,'--verify-htj2k-reference',root/'changed.tif',image],capture_output=True)
+                self.assertNotEqual(bad.returncode,0)
+                self.assertIn(b'HT pixels differ',bad.stderr)
 
     def test_transparency_is_not_silently_discarded(self):
         with tempfile.TemporaryDirectory() as root:

@@ -471,7 +471,7 @@ set_target_properties(benchmark-images PROPERTIES CXX_EXTENSIONS OFF)
 
 # Offline real-image benchmark preparation, never part of the runtime image.
 add_executable(prepare-archive-image EXCLUDE_FROM_ALL benchmarks/PrepareArchiveImage.cpp)
-target_link_libraries(prepare-archive-image PRIVATE TIFF::TIFF grok::grok lcms::lcms)
+target_link_libraries(prepare-archive-image PRIVATE TIFF::TIFF grok::grok lcms::lcms j2kreader imagestorage)
 target_compile_features(prepare-archive-image PRIVATE cxx_std_20)
 set_target_properties(prepare-archive-image PROPERTIES CXX_EXTENSIONS OFF)
 

@@ -260,3 +260,5 @@ pre-optimization/current kernels on an Intel/AMD VM without installing build too
 Recorded native VM run: [2026-10-12 Home x86 scaling](benchmarks/2026-10-12-x86-resize.md).
 
 Archive follow-up: [2026-10-12 Home x86 TIFF/JP2 render core](benchmarks/2026-10-12-x86-archive-resize.md).
+
+HTJ2K follow-up: [2026-10-12 lossless TIFF/JP2/JPH comparison](benchmarks/2026-10-12-htj2k.md).

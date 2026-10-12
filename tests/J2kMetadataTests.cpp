@@ -55,18 +55,18 @@ int main(int argc, char** argv) {
     try {
         require(argc == 2, "fixture directory required");
         const std::filesystem::path root(argv[1]);
-        for (const auto* name : {"source.jp2", "source.j2k", "offset.jp2", "metadata-box.jp2"}) {
+        for (const auto* name : {"source.jp2", "source.j2k", "offset.jp2", "metadata-box.jp2", "source.jph", "source.jhc", "offset.jph"}) {
             sipi::LocalFileSource file(root/name);
             ObservedSource source(file);
             const auto m = sipi::read_j2k_metadata(source);
             require(m.width == 37 && m.height == 23, "reference-grid dimensions");
             require(m.tile_width == 32 && m.tile_height == 16, "tile dimensions");
             require(m.resolution_count == 3, "resolution count");
-            require(m.components.size() == (std::string(name) == "source.j2k" ? 1 : 3), "components");
+            require(m.components.size() == ((std::string(name) == "source.j2k" || std::string(name) == "source.jhc") ? 1 : 3), "components");
             for (const auto& c : m.components)
                 require(c.width == 37 && c.height == 23 && c.precision == 8 &&
                         !c.is_signed && c.step_x == 1 && c.step_y == 1, "component facts");
-            require(m.origin_x == (std::string(name) == "offset.jp2" ? 3 : 0), "origin");
+            require(m.origin_x == ((std::string(name) == "offset.jp2" || std::string(name) == "offset.jph") ? 3 : 0), "origin");
             require(source.bytes > 0 && source.bytes <= file.info().size * 2, "bounded callback reads");
             bool caught = false;
             try { (void)sipi::read_j2k_metadata(source, 1); }
@@ -77,14 +77,16 @@ int main(int argc, char** argv) {
             catch (const sipi::ByteSourceError& e) { caught = e.code() == sipi::ByteSourceErrorCode::changed; }
             require(caught, "source error propagated across callback");
         }
-        sipi::LocalFileSource tagged(root/"profile.jp2");
-        require(sipi::read_j2k_metadata(tagged).icc_profile == fixture::icc_header(),
-                "ICC bytes remain owned and unchanged after codec destruction");
+        for (const auto* name : {"profile.jp2", "profile.jph"}) {
+            sipi::LocalFileSource tagged(root/name);
+            require(sipi::read_j2k_metadata(tagged).icc_profile == fixture::icc_header(),
+                    "ICC bytes remain owned and unchanged after codec destruction");
+        }
         sipi::LocalFileSource raw(root/"source.j2k");
         LargeSource large(raw);
         require(sipi::read_j2k_metadata(large).height == 23, "large source header");
         require(large.bytes <= 128*1024, "header must not stage whole object");
-        for (const auto* name : {"source.jp2", "source.j2k"}) {
+        for (const auto* name : {"source.jp2", "source.j2k", "source.jph", "source.jhc"}) {
             std::ifstream input(root/name, std::ios::binary);
             char bytes[32]{}; input.read(bytes, sizeof(bytes));
             const auto path = root/(std::string(name)+".truncated");

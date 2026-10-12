@@ -315,7 +315,7 @@ including MINISBLACK/MINISWHITE normalization, pyramid selection and local/S3
 access. PNG and JPEG retain a single gray channel and its ICC profile. See
 [strips and grayscale](docs/tiff-strips-and-gray.md) for examples and limits.
 
-JPEG 2000 input via Grok now supports headers and region/resolution pixel decoding locally and over S3. See
+JPEG 2000 and HTJ2K input via Grok support headers and region/resolution pixel decoding locally and over S3 (JP2/JPH containers and raw codestreams). See
 [JPEG 2000 input](docs/jpeg2000-input.md) for the local Conan recipe, CLion setup,
 supported pixel layouts, read planning and resource limits.
 

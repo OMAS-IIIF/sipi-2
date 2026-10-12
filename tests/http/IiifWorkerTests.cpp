@@ -9,7 +9,7 @@
 bool rendering(const std::filesystem::path& fixtures, const std::filesystem::path& directory) {
     using Worker = sipi::http::IiifWorker;
     std::vector<Worker::Request> requests;
-    for (const auto* name : {"tiled.tif", "alpha.tif", "source.jp2", "source.j2k"})
+    for (const auto* name : {"tiled.tif", "alpha.tif", "source.jp2", "source.j2k", "source.jph", "source.jhc"})
         for (const auto* angle : {"0", "!90"}) {
             const auto parsed = sipi::iiif::parse_path(std::string("/") + name + "/full/max/" + angle + "/default.png");
             requests.push_back({std::get<sipi::iiif::ImageRequest>(parsed), {}, {}});

@@ -62,7 +62,7 @@ def run(executable: Path, fixtures: Path, verifier: Path, configured: bool = Fal
     with tempfile.TemporaryDirectory(prefix="sipi-http-") as directory:
         root = Path(directory, "images")
         root.mkdir()
-        for name in ("source.jp2", "source.j2k", "offset.jp2", "metadata-box.jp2", "corrupt-tile.jp2", "sixteen.jp2", "rgb-unknown.j2k", "sample.tif", "rotated.tif", "large.tif", "tiled.tif", "broken-tile.tif", "pyramid.tif", "pyramid-level.tif", "pyramid-stripped.tif", "invalid-profile.tif", "alpha.tif", "alpha-associated.tif", "alpha-pyramid.tif", "alpha-unspecified.tif", "alpha-invalid.tif", "gray.tif", "gray-white.tif", "gray-tiled.tif", "gray-pyramid.tif", "strip-rgba.tif"):
+        for name in ("source.jph", "source.jhc", "offset.jph", "source.jp2", "source.j2k", "offset.jp2", "metadata-box.jp2", "corrupt-tile.jp2", "sixteen.jp2", "rgb-unknown.j2k", "sample.tif", "rotated.tif", "large.tif", "tiled.tif", "broken-tile.tif", "pyramid.tif", "pyramid-level.tif", "pyramid-stripped.tif", "invalid-profile.tif", "alpha.tif", "alpha-associated.tif", "alpha-pyramid.tif", "alpha-unspecified.tif", "alpha-invalid.tif", "gray.tif", "gray-white.tif", "gray-tiled.tif", "gray-pyramid.tif", "strip-rgba.tif"):
             shutil.copyfile(fixtures / name, root / name)
         for name in ("id", "hello-world", "a/b", "a%2Fb", "a+b", "café.tif", "source with spaces.tif"):
             target = root / name
@@ -86,7 +86,7 @@ def run(executable: Path, fixtures: Path, verifier: Path, configured: bool = Fal
 function preflight(request)
     local id = request.identifier
     if id == 'jpeg-alias' then return {decision='allow', source='tiled.tif'} end
-    if id == 'metadata-box.jp2' or id == 'corrupt-tile.jp2' or id == 'sixteen.jp2' or id == 'rgb-unknown.j2k' or id == 'source.jp2' or id == 'source.j2k' or id == 'offset.jp2' or id == 'broken.jp2' or id == 'tiled.tif' or id == 'broken-tile.tif' or id == 'invalid-profile.tif' or id:match('^pyramid') or id:match('^alpha') or id:match('^gray') or id == 'strip-rgba.tif' then return {decision='allow', source=id} end
+    if id == 'source.jph' or id == 'source.jhc' or id == 'offset.jph' or id == 'metadata-box.jp2' or id == 'corrupt-tile.jp2' or id == 'sixteen.jp2' or id == 'rgb-unknown.j2k' or id == 'source.jp2' or id == 'source.j2k' or id == 'offset.jp2' or id == 'broken.jp2' or id == 'tiled.tif' or id == 'broken-tile.tif' or id == 'invalid-profile.tif' or id:match('^pyramid') or id:match('^alpha') or id:match('^gray') or id == 'strip-rgba.tif' then return {decision='allow', source=id} end
     if id == 'denied' then return {decision='deny'} end
     if id == 'script-error' then error(sipi.secrets.test_token .. ' /private/source.tif') end
     if id == 'invalid-result' then return {decision='allow', restrictions={}} end
@@ -183,12 +183,12 @@ end
                     assert request(path)[0] == 200
                 assert request('/id/%66ull/max/%210/default%2Ejpg')[0] == 200
 
-                for name in ('source.jp2', 'source.j2k', 'offset.jp2', 'metadata-box.jp2'):
+                for name in ('source.jp2', 'source.j2k', 'offset.jp2', 'metadata-box.jp2', 'source.jph', 'source.jhc', 'offset.jph'):
                     _, info = json_request('/museum/'+name+'/info.json', 200)
                     assert (info['width'], info['height']) == (37, 23)
                     assert info['id'].endswith('/museum/'+name)
                     assert info['profile']=='level2'
-                    assert info.get('extraQualities', []) == (['gray', 'bitonal'] if name=='source.j2k' else ['color','gray','bitonal'])
+                    assert info.get('extraQualities', []) == (['gray', 'bitonal'] if name in ('source.j2k','source.jhc') else ['color','gray','bitonal'])
                     status, _, data = request('/'+name+'/info.json', method='HEAD')
                     assert status == 200 and not data
                     assert request('/'+name+'/full/max/0/default.jpg')[0] == 200
@@ -196,7 +196,7 @@ end
                     status, _, body = request(path+'png')
                     assert status == 200
                     w,h,pixels,icc,_ = decode_png(body)
-                    channels = 1 if name == 'source.j2k' else 3
+                    channels = 1 if name in ('source.j2k','source.jhc') else 3
                     expected = bytes(((x+3)*7+(y+4)*11+c*31)%256
                                      for y in range(8) for x in range(19) for c in range(channels))
                     assert (w,h,pixels,icc) == (19,8,expected,None)
