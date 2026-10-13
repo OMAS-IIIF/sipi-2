@@ -52,6 +52,13 @@ USER 10001:10001
 ENTRYPOINT ["python3", "/opt/benchmark/compare_resize.py"]
 
 FROM ubuntu:24.04 AS runtime
+# Raw Docker builds have unknown provenance; the release helper overrides these
+# labels from CMake/Git and verifies them after building each architecture.
+LABEL org.opencontainers.image.title="SIPI-2" \
+      org.opencontainers.image.source="https://github.com/OMAS-IIIF/sipi-2" \
+      org.opencontainers.image.version="unknown" \
+      org.opencontainers.image.revision="unknown" \
+      org.omas-iiif.sipi.source-state="unknown"
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 10001 --create-home sipi \

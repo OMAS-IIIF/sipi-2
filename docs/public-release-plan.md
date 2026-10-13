@@ -12,8 +12,11 @@ The [readiness review](release-readiness.md) is the current remaining-gate list.
 The inventory and gap map below preserve the starting assessment; completed items
 are recorded in dated sections and are not reopened by historical wording.
 Master context consolidation is complete, with the old text archived intact apart
-from relative link adjustments. Remaining work concerns clean-checkout validation,
-release provenance, asset attribution, contribution/security channels and notices.
+from relative link adjustments. Fresh macOS ARM64 checkout validation is now complete (69 native tests and 92
+example checks); see the readiness review for scope. Remaining work concerns
+deployment acceptance, release provenance, asset attribution, contribution/security
+channels and notices. S3/external-validator and both local Docker architecture
+checks now pass; AMD64 execution is emulated, not native x86.
 
 ## Inventory and immediate decisions
 
@@ -290,6 +293,16 @@ locally inspected published image. Exact old image/source identity is unresolved
 GitHub visibility/settings/releases were not inspected because gh is unavailable.
 All 520 local inline Markdown links/anchors resolve. No runtime changes or tests,
 asset deletion, history rewrite, tagging, publication or repository setting changes.
+
+## Release provenance workflow implemented (2026-10-13)
+
+OCI source/version/revision/state labels and local JSON evidence now link helper
+builds to their Git/CMake inputs. Publish rejects dirty trees, uses a fixed Git
+archive and checks source state between verification/build stages. Reports retain
+platform image IDs/digests, smoke results and eventual push metadata/uncertainty.
+Ten mocked/real-Git regression cases and a real local ARM64 development-image smoke
+pass. No commit, Git tag or push was made. The clean release snapshot/tag policy,
+final published artifact acceptance and old-image provenance remain separate work.
 
 ## Execution order and completion criteria
 

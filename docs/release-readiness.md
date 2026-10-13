@@ -26,9 +26,9 @@ untracked assets awaiting initial inclusion as described in the original invento
 
 | Area | Evidence / gap | Completion criterion | Type |
 | --- | --- | --- | --- |
-| Fresh checkout | Examples used existing builds/caches; no isolated clean native build has been recorded for this preparation | Build from a named source snapshot with isolated generated/Conan state; run normal tests and first-image/config/policy examples; record platform/compiler and failures | Engineering verification |
-| Release provenance | CMake and running binary say 0.1.3; local and remote Git tag listings are empty. Inspected local published-image labels expose only inherited Ubuntu version `24.04`, no SIPI source revision | Select a source revision; retain source/tag, build inputs and resulting image digest together; add reliable OCI source/revision/version metadata in the release workflow and verify it | Engineering and release decision |
-| Platform acceptance | ARM64 published-image checks are current; AMD64 manifests exist and older runtime evidence is recorded | Verify the intended release artifacts on the supported platforms, marking emulated versus native execution and avoiding emulated performance claims | Engineering verification |
+| Fresh checkout | Passed for macOS ARM64 Debug at `54f8e54`: isolated checkout/Conan cache, 69 CTests and 92 documented-example checks | Native gate complete; subsequent S3/external-validator/ARM64-container follow-up also passed below; other release platforms remain open | Verified, scoped |
+| Release provenance | Helper now emits/verifies OCI labels, rejects dirty publication, freezes Git input and records Buildx digests; local ARM64 development run and mocked release/failure tests pass | Commit the workflow and verify the intended clean release snapshot; choose Git tag/release policy and retain the eventual published digest. Old 0.1.3 image identity remains unresolved | Workflow implemented; final release decision open |
+| Platform acceptance | Both local source images at 54f8e54 pass build/smoke: ARM64 native, AMD64 emulated on ARM64 | Functional container gate complete for these artifacts; native x86 execution/performance and final published-artifact verification are not implied | Verified, scoped |
 | Image/brand attribution | Owner identified seven originals as their own; chosen public image attribution/license is still unspecified. Brand assets have no separate published attribution statement | Owner selects attribution and applicable image/brand terms; record them beside assets and keep excluded originals/derivatives private | Owner decision |
 | Code/dependency notices | Root AGPLv3 text and compact-ICC attribution are present; a complete shipped-component notice inventory is absent | Confirm intended project declaration/attribution, inventory distributed components and preserve their applicable notices in release artifacts | Maintainer review |
 | Contributions and support | No CONTRIBUTING.md or issue/PR templates; public docs explain builds but not contribution routing or expectations | Provide contribution/support entry point with scoped changes, test tiers and policy for reports; confirm the actual channel before publishing it | Documentation and owner decision |
@@ -82,9 +82,9 @@ selection/archival decision; do not treat them as automatically disposable balla
 
 ## Recommended next sequence
 
-1. Perform the isolated fresh-checkout build/test while asset attribution and
-   contribution/security channels are being settled. Use a snapshot that includes
-   the intended pending docs/examples; do not silently test only an older HEAD.
+1. Retain the completed macOS ARM64 fresh-checkout evidence below while resolving
+   asset attribution and contribution/security channels; verify other intended
+   release platforms and separate integration gates against the chosen snapshot.
 2. Add contributor, security, release-note and verified migration entry points from
    confirmed choices; review dependency notices and public evidence scope.
 3. Strengthen release provenance and choose the release revision/artifact mapping;
@@ -94,3 +94,99 @@ selection/archival decision; do not treat them as automatically disposable balla
 Public DNS, ACME issuance/renewal, production permissions, browser-cookie behavior
 and service-manager stop grace are deployment acceptance checks, distinct from a
 public-source release. No production configuration was changed in this review.
+
+## Fresh native verification completed (2026-10-13)
+
+A separate local clone at `54f8e5403a78d533ea4be4b3b9edd612c9711391` was prepared
+without shared Git objects, generated builds or private originals. A new Conan home
+held the detected profile and exported Grok recipe. The user completed dependency
+installation/build and reported 69 passing tests; the retained CTest log confirms
+69 passes and no failures. CMake identifies this checkout/toolchain, Debug and
+`SIPI_TEST_S3=OFF`; the binary links Grok from the separate Conan home.
+
+The new binary reports 0.1.3. On macOS ARM64 with Apple Clang 21, SDK 27.0,
+Conan 2.33.0, CMake 4.4.3 and Ninja 1.13.2, 92 further checks pass against the actual
+native TOML, alias policy, JWT policy and documented token recipe. Coverage includes
+320×200 info/PNG, 160×100 JPEG, public IDs/redirects, GET/HEAD, CLI precedence,
+persistent-cache restart/stable output, valid credentials and denial after cache
+fill. Only ports/public URLs and dedicated temporary cache paths were adapted.
+All owned servers and temporary secrets/caches were cleaned up; the tested source
+checkout remains clean.
+
+The local evidence directory is the sibling `sipi-2-release-check-state/`: retained
+CTest output, toolchain/build-origin records, a reproducible example-check script
+and JSON results with source revision and binary SHA-256. A full install/build
+transcript was not retained; no assertion that every dependency built from source
+is made. Host tools/SDK are shared, so this is not a second-machine portability
+claim. Docker/MinIO, external IIIF validation and other platforms remain separate.
+
+## Integration follow-up completed (2026-10-13)
+
+At the same clean source revision `54f8e54`, enabling S3 tests and compiling their
+additional target produced two passing integration suites (`s3-byte-source`,
+`s3-http`) plus four required fixture setup steps. The existing loopback development
+MinIO was reused without restarting it; uniquely owned disposable buckets were
+cleaned up. This supplements, rather than reruns, the earlier 69 native tests.
+
+The unchanged upstream validator at `f05e365a1cb28f8707cbd50466a86d8f611d1ab8`
+passed 78 selected tests: 31 Level 2 and eight optional on each original and
+restricted-public service. Exact public-reference pixels and independent WebP
+signature/decoding checks passed. The known broken upstream Python-3 `format_webp`
+test remains excluded as documented in [external validation](external-validation.md);
+this is not certification. The existing validator checkout/venv were reused.
+
+A local Linux ARM64 Docker build from the clean checkout produced test tag
+`sipi-release-check:54f8e54-arm64`, image ID
+`sha256:81affa674960bb4e2b48741e9444480ab63497daa78b9b8848a4a5b24e303b5b`.
+Runtime smoke checks passed for health, OLDAP/JWT, prefixes, info/PNG, cache/denial,
+read-only media/Lua mounts, environment settings and JPEG sampling. BuildKit caches
+were reused; this was not an uncached Linux dependency bootstrap. The image remains
+local, with no registry publication or replacement of running services.
+
+Detailed evidence is retained in sibling `sipi-2-release-check-state/` as
+`integration-results.json`, `external-validation.json` and per-stage logs. The
+isolated source and upstream validator remain clean; S3 remains enabled only in
+the isolated generated build configuration. Test containers/volumes/buckets are
+removed. Current AMD64 acceptance, public deployment checks and release artifact
+provenance remain open.
+
+## AMD64 functional verification completed (2026-10-13)
+
+Built the same clean `54f8e54` snapshot with `--platform linux/amd64` and loaded
+`sipi-release-check:54f8e54-amd64`. Image ID:
+`sha256:5e3ca6e34c4f2b9a11b0125854ffd5dc6f961cd2ee75d115d19ad21270ccbd92`.
+The Docker engine is `aarch64`; build and execution use AMD64 emulation on this
+ARM64 host. Architecture inspection and the complete existing container smoke suite
+passed, including runtime contents/user, version/health, OLDAP JWT/prefix handling,
+info/PNG, cache/denial, read-only mounts, environment configuration and JPEG sampling.
+
+The local evidence directory retains `amd64-results.json`, builder inspection and
+full build/smoke logs. BuildKit/Conan caches were available; this is not a fully cold
+Linux bootstrap or native x86 performance measurement. Source checkout remains
+clean, test containers/volumes were removed and existing services were unchanged.
+Both architecture test images remain local and unpushed. Final release provenance,
+publication metadata and production deployment acceptance are still open; if native
+x86 execution is required for the support claim, verify it on that hardware separately.
+
+## Release provenance workflow implemented (2026-10-13)
+
+The helper now supplies CMake version, canonical source URL, full Git revision and
+clean/dirty state as image labels, checks them with the image architecture, and
+records per-platform image IDs/digests plus smoke results under `build/releases/`.
+Publication rejects pending staged/unstaged/untracked files, uses a fixed Git archive
+for all builds and rechecks Git state between stages. Its final Buildx push records
+the actual returned digest; interrupted/failed pushes remain explicitly uncertain.
+Raw Docker builds use unknown labels rather than an inherited Ubuntu version.
+
+Ten Python regression cases cover real Git dirty-state detection, fixed-archive
+orchestration, labels, blocked publication, metadata validation and failed-push
+reporting. A real ARM64 local build with pending edits passed the full container
+smoke suite and reported version 0.1.3, base revision 54f8e54 with a dirty suffix,
+image identity and no publication attempt. The publish path was mocked only: no
+registry push, Git tag or commit was made. This validates the workflow, not a new
+release artifact. See [operator instructions](makefile.md#image-identity-and-release-evidence).
+
+The older source/image findings above remain historical evidence. The intended
+clean release commit, version/tag policy and final artifact verification are still
+required. Mutable external dependencies and the final cached multi-platform build
+are not a claim of bit-identical independent rebuilds or signed attestation.

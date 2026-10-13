@@ -351,3 +351,7 @@ networking and secrets explicitly.
 The separate oldap-mediaserver project has its own activation/rollback procedure
 and proxy-prefix conventions. Its local trial instructions are not prerequisites
 for this generic Docker guide; do not replace an existing deployment with a demo.
+
+For source/version labels, immutable publication source snapshots, clean-tree
+requirements and recorded image digests, see [release evidence](makefile.md#image-identity-and-release-evidence).
+Raw Docker builds use unknown provenance labels; the helper fills and verifies them.

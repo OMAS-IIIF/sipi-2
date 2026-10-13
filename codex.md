@@ -110,9 +110,30 @@ verification. Do not invoke publication merely to test a documentation example.
 
 Existing native Debug 0.1.3, published native ARM64 image and isolated Caddy proxy
 checks support the public examples. AMD64 manifests were inspected; historical
-cross-platform checks have their own evidence. A fresh isolated checkout/cache
-build, current release-platform acceptance and exact source/image provenance remain
-open release gates. No current test-count assertion substitutes for those gates.
+cross-platform checks have their own evidence. Fresh macOS ARM64 Debug verification
+at `54f8e54` now passes: separate checkout/Conan cache, 69 CTests and 92 documented
+example checks. Local evidence is in sibling `sipi-2-release-check-state/`; the tested
+checkout remains clean. The follow-up also passes both S3 suites, 78 external IIIF tests and a new local
+ARM64 Docker build/smoke run. Existing MinIO/validator/BuildKit infrastructure was
+reused; see readiness scope. A new local AMD64 image at the same revision also
+passes build/smoke under emulation on ARM64; no native-x86 or performance claim.
+Deployment checks and exact release source/image provenance remain open.
+
+## Release provenance workflow
+
+`scripts/docker_image.py` now derives OCI source/version/revision labels from
+CMake/Git and verifies labels/architecture before smoke tests. Local/test builds
+may be dirty and advertise `-dirty`; publish rejects staged/unstaged/untracked
+changes and uses one fixed `git archive` for all build stages. Git state is checked
+between stages. Each invocation records image IDs, Buildx digests, smoke outcomes
+and publication status in ignored `build/releases/`; retain successful release
+reports separately. Raw Docker builds use unknown provenance defaults. No Git tag
+is created and no old-image provenance is inferred. Final multi-platform publication
+still uses Buildx/cache and records its actual digest; independent reproducible
+rebuilds are not promised. See [release evidence](docs/makefile.md#image-identity-and-release-evidence).
+The workflow has mocked publication/failure regression coverage and a real local
+ARM64 dirty-source smoke run; commit and verify the intended clean release snapshot
+before a future explicitly requested publication.
 
 ## Working conventions and preservation
 
@@ -149,7 +170,7 @@ must be explicitly labelled, not silently presented as original measurements.
    asset attribution, maintainer/security channels and dependency notice inventory.
 2. Complete contributor/release/migration entry points and current architecture
    documentation without importing outdated chronological claims.
-3. Verify a fresh checkout with isolated generated state and record build/platform
-   evidence, then bind the intended source revision to the release artifacts.
+3. Complete remaining platform/integration gates using the fresh-checkout evidence,
+   then bind the intended source revision to the release artifacts.
 4. Review publication scope and perform release/push/visibility actions only when
    requested. Production DNS/TLS, permissions and service lifecycle remain deployment checks.

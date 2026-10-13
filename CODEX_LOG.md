@@ -1,3 +1,27 @@
+### Update 2026-10-13 23:38
+- Decisions: Bind helper-built images to explicit Git/CMake metadata; refuse dirty publication and freeze committed build input without changing existing tag/push authorization semantics.
+- Implementation: Added OCI labels/default unknown provenance, architecture/label checks, fixed Git-archive publication input, inter-stage source checks and build/releases reports with Buildx digests/failure state. Extended release regression coverage and documented workflow/limits; updated master context/readiness.
+- Open: Commit/reverify intended clean release snapshot, choose version/Git-tag policy, then explicitly authorize final publication; asset/notices/contact decisions remain. Old published-image source identity is not retroactively established.
+- Risks/Assumptions: Ten regression cases and real local ARM64 dirty-source build/full container smoke pass; publication tested with mocks only. Local/test dirty labels do not fingerprint pending bytes. Final multi-platform build still relies on Buildx caches; mutable dependencies prevent a bit-reproducibility claim. No Git commit/tag or registry push; prior evidence and running services preserved.
+
+### Update 2026-10-13 23:32
+- Decisions: Complete AMD64 functional container acceptance at the same clean source snapshot, explicitly distinguishing emulation from native x86/performance evidence.
+- Implementation: Built linux/amd64 as sipi-release-check:54f8e54-amd64; architecture inspection and complete existing Docker smoke suite passed. Saved image ID, builder details and build/smoke logs in sibling release-check-state; updated release readiness/master context.
+- Open: Release provenance/metadata, attribution/notices and maintainer channels, production deployment checks; native x86 execution if required for the support claim. No commit or publication.
+- Risks/Assumptions: ARM64 Docker Desktop emulates AMD64; existing BuildKit/Conan caches reused. Test containers/volumes removed, clean test checkout and live services preserved. Both local architecture test images retained; no performance claim or registry push.
+
+### Update 2026-10-13 23:25
+- Decisions: Complete separate integration gates at the clean tested revision without replacing live services or published tags.
+- Implementation: Enabled isolated S3 tests and built their target; two suites/four fixtures pass. Reused pinned clean external validator/venv: 78 selected tests plus independent WebP/public-pixel checks pass. Built new local ARM64 image sipi-release-check:54f8e54-arm64 and passed runtime/mount/JWT/cache smoke. Saved evidence in sibling release-check-state and updated release context.
+- Open: Current AMD64 acceptance, deployment checks, release provenance, attribution/notices and maintainer channels. No commit, tag or push.
+- Risks/Assumptions: Existing MinIO/validator environment and BuildKit caches reused, not rebuilt fresh. Known upstream WebP test excluded transparently. Test buckets/containers/volumes removed; live services unchanged. Local test image retained; isolated S3 configuration remains enabled. Earlier 69 native-suite evidence is separate, not rerun.
+
+### Update 2026-10-13 23:22
+- Decisions: Validate documented examples against the newly built isolated checkout, keeping the tested source immutable and integration/platform claims scoped.
+- Implementation: Recorded user-completed Debug build and confirmed 69 CTest passes from retained log at 54f8e54. Ran 92 native example assertions covering image dimensions/IDs, TOML/CLI precedence, cache restart, alias and JWT policies including denial after cache hits. Saved checker, logs, binary hash and results in sibling release-check-state; updated release readiness/master context.
+- Open: Other release platforms, Docker/MinIO/external-validator gates, release provenance, attribution/notices and maintainer channels. No commit or push.
+- Risks/Assumptions: CMake and Grok linkage point into isolated checkout/cache; host tools/SDK are shared. Full install/build transcript absent; no all-dependencies-from-source claim. Test checkout remains clean; owned servers/secrets/caches removed. Main checkout changes are documentation only.
+
 ### Update 2026-10-13 23:01
 - Decisions: Keep master context current and concise; preserve historical rationale separately and distinguish verified release evidence from unresolved owner choices.
 - Implementation: Consolidated codex.md from 1,532 to 155 lines; archived its original text with reversible relative-link adjustments and verified SHA-256. Added docs/release-readiness.md, labelled historical architecture scope, and updated navigation/release progress.
