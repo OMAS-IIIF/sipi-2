@@ -110,9 +110,10 @@ or MinIO integration tests.
 
 Settings can come from CLI arguments, environment variables and an explicitly
 selected TOML file. Precedence is **CLI > environment > TOML > default**.
-No configuration file is searched for implicitly. Start with
-[`sipi.example.toml`](sipi.example.toml) and the
-[configuration reference](docs/command-line.md).
+No configuration file is searched for implicitly. Follow the
+[native configuration guide](docs/command-line.md) with its
+[runnable TOML example](examples/native/sipi.toml). The annotated
+[`sipi.example.toml`](sipi.example.toml) lists all configurable settings.
 
 A configured Lua `preflight(request)` returns an allow/deny decision and optional
 source/policy settings. Scripts are trusted operator code, validated and
@@ -123,7 +124,8 @@ segments are not automatically filesystem directories.
 See the [preflight input/output contract](docs/preflight.md),
 [configuration and secrets](docs/lua-configuration.md), and
 [source mapping](docs/source-resolution.md). The [minimal policy](examples/preflight.lua)
-requires adapting its source path. The [OLDAP integration](docs/oldap-preflight.md)
+runs directly with the native example configuration. See the guide for a
+[JWT-protected example](examples/preflight-jwt.lua). The [OLDAP integration](docs/oldap-preflight.md)
 is a separate example, not a prerequisite for using SIPI-2.
 
 ## Documentation and development

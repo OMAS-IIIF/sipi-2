@@ -1,41 +1,189 @@
-# Lua preflight contract
+# Lua preflight: access policies and source mapping
 
-The standalone `preflight` CMake target evaluates trusted operator-written Lua
-policies. It has no Drogon or codec dependency. The HTTP adapter invokes it for
-IIIF requests on a dedicated worker after startup validation. Lua 5.4.8 is pinned through Conan; no system Lua installation is required.
-The initial implementation uses Lua's C API directly, without a binding framework.
+A Lua `preflight(request)` function decides whether an IIIF resource may be read,
+which source to use, and whether to apply reduced public resolution or a watermark.
+It runs before source access and encoded-result cache lookup for image, information
+and base-URI requests, including HEAD. Without a configured script, the default
+repository mapping is accessible without application authorization.
 
-## Files and use
+The script returns one decision table. SIPI performs storage access, image
+processing and HTTP delivery. Lua does not receive a live connection or write the
+response. Policies are trusted operator code; Lua 5.4.8 is bundled through Conan,
+so no separate Lua installation is required.
 
-- `src/preflight/LuaPreflight.h`: owning request/decision types and public evaluator.
-- `src/preflight/LuaPreflight.cpp`: script loading, Lua lifetime, protected calls,
-  and strict result decoding.
-- `examples/preflight.lua`: minimal allow/deny policy with one explicit source.
-- `tests/preflight/LuaPreflightTests.cpp`: contract, error, and isolation tests.
+## Quickstart: one public image alias
 
-```cpp
-#include "preflight/LuaPreflight.h"
+From the repository root, after the [native build](building.md):
 
-sipi::preflight::LuaPreflight policy("examples/preflight.lua");
-sipi::preflight::Request request{
-    .resource = {.prefix = {}, .identifier = "example"},
-    .authorization = std::nullopt,
-    .cookie = std::nullopt
-};
-policy.validate(); // Initialize and check the entry point without a request.
-const auto decision = policy.evaluate(request);
-// Inspect Allow or Deny; PreflightError represents a technical failure.
+```sh
+./build/Debug/sipi-2 --config examples/native/sipi.toml \
+  --preflight-script examples/preflight.lua
 ```
 
-Construction snapshots the script text from disk and the explicitly supplied
-`ScriptConfig` (empty by default). `sipi.config` and `sipi.secrets` are fresh tables
-for each state, available during initialization; see [script configuration](lua-configuration.md). validate() compiles and runs
-top-level initialization in a fresh state, then checks the global preflight function
-without calling it. Evaluation compiles text-only
-Lua, executes top-level initialization, and calls the global function
-`preflight(request)`. Construct a new evaluator to adopt a changed script file.
-Top-level chunk return values are ignored; this is a named-function contract,
-not a module-return contract. A missing function fails explicitly.
+Stop any other demo using port 18080 first. The [minimal policy](../examples/preflight.lua)
+allows only an empty prefix and identifier `example`, returning
+`{ decision = "allow", source = "sample.png" }`. The source is relative to
+`iiif-root`, which this configuration sets to `examples/images`.
+
+In another terminal:
+
+```sh
+curl --fail http://127.0.0.1:18080/example/info.json
+curl --fail http://127.0.0.1:18080/example/full/160,/0/default.jpg -o preview.jpg
+curl --head http://127.0.0.1:18080/example/info.json
+curl --include http://127.0.0.1:18080/example
+curl --include http://127.0.0.1:18080/sample.png/info.json
+curl --include http://127.0.0.1:18080/other/example/info.json
+```
+
+Expect 200 for info/image/HEAD, 303 from `/example` to its `info.json`, and 403 for
+both the direct filename and the unapproved prefix. The preview is 160 × 100.
+The alias illustrates source selection; it is a public allowlist, not a login.
+Stop with Ctrl-C. Script edits require a restart.
+
+Enable your own policy with `--preflight-script PATH`, `SIPI_PREFLIGHT_SCRIPT`, or
+TOML `preflight-script = "PATH"`; normal [configuration precedence](command-line.md#sources-and-precedence)
+applies. The script path uses the process working directory. Relative **returned
+sources** instead use `iiif-root`. For container paths and mounted policies, see
+[the Docker example](docker.md#toml-lua-and-a-persistent-cache).
+
+## Request and decision flow
+
+1. SIPI validates the IIIF path and query and submits a job to the worker pool.
+2. A fresh Lua state initializes the snapshotted script and calls `preflight(request)`.
+3. `deny` stops delivery with 403 before source access. A script/contract failure
+   produces 500; it never grants access.
+4. `allow` resolves the selected image and any required mask, checks metadata and
+   applies the policy. Only then may an authorized request reuse an encoded result.
+5. SIPI returns the image, information document, or base-URI redirect.
+
+Health/hello and CORS OPTIONS do not invoke this policy. All IIIF request kinds
+need authorization: allowing `info` or `base` also exposes resource information.
+A cache hit does not replace the next request's policy check. Policy-dependent
+responses use `Cache-Control: no-store`.
+
+## Input at a glance
+
+| Field | Lua value | Meaning |
+| --- | --- | --- |
+| `request.prefix` | Dense one-based array of strings; possibly empty | Decoded IIIF prefix segments; not automatically part of a storage path |
+| `request.identifier` | String | Decoded resource identifier; no extension is added |
+| `request.headers` | Table | Only optional `authorization` and `cookie`, not arbitrary HTTP headers |
+| `request.cookies` | String-to-string table | Parsed cookies; use this for HTTP Cookie input |
+| `request.query` | String-to-array table | Decoded query names with ordered value arrays, even for a single value |
+| `request.kind` | `"image"`, `"info"`, `"base"` | Parsed route category |
+| `request.method` | `"GET"`, `"HEAD"` | Original request method |
+
+Tables are present even when empty; missing individual headers/cookies/query names
+are `nil`. There are no region, size, rotation, quality, format, client-IP or arbitrary
+header fields in this contract. Image-output limits belong to server configuration;
+public-detail restrictions use `resolution`. Do not decode identifiers or query
+values again. Detailed encoding/duplicate rules follow under [Lua input](#lua-input).
+
+## Output at a glance
+
+Return **exactly one plain table**. All nested policy tables must also have no metatable.
+
+| Field | On allow | On deny |
+| --- | --- | --- |
+| `decision` | Required exact string `"allow"` | Required exact string `"deny"` |
+| `source` | Optional local path string or `{type="s3", key="..."}` | Must be absent/nil |
+| `resolution` | Optional `{max_width=1000, max_height=1000}`; both positive uint32 integers | Must be absent/nil |
+| `watermark` | Optional required-mask policy described below | Must be absent/nil |
+
+Unknown keys, coercible wrong types, missing decisions and multiple return values
+are contract failures. `nil`, `false`, a string, or `{decision="deny", status=401}`
+are not valid decisions. Lua cannot set a custom status, response body, redirect or
+response header through this table. Denial maps to 403, not an authentication challenge.
+
+| Allowed source | Storage behavior |
+| --- | --- |
+| Omitted | Identifier in the configured local root or S3 bucket; prefix ignored |
+| `"sample.png"` | Local file relative to `iiif-root`, even with an S3 default |
+| `"/srv/images/sample.tif"` | Trusted explicit absolute local path; may be outside the root |
+| `{type="s3", key="project/sample.tif"}` | Literal key in the configured bucket, even with a local default |
+
+Scripts cannot supply S3 endpoints, buckets or credentials. Prefer explicit
+allowlists or validated project mapping over building absolute paths from request
+strings. Relative/default local sources remain subject to root containment.
+See [source resolution](source-resolution.md) for symlinks and storage failures.
+
+## Example: JWT-protected image
+
+The [complete JWT policy](../examples/preflight-jwt.lua) accepts an Authorization
+Bearer token only, restricts requests to `/sample.png` with no prefix, verifies
+HS256 signature/expiry/issuer/audience/type, and requires `sub = "sample.png"` plus
+`read = true`. These last two claims are an example application contract, not
+built-in SIPI permission names. Missing or rejected tokens return deny; helper misuse or quota failures remain
+technical errors. Query/cookie
+credentials are deliberately not alternate login paths in this example.
+
+Set up a **local demonstration** with Python 3 and a temporary secret file:
+
+```sh
+demo_dir=$(mktemp -d)
+echo "Demo directory: $demo_dir"
+python3 - "$demo_dir" <<'PYTOKEN'
+import base64, hashlib, hmac, json, secrets, sys, time
+from pathlib import Path
+root = Path(sys.argv[1])
+key = secrets.token_bytes(32)
+(root / "jwt.key").write_bytes(key)
+(root / "jwt.key").chmod(0o600)
+def encode(value):
+    return base64.urlsafe_b64encode(value).rstrip(b"=")
+def part(value):
+    return encode(json.dumps(value, separators=(",", ":")).encode())
+message = part({"alg": "HS256", "typ": "JWT"}) + b"." + part({
+    "iss": "sipi-demo", "aud": "sipi-demo-images", "sub": "sample.png",
+    "read": True, "exp": int(time.time()) + 300
+})
+token = message + b"." + encode(hmac.new(key, message, hashlib.sha256).digest())
+(root / "token").write_bytes(token)
+(root / "token").chmod(0o600)
+PYTOKEN
+./build/Debug/sipi-2 --config examples/native/sipi.toml \
+  --preflight-script examples/preflight-jwt.lua \
+  --preflight-config jwt_issuer=sipi-demo \
+  --preflight-config jwt_audience=sipi-demo-images \
+  --preflight-secret-file "jwt_key=$demo_dir/jwt.key"
+```
+
+Stop the previous demo first. In a second terminal, set `demo_dir` to the path
+printed above:
+
+```sh
+curl --include http://127.0.0.1:18080/sample.png/info.json
+curl --fail -H "Authorization: Bearer $(cat "$demo_dir/token")" \
+  http://127.0.0.1:18080/sample.png/info.json
+curl --fail -H "Authorization: Bearer $(cat "$demo_dir/token")" \
+  http://127.0.0.1:18080/sample.png/full/160,/0/default.jpg -o preview.jpg
+```
+
+Expect 403 without a token and 200 with the generated token for five minutes.
+Stop the server, then remove the temporary demo directory with `rm -r "$demo_dir"`.
+For real deployments, use the application's trusted issuer and key-management
+workflow; serve credentials over HTTPS and keep them out of logs. A client/viewer
+must attach credentials to every info/image request. SIPI does not issue login
+sessions or automatically forward a browser's token to subsequent requests.
+See [JWT semantics](lua-jwt.md) for RS256 and claim validation, and
+[configuration/secrets](lua-configuration.md) for TOML, environment and secret-file
+snapshots. Do not wrap all verification/configuration failures in a blanket
+`pcall` that silently allows access.
+
+## More policy examples
+
+- [Reduced public resolution](../examples/restricted-resolution.lua) allows only
+  `/public/` with a fixed public coordinate system; the original remains denied.
+  Set smaller limits than the source to observe reduction. This is a whole-image
+  detail restriction, not the output-width limit of an individual IIIF response.
+- [Watermark decisions](#single-color-watermark-decision) combine with source and
+  resolution. Supply a supported grayscale mask as described in [watermarks](watermarks.md);
+  a missing/invalid required mask fails delivery rather than serving an unmarked image.
+- [Project-prefix mapping](#explicit-project-prefix-mapping) explicitly chooses
+  S3 keys; a prefix alone is not proof of authorization.
+- [OLDAP integration](oldap-preflight.md) is a separate deployment policy using
+  JSON, HTTP, JWT, configuration and explicit shared caching.
 
 ## Lua input
 
@@ -203,6 +351,28 @@ See [watermark processing](watermarks.md) for the mask/color and placement rules
 
 ## Lifetime and errors
 
+Scripts, configuration and secrets are read at startup; restart to adopt edits.
+Top-level code runs once for startup validation and again in each request's fresh
+state. Keep it deterministic: define functions and validate local settings there.
+Outbound HTTP and shared-cache operations are enabled only inside the request call,
+not initialization or teardown. Startup checks syntax/initialization and the named
+function; it does not execute a sample request or validate external services.
+
+| Outcome | HTTP behavior |
+| --- | --- |
+| Explicit deny | 403 / `access_denied`; no image/mask source access |
+| Lua exception, invalid return, instruction/allocation limit | 500 / `preflight_failed` |
+| Allowed source missing | 404 / `image_not_found` |
+| Required repository/backend configuration missing | 500 / `source_not_configured` |
+| Relative source outside the allowed root | 403 / `source_not_allowed` |
+| Required mask missing/invalid | 500 / `watermark_failed`; no unmarked fallback |
+
+A missing/unreadable script, syntax error or failing top-level assertion prevents
+server startup (exit 2). Client errors are generic; use operator logs for the
+category and masked diagnostic. Never include credentials or backend bodies in
+`error()`/`assert()` messages. Expected lack of permission should return deny;
+technical backend failures should remain failures, not permission grants.
+
 Each evaluation owns a fresh Lua state through `std::unique_ptr` with `lua_close`
 as its deleter. Globals, modified library tables, stack values, and request data do
 not survive a call unless explicitly stored through `sipi.cache`. Repeated and
@@ -237,28 +407,20 @@ limits do not bound C++ allocations, file I/O, script text storage, native-libra
 execution time, or wall-clock duration. HTTP has separate transfer/aggregate
 timeouts and byte limits; see [the HTTP contract](lua-http.md).
 
-## Validation and next steps
+## Validation and tests
+
+After building, run the focused existing contract and HTTP tests:
 
 ```sh
-conan install . -pr:h profiles/macos-debug -pr:b sipi-2-local --build=missing
-cmake --preset conan-debug
-cmake --build --preset conan-debug
-ctest --preset conan-debug -R lua-preflight --output-on-failure
+ctest --test-dir build/Debug --output-on-failure \
+  -R '^(lua-preflight|preflight-context-http|script-config-http|lua-jwt)$'
 ```
 
-Tests exercise input transport, missing/empty headers, UTF-8 and binary strings,
-owning outputs, invalid fields/types, missing functions, syntax and runtime errors,
-non-string errors, successful calls after errors, snapshots, and concurrent calls.
-The module also passes an ASan/UBSan build with strict compiler warnings; Conan
-dependency binaries are not sanitizer-instrumented.
-
-HTTP integration uses a bounded worker pool with 64 waiting jobs and the status
-mapping in [HTTP routes](http-server.md). Script-path configuration and startup
-validation are described in [startup configuration](command-line.md). Add reduced-source variants in a separate understandable increment.
-[Explicit script configuration/secrets](lua-configuration.md) are available. Generic [JWT signing/verification](lua-jwt.md) is available. Outbound HTTP(S) is now
-available through [sipi.http.request](lua-http.md).
-The [delivery architecture](iiif-delivery-architecture.md) remains the guide for
-the eventual processing order and authorization/cache boundaries.
+These cover input/output types, invalid contracts, errors/quotas, isolated states,
+query/context transport, GET/HEAD authorization before cache hits, configured
+secrets and JWT checks. Also exercise the actual policy with allowed and denied
+image/info/base requests; `/health` and startup alone do not call its request path.
+The [build guide](building.md) describes the broader test workflow.
 
 ## Explicit project-prefix mapping
 
@@ -293,8 +455,8 @@ source produces `source_not_configured`; malformed Lua tables fail the contract.
 `sipi.json.decode`, `encode`, `null`, `array()` and `object()` are available in
 all script states. See [JSON mapping, limits and examples](lua-json.md).
 Generic [HTTP(S) requests](lua-http.md) are available inside `preflight(request)`.
-Generic [JWT signing and verification](lua-jwt.md) are also available. Configured values are available in `sipi.config`/`sipi.secrets`; request-context
-extensions are the next step.
+Generic [JWT signing and verification](lua-jwt.md) are also available. Configured values are available in `sipi.config`/`sipi.secrets`; query, route kind
+and method are available in the request snapshot documented above.
 
 ## Explicit shared cache
 
@@ -313,3 +475,38 @@ watermark. Keep public/original service URLs distinct through Lua prefix policy;
 never switch the coordinate system at the same URL on login. See
 [restricted resolution](restricted-resolution.md) and the
 [deny-by-default example](../examples/restricted-resolution.lua).
+
+## Files and use
+
+The standalone `preflight` CMake target uses the Lua C API directly and has no
+Drogon or codec dependency. The HTTP adapter evaluates policies on image workers.
+
+- `src/preflight/LuaPreflight.h`: owning request/decision types and public evaluator.
+- `src/preflight/LuaPreflight.cpp`: script loading, Lua lifetime, protected calls,
+  and strict result decoding.
+- `examples/preflight.lua`: minimal allow/deny policy with one explicit source.
+- `tests/preflight/LuaPreflightTests.cpp`: contract, error, and isolation tests.
+
+```cpp
+#include "preflight/LuaPreflight.h"
+
+sipi::preflight::LuaPreflight policy("examples/preflight.lua");
+sipi::preflight::Request request{
+    .resource = {.prefix = {}, .identifier = "example"},
+    .authorization = std::nullopt,
+    .cookie = std::nullopt
+};
+policy.validate(); // Initialize and check the entry point without a request.
+const auto decision = policy.evaluate(request);
+// Inspect Allow or Deny; PreflightError represents a technical failure.
+```
+
+Construction snapshots the script text from disk and the explicitly supplied
+`ScriptConfig` (empty by default). `sipi.config` and `sipi.secrets` are fresh tables
+for each state, available during initialization; see [script configuration](lua-configuration.md). validate() compiles and runs
+top-level initialization in a fresh state, then checks the global preflight function
+without calling it. Evaluation compiles text-only
+Lua, executes top-level initialization, and calls the global function
+`preflight(request)`. Construct a new evaluator to adopt a changed script file.
+Top-level chunk return values are ignored; this is a named-function contract,
+not a module-return contract. A missing function fails explicitly.

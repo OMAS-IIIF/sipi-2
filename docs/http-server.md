@@ -137,7 +137,8 @@ semantics; raw header ordering/duplicates cannot be recovered by this adapter.
 
 All preflight-dependent responses carry Cache-Control: no-store. Lua diagnostics,
 credentials, and local paths are not included in responses; logs record error
-categories without script-controlled error messages. HEAD has identical status
+categories with bounded, escaped Lua diagnostics and known-secret masking (see
+[diagnostics](lua-configuration.md#limits-and-diagnostics)). HEAD has identical status
 and policy handling, with its body removed by Drogon.
 
 Relative/default sources use iiif-root and must stay inside its canonical path.

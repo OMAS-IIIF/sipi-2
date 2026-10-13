@@ -1,7 +1,8 @@
 # Public release preparation
 
-Status: inventory, third-party image history cleanup, README/navigation refresh and
-feature catalog and Docker operator guide completed on 2026-10-13; remaining
+Status: inventory, third-party image history cleanup, README/navigation refresh,
+feature catalog, Docker/native configuration and Lua-preflight guides completed
+on 2026-10-13; remaining
 documentation and release checks are listed below.
 Baseline: commit `2d26200`, CMake version `0.1.3`. This is a preparation plan,
 not a release announcement. Later sections record registry/runtime verification.
@@ -211,6 +212,41 @@ Python or curl; probes run on the host. All test-owned containers/volumes were
 removed. Registry AMD64/ARM64 manifests were rechecked; AMD64 execution, full S3,
 proxy/TLS and actual upgrade/rollback were not rerun or enacted. No image rebuild,
 push or deployment modification.
+
+## Native configuration guide completed (2026-10-13)
+
+Reworked `docs/command-line.md` into a native quickstart and shared option reference:
+36 configurable keys with environment bindings, defaults/types/limits, three
+command-only options, precedence, working-directory paths, permissions, restart
+requirements and error behavior. Preserved detailed topic anchors. Added the
+runnable `examples/native/sipi.toml` and completed JPEG entries in the annotated
+root template; updated onboarding links.
+
+Checked table and template coverage against parser registrations/environment
+bindings. All three focused CTest suites passed (startup, S3 and script
+configuration). Sixteen isolated checks with the existing native Debug 0.1.3
+binary passed: sample/info/JPEG/cache, precedence, inherited/explicit height,
+working-directory behavior, help and invalid-input cases, and root-template
+startup. Test-owned processes and temporary directories were cleaned up. No new
+build, Docker/S3 network test, production code change, commit or push in this step.
+
+## Lua-preflight operator guide completed (2026-10-13)
+
+Reorganized `docs/preflight.md` around runnable native examples, request/decision
+field tables, source mapping, authorization before cache lookup, lifetime/restart,
+errors, helpers and detailed contracts. Moved C++ usage behind operator guidance.
+The minimal policy now maps only `/example` to the public synthetic sample; added
+`examples/preflight-jwt.lua` with explicit issuer/audience, identifier/read and
+prefix checks. Its documented Python recipe generates an ephemeral local demo key
+and expiring token. Updated navigation and stale context/diagnostic statements.
+
+Four existing suites passed: lua-preflight, preflight-context-http,
+script-config-http and lua-jwt. Forty-four isolated native HTTP checks exercised
+both actual example files and the exact token-generation recipe: GET/HEAD for
+info/image/base, allowed/denied aliases, cached authorization, bad/expired tokens,
+claim binding, no query fallback, script snapshots/restart and contract-error
+mapping. Temporary processes/files were cleaned up. Existing native Debug 0.1.3
+binary used; no rebuild, Docker/S3/OLDAP deployment or production-code change.
 
 ## Execution order and completion criteria
 

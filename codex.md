@@ -24,8 +24,19 @@ policy and explicit container TOML; these are host-mounted, not image contents.
 Native ARM64 image checks passed minimal/configured/Compose starts, 403 policy,
 cache persistence, readonly root, precedence and missing-bind failure; all owned
 resources were cleaned up. OLDAP-specific trial details moved to its own guide.
-Next: operator-first Lua/configuration guides, operations and compact master-context
-consolidation.
+`docs/command-line.md` now provides native setup, paths/permissions, startup/error
+semantics and a complete table of 36 configurable keys plus three command-only
+options. `examples/native/sipi.toml` runs against the public sample; the annotated
+root template covers every key. Parser/environment/template coverage checks, three
+existing configuration suites and 16 native startup/HTTP checks passed.
+`docs/preflight.md` now starts with runnable native policies, request/decision
+tables, source mapping, JWT authorization and lifetime/error behavior, followed by
+the detailed contract and C++ notes. `examples/preflight.lua` exposes only the
+public sample alias `/example`; `examples/preflight-jwt.lua` demonstrates explicit
+HS256 issuer/audience/resource/read checks without prefix or credential fallbacks.
+Four focused existing suites and 44 native HTTP checks passed, including the
+documented token recipe, denied cache hits and script restart semantics.
+Next: operations guidance and compact master-context consolidation.
 
 ## Public release preparation (2026-10-13)
 

@@ -1,118 +1,240 @@
-# Startup configuration contract
+# Native configuration and option reference
 
-The working implementation uses CLI11 in `src/CommandLine.cpp`.
-`load_startup_options` returns either owning `StartupOptions` or `ParseError`.
-`main` supplies argument views (excluding argv[0]) and an optional snapshot of
-`SIPI_LOG_LEVEL`, `SIPI_PORT`, `SIPI_SIZE_UPSCALING`, `SIPI_PREFLIGHT_SCRIPT`,
-`SIPI_IIIF_ROOT`, `SIPI_PUBLIC_BASE_URL`, the three `SIPI_CACHE_*` settings, the two `SIPI_METADATA_CACHE_*` settings, and the three `SIPI_S3_*` credential variables. The loader reads an explicitly selected file, but does not log,
-print, exit, or change logging/environment state.
+SIPI-2 can run directly as a native executable, without Docker. Configure the
+listener, repository and optional Lua policy at startup using command-line
+arguments, environment variables or one explicitly selected TOML file. This page
+is the shared option reference for native and container operation; see the
+[Docker guide](docker.md) for mounts and container-specific defaults.
+
+## Quickstart without Docker
+
+After following the [build guide](building.md), run from the repository root:
+
+```sh
+./build/Debug/sipi-2 --config examples/native/sipi.toml
+```
+
+The [native example](../examples/native/sipi.toml) binds to `127.0.0.1:18080`, serves
+[the synthetic image](../examples/images/README.md), and selects two workers.
+No Lua policy or persistent cache is enabled. In another terminal:
+
+```sh
+curl --fail http://127.0.0.1:18080/health
+curl --fail http://127.0.0.1:18080/sample.png/info.json
+curl --fail http://127.0.0.1:18080/sample.png/full/160,/0/default.jpg -o preview.jpg
+```
+
+The source is 320 × 200 and the preview 160 × 100. Stop with Ctrl-C. Use the Release
+binary at `build/Release/sipi-2` after a Release build. Stop other demos using port
+18080 first. For your own collection, copy the configuration and set `iiif-root`
+to its existing directory. Without a policy, supported resolvable images in that
+repository are accessible.
+
+To enable the optional persistent result cache, restart with:
+
+```sh
+./build/Debug/sipi-2 --config examples/native/sipi.toml \
+  --cache-dir build/native-demo-cache
+```
+
+The server creates this dedicated cache directory if possible. Original images
+remain in `examples/images`; the cache is separate and regenerable.
 
 ## Sources and precedence
 
-For each setting: **command line > environment > file > default**.
-The resolved `ServerConfig` contains concrete values and optional preflight and repository paths. CLI11 tracks whether
-an option was explicitly supplied, so `--log-level info` overrides a file value
-just as any other explicit level does. An absent preflight path disables script loading.
+Each setting resolves independently in this order:
 
-The loader first parses CLI arguments. For ordinary startup, it supplies the
-injected environment value to the same option/validator only if CLI omitted it.
-It then uses `parse_from_stream` to fill still-missing options from the file.
-This order is deliberate: CLI11's automatic `set_config`/`envname` processing
-would put the file ahead of the environment in the version we use.
+**CLI > environment > explicitly selected TOML file > built-in default.**
+
+```sh
+SIPI_PORT=18081 ./build/Debug/sipi-2 --config examples/native/sipi.toml \
+  --port 18082 --public-base-url http://127.0.0.1:18082
+```
+
+This starts on 18082: CLI beats environment 18081 and file 18080. The public URL
+is overridden separately because it is an independent setting. Remove `--port`
+to use the environment value; remove both overrides to use the file value. Adjust
+the public URL accordingly. An explicit value equal to a default still overrides
+lower-priority values.
+
+No configuration file is searched for implicitly and there is no `SIPI_CONFIG`
+environment setting. Select a file with `--config PATH`. Environment changes in
+another shell do not affect a running server. Configuration, Lua scripts and
+secret-file contents are startup snapshots: restart to adopt changes. There is no
+hot reload, `--check-config` mode or effective-configuration dump.
+
+Empty selected scalar values normally fail; they do not clear lower-priority
+settings. To disable optional file-cache or policy configuration, remove its value
+from all applicable sources rather than assigning an empty path. Booleans use
+exactly `true` or `false`, not `1`, `yes` or a valueless switch. Lua maps have their
+own per-name merge rules described below.
+
+## Paths, permissions and service startup
+
+All relative filesystem paths are based on the **process working directory**, not
+the TOML file's directory. This includes `--config` itself, `iiif-root`, Lua script
+paths, secret files and cache paths. Relative *source paths returned by Lua* are a
+separate case: they resolve within `iiif-root`. There is no application-level
+expansion of `~`, `$VARIABLE` or `${VARIABLE}` in configuration values; your shell
+may expand unquoted CLI input before SIPI receives it.
+
+For a system service, use absolute paths or explicitly set its working directory.
+Run it as an account that can read image/configuration/policy files and traverse
+their parent directories. Only its cache and working/runtime directories need
+writes for ordinary delivery. Drogon may create an `uploads/` directory in the
+working directory; this does not enable an upload API. A native user does not need
+the container's UID 10001.
+
+Repository roots must already exist. Use a dedicated writable cache directory,
+separate from the image repository and private to one running SIPI instance. Do
+not share it between processes or over network storage. Keep port/bind settings
+separate from public URL configuration; HTTPS normally belongs to a reverse proxy.
+
+## Complete option table
+
+For each row below, the first column is the **TOML root key**; prefix it with `--`
+for the corresponding CLI option. For example, `jpeg-quality = 85`,
+`SIPI_JPEG_QUALITY=85` and `--jpeg-quality 85` address the same setting.
+Quoted strings, booleans and decimal integers are used in the flat TOML schema.
+Three command-only options are separate:
+
+| CLI only | Meaning |
+| --- | --- |
+| `--help` | Print supported options and exit 0; not a configuration validation mode |
+| `--version` | Print the CMake-defined version and exit 0 |
+| `--config PATH` | Load one explicit file; no environment or TOML equivalent |
+
+### Listener and public HTTP behavior
+
+| TOML key / CLI name | Environment | Default | Type, values and purpose |
+| --- | --- | --- | --- |
+| `log-level` | `SIPI_LOG_LEVEL` | `info` | String: trace, debug, info, warn, error, critical, off; application log severity |
+| `listen-address` | `SIPI_LISTEN_ADDRESS` | `127.0.0.1` | Numeric IPv4/IPv6 address, no hostname/port/brackets/zone suffix |
+| `port` | `SIPI_PORT` | `8080` | Integer 1–65535; listener port |
+| `public-base-url` | `SIPI_PUBLIC_BASE_URL` | `http://127.0.0.1:<port>` | Absolute HTTP(S) public origin and optional encoded proxy mount |
+| `cors-origins` | `SIPI_CORS_ORIGINS` | `*` | One string: wildcard or comma-separated exact HTTP(S) origins, without spaces/paths |
+| `cors-credentials` | `SIPI_CORS_CREDENTIALS` | `false` | Boolean; true requires explicit origins, not wildcard |
+
+The shipped Docker image sets `SIPI_LISTEN_ADDRESS=0.0.0.0`; that environment value
+also overrides a TOML bind setting. Native SIPI has no such injected default.
+
+### Repository and S3
+
+| TOML key / CLI name | Environment | Default | Type, values and purpose |
+| --- | --- | --- | --- |
+| `iiif-root` | `SIPI_IIIF_ROOT` | Absent | Nonempty path to an existing local repository; also resolves relative Lua sources |
+| `iiif-storage` | `SIPI_IIIF_STORAGE` | `local` | String: local or s3; default source mapping |
+| `s3-bucket` | `SIPI_S3_BUCKET` | Absent | Bucket name, 3–63 characters under the validation rules below; required for S3 sources |
+| `s3-region` | `SIPI_S3_REGION` | `us-east-1` | Lowercase alphanumeric segments separated by hyphens |
+| `s3-endpoint` | `SIPI_S3_ENDPOINT` | AWS regional endpoint | HTTP(S) origin only; no path, trailing slash, credentials, query or fragment |
+| `s3-path-style` | `SIPI_S3_PATH_STYLE` | `false` | Boolean; typically true for local MinIO |
+| `s3-access-key` | `SIPI_S3_ACCESS_KEY` | Absent | Nonempty credential string; must be paired with secret key |
+| `s3-secret-key` | `SIPI_S3_SECRET_KEY` | Absent | Nonempty credential string; must be paired with access key |
+| `s3-session-token` | `SIPI_S3_SESSION_TOKEN` | Absent | Nonempty temporary token; requires the key pair |
+
+### Image output and concurrency
+
+| TOML key / CLI name | Environment | Default | Type, values and purpose |
+| --- | --- | --- | --- |
+| `size-upscaling` | `SIPI_SIZE_UPSCALING` | `false` | Boolean; actual enlargement also requires an IIIF `^` size |
+| `max-width` | `SIPI_MAX_WIDTH` | `8192` | Decimal integer 1–32768; output width before rotation |
+| `max-height` | `SIPI_MAX_HEIGHT` | Resolved max-width | Decimal integer 1–32768; inherits width only when absent from every source |
+| `max-area` | `SIPI_MAX_AREA` | `8388608` | Decimal integer 1–8388608; output pixel-area ceiling |
+| `jpeg-quality` | `SIPI_JPEG_QUALITY` | `90` | Decimal integer 1–100; JPEG quantization, not a lossless mode |
+| `jpeg-sampling` | `SIPI_JPEG_SAMPLING` | `4:4:4` | String: 4:4:4 or 4:2:0; ignored for one-channel JPEG |
+| `bitonal-method` | `SIPI_BITONAL_METHOD` | `threshold` | String: threshold or floyd-steinberg |
+| `iiif-workers` | `SIPI_IIIF_WORKERS` | Logical CPUs clamped to 1–4 | Decimal integer 1–32; image workers, not an automatic memory quota |
+
+### Cache capacity
+
+| TOML key / CLI name | Environment | Default | Type, values and purpose |
+| --- | --- | --- | --- |
+| `cache-dir` | `SIPI_CACHE_DIR` | Absent; disabled | Nonempty dedicated local path; created if needed |
+| `cache-max-bytes` | `SIPI_CACHE_MAX_BYTES` | `1073741824` | Decimal integer 1–4611686018427387903; encoded-file budget, excluding DB/overhead |
+| `cache-target-percent` | `SIPI_CACHE_TARGET_PERCENT` | `90` | Decimal integer 1–99; target occupancy after eviction |
+| `metadata-cache-max-entries` | `SIPI_METADATA_CACHE_MAX_ENTRIES` | `256` | Unsigned decimal size_t; source metadata entry capacity |
+| `metadata-cache-max-bytes` | `SIPI_METADATA_CACHE_MAX_BYTES` | `67108864` | Unsigned decimal size_t; accounted metadata bytes |
+| `mask-cache-max-entries` | `SIPI_MASK_CACHE_MAX_ENTRIES` | `64` | Unsigned decimal size_t; decoded watermark entry capacity |
+| `mask-cache-max-bytes` | `SIPI_MASK_CACHE_MAX_BYTES` | `33554432` | Unsigned decimal size_t; accounted mask bytes |
+| `variant-cache-max-entries` | `SIPI_VARIANT_CACHE_MAX_ENTRIES` | `16` | Unsigned decimal size_t; reduced-public-raster entry capacity |
+| `variant-cache-max-bytes` | `SIPI_VARIANT_CACHE_MAX_BYTES` | `67108864` | Unsigned decimal size_t; accounted public-raster bytes |
+
+For the six `size_t` fields, allowed values are 0–18446744073709551615 on the
+supported 64-bit builds. Either zero limit disables that memory cache's retention.
+Zero is **not** valid for `cache-max-bytes`; omit `cache-dir` to disable persistence.
+These limits do not reserve memory or bound total process RSS. Byte settings take
+plain decimal numbers, not units such as `64M` or `1GiB`.
+
+### Lua policy and settings
+
+| TOML key / CLI name | Environment | Default | Type, values and purpose |
+| --- | --- | --- | --- |
+| `preflight-script` | `SIPI_PREFLIGHT_SCRIPT` | Absent; disabled | Nonempty path to a trusted Lua script |
+| `preflight-config` | `SIPI_PREFLIGHT_CONFIG_<NAME>` | Empty map | TOML array / repeatable CLI `name=value`; populates sipi.config |
+| `preflight-secret` | `SIPI_PREFLIGHT_SECRETS_<NAME>` | Empty map | TOML array / repeatable CLI `name=value`; literal secret bytes |
+| `preflight-secret-file` | `SIPI_PREFLIGHT_SECRET_FILES_<NAME>` | Empty map | TOML array / repeatable CLI `name=path`; secret-file startup snapshot |
+
+Script names use `[a-z][a-z0-9_]*`, up to 64 characters; environment suffixes
+normalize to lowercase names. Config and secret maps resolve per name, not by
+replacing the whole map. Literal and file secrets share one namespace/priority
+chain. Same-source duplicates/collisions fail. Script settings require a script.
+An empty ordinary Lua config string is allowed; empty secrets/file paths are not.
+See [explicit Lua configuration and secrets](#explicit-lua-configuration-and-secrets).
 
 ## Supported input
 
-- `--help`: print CLI11-generated help; exit 0 without startup logging.
-- `--version`: print the CMake-defined application version; exit 0 without startup logging.
-- `--log-level LEVEL`: select `trace`, `debug`, `info`, `warn`, `error`, `critical`, or `off`.
-- `--port PORT`: local HTTP port, an integer from 1 to 65535.
-- `--size-upscaling BOOL`: permit IIIF enlargement; exactly `true` or `false`.
-- `--preflight-script PATH`: optional Lua script, nonempty and without NUL bytes.
-- `--iiif-root PATH`: optional repository directory, nonempty and without NUL bytes.
-- `--cache-dir PATH`: optional persistent cache directory; see the cache section below.
-- `--cache-max-bytes BYTES`: encoded file limit, default `1073741824` (1 GiB).
-- `--cache-target-percent PERCENT`: cleanup target from 1 to 99, default `90`.
-- `--public-base-url URL`: public HTTP(S) origin and optional proxy mount; see below.
-- `SIPI_PUBLIC_BASE_URL` and TOML `public-base-url` supply the same setting.
-- S3 credential options are listed in the table below.
-- `--config PATH`: load one explicitly selected configuration file.
-- `SIPI_LOG_LEVEL`: the same case-sensitive level names; empty is invalid if selected.
-- `SIPI_PORT`: the same port range; empty is invalid if selected.
-- `SIPI_SIZE_UPSCALING`: exactly `true` or `false`; empty is invalid if selected.
-- File: `log-level = "warn"` and `port = 9090`, for example. No file is loaded implicitly.
-- File also supports `size-upscaling = true` or `false`.
-- `SIPI_PREFLIGHT_SCRIPT`: optional Lua path with the same validation.
-- File also supports `preflight-script = "scripts/preflight.lua"`.
-- `SIPI_IIIF_ROOT`: repository path, with the same validation.
-- File also supports `iiif-root = "data/images"`.
-- Defaults: log level `info`, port `8080`, size upscaling `false`, no preflight script, no repository root.
+`--name=value` and `--name value` work. There are no short aliases, positional
+arguments or `--run` option. Boolean settings require an explicit value. Scalar
+option duplicates and conflicting help/version actions fail; the three Lua
+assignment options are repeatable with distinct names. `--` ends option parsing,
+but positional tokens after it remain errors. `--help=false` is not supported.
 
-CLI11 also accepts equals syntax (`--log-level=debug`, `--config=path`).
-There are no short option aliases, positional arguments, or `--run` option.
-Duplicate scalar options/flags and conflicting help/version actions are errors.
-CLI11's standard `--` end-of-options marker is accepted; positional tokens after
-it remain errors. Flag value overrides such as `--help=false` are rejected.
-
-The supported file schema includes these root keys: `log-level`, `port`, `size-upscaling`,
-`preflight-script`, `preflight-config`, `preflight-secret`, `preflight-secret-file`, `iiif-root`, `public-base-url`, `s3-access-key`, `s3-secret-key`,
-`s3-session-token`, `iiif-storage`, `s3-bucket`, `s3-region`, `s3-endpoint`,
-`s3-path-style`, `cache-dir`, `cache-max-bytes`, and `cache-target-percent`,
-`metadata-cache-max-entries`, `metadata-cache-max-bytes`,
-`mask-cache-max-entries`, `mask-cache-max-bytes`,
-`variant-cache-max-entries`, `variant-cache-max-bytes`, `iiif-workers`,
-`bitonal-method`, `jpeg-quality`, `jpeg-sampling`, `max-width`, `max-height`, `max-area`, `cors-origins`, and
-`cors-credentials`. Unknown keys
-and startup actions in the file are rejected. CLI11's built-in TOML-style reader
-is used directly; this is not a promise of full TOML grammar validation (including
-all malformed syntax or duplicate-key checks). Revisit the parser if the schema
-needs full TOML semantics rather than these simple settings.
+The supported file schema consists of the root keys in the complete table.
+Use flat assignments; unknown keys and command-only actions inside a file are
+rejected. CLI11's TOML-style reader handles this schema; it is not a claim of full
+TOML-spec validation for arbitrary malformed syntax, duplicate keys or structures.
+The annotated [root template](../sipi.example.toml) lists settings without enabling
+an arbitrary repository or application policy. The [native demo](../examples/native/sipi.toml)
+is directly runnable from the repository root.
 
 ## Errors and overrides
 
-All CLI input is validated, even for help/version. Once CLI parsing succeeds,
-help/version bypass environment and file loading. Thus a missing file does not
-prevent help, but `--help --unknown` is still an error.
+All explicit CLI input is validated, including with help/version. Once parsing
+succeeds, help/version skip environment/file loading, script I/O and server startup.
+Consequently `--help --config missing.toml` succeeds, but `--help --unknown` fails.
+Help is **not** a way to validate a TOML file. Normal startup checks the selected
+configuration and resources before serving; exercise a representative image too,
+because `/health` does not establish that every source or policy backend works.
 
-For normal startup, an explicitly requested file must be readable even if CLI
-supplies every setting. Unknown file keys remain errors. A lower-priority setting
-value that is overridden is not semantically validated; the selected value is.
-An invalid selected value fails startup instead of silently reverting to defaults.
-Diagnostics go to stderr and main returns 2. CLI11 parse errors expose only the
-error category, not raw values (which could contain credentials, including in
-unknown/duplicate options). File I/O errors still identify the configuration path. The loader retains no input views.
-Allocation failures may propagate as exceptions.
+An explicitly selected file must be readable even when CLI overrides all of its
+values. Unknown keys still fail. For ordinary scalar settings an overridden value
+is not semantically validated; an invalid selected value fails rather than reverting
+to defaults. Lua maps additionally reject malformed assignments/duplicates at their
+source boundary. Cross-field rules still apply after merging (S3 credentials,
+S3 default bucket, CORS credential mode and settings requiring a policy).
+
+Configuration, script initialization and repository startup failures report to
+stderr and exit 2. Invalid CLI values are not echoed in parser diagnostics;
+configuration-file I/O errors can identify its path. Logs may include bounded,
+escaped Lua diagnostics with known-secret masking; do not log transformed secrets
+or complete resolved configuration. Cache-storage initialization failure can instead
+warn and continue uncached; an invalid cache *setting* still fails parsing.
+`log-level=off` does not suppress required startup stderr diagnostics.
 
 ## Representative outcomes
 
 | Input | Result |
 | --- | --- |
-| No sources | run, info |
-| File warn | run, warn |
-| File warn + environment debug | run, debug |
-| File warn + environment debug + CLI error | run, error |
-| File warn + CLI info | run, info |
-| `--log-level debug --version` | version output, exit 0 |
-| `--help --config missing.toml` | help output, exit 0 |
-| `--log-level` | error, exit 2 |
-| `--help --version` | error, exit 2 |
-| `--log-level DEBUG` | error, exit 2 |
-| `--log-level 2` | error, exit 2 |
-| `--log-level info --log-level debug` | error, exit 2 |
-| Invalid selected environment level | error, exit 2 |
-| `--config missing.toml` | error, exit 2 |
-
-## Tests and evolution
-
-`tests/CommandLineTests.cpp` retains the manual parser's acceptance cases, updates
-those intentionally changed by CLI11, and adds source-priority/file cases.
-Run via `ctest --preset conan-debug --output-on-failure` after building.
-The previous hand-written parser was reviewed successfully before replacement.
-Future configuration fields belong in `ServerConfig` and must have explicit
-validation and precedence tests. No generic configuration registry is needed.
-
-Size upscaling controls geometry admission and actual bilinear enlargement.
-It defaults to false; enabled requests must still use ^ and respect output limits.
-See [upscaling](upscaling.md) for examples, mixed-axis filtering and advertisement.
+| No repository or policy | Listener can start; default image requests lack a source repository |
+| File port + environment port + CLI port | CLI port wins; other settings resolve independently |
+| File max-width=1000; no max-height anywhere | Both effective axes are 1000 |
+| File max-height=900 + CLI max-width=1200 | Height stays 900 |
+| `--help --config missing.toml` | Help, exit 0; file was not validated |
+| `--help --unknown` or `--help --version` | Error, exit 2 |
+| Selected `SIPI_PORT=invalid` | Error, exit 2 |
+| Invalid environment port overridden by valid CLI port | CLI value used |
+| Missing configured image root or invalid Lua script | Startup error, exit 2 |
+| Script settings without preflight-script | Startup error, exit 2 |
 
 ## Preflight startup initialization
 
@@ -125,15 +247,15 @@ After configuration/help/version handling, main loads a configured script once a
 calls `LuaPreflight::validate()` before opening the listener. Validation compiles
 and executes top-level initialization, then checks that `preflight` is a function;
 it does not call the request function. Unreadable files, syntax errors, initialization
-errors, or a missing function print a value-free error category to stderr and exit 2, including
-when logging is off. There is no fallback to running without the configured script.
+errors, or a missing function print an error category and bounded, escaped,
+known-secret-masked diagnostic to stderr and exit 2, including when logging is off. There is no fallback to running without the configured script.
 Help/version skip script I/O but still reject invalid CLI path syntax.
 
 The script snapshot lives for the server lifetime; changes require a restart.
 Request-dependent failures remain detectable only during evaluation. Trusted script
 initialization has the same Lua memory/instruction budgets as request evaluation.
 Native-call wall-clock limits remain separate. A configured script authorizes IIIF
-image/info GET and HEAD requests on the worker before source lookup. Health and
+image/info/base GET and HEAD requests on the worker before source lookup. Health and
 hello are outside this policy. Without a script, delivery uses the repository's default mapping.
 See [the preflight contract](preflight.md).
 
@@ -143,8 +265,7 @@ The optional iiif_root field is a filesystem path. Server initialization validat
 and canonicalizes an explicitly configured existing directory before listening;
 missing/non-directory roots exit 2. Relative root paths use cwd. Request resolution
 uses root/identifier by default (without prefix); relative Lua source overrides
-also use root. Only absolute Lua source overrides work without a root. This changes
-the previous cwd-based relative-source rule. See [source resolution](source-resolution.md).
+also use root. Only absolute Lua source overrides work without a root. See [source resolution](source-resolution.md).
 
 ## Public service address
 
@@ -168,11 +289,7 @@ See [information responses](iiif-info.md) for examples and development boundarie
 
 ## S3 credentials
 
-| Command line | Environment | TOML root key | Default |
-| --- | --- | --- | --- |
-| `--s3-access-key KEY` | `SIPI_S3_ACCESS_KEY` | `s3-access-key` | Absent |
-| `--s3-secret-key SECRET` | `SIPI_S3_SECRET_KEY` | `s3-secret-key` | Absent |
-| `--s3-session-token TOKEN` | `SIPI_S3_SESSION_TOKEN` | `s3-session-token` | Absent |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 Each parameter follows **CLI > environment > TOML > absent**, exactly like the
 other settings. Values are stored as owning strings in `ServerConfig.s3`, the
@@ -223,13 +340,7 @@ process test also checks main's actual SIPI_S3_* environment snapshot. See
 
 ## Repository selection: local or S3
 
-| Command line | Environment | TOML root key | Default |
-| --- | --- | --- | --- |
-| `--iiif-storage` | `SIPI_IIIF_STORAGE` | `iiif-storage` | `local` |
-| `--s3-bucket` | `SIPI_S3_BUCKET` | `s3-bucket` | Absent |
-| `--s3-region` | `SIPI_S3_REGION` | `s3-region` | `us-east-1` |
-| `--s3-endpoint` | `SIPI_S3_ENDPOINT` | `s3-endpoint` | AWS regional endpoint |
-| `--s3-path-style` | `SIPI_S3_PATH_STYLE` | `s3-path-style` | `false` |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 All five fields use **CLI > environment > TOML > default**. `iiif-storage` accepts
 exactly `local` or `s3`; `s3-path-style` accepts exactly `true` or `false`.
@@ -246,7 +357,7 @@ A configured local root is validated at startup, even with S3 as the default.
 A configured bucket enables one shared S3 client, also when the default is local
 and only Lua selects S3. Bucket existence, object access and credentials are
 checked on source access; startup does not probe objects. No S3 client is created
-without a bucket. This increment supports one configured S3 backend/bucket.
+without a bucket. One S3 backend/bucket can be configured per server instance.
 
 **The IIIF URL prefix stays outside the default mapping. Project-specific
 translation belongs in the preflight script.** For example:
@@ -273,11 +384,7 @@ With `sipi-test-images/tiled.tif` uploaded, both `/tiled.tif/info.json` and
 
 ## Persistent result cache
 
-| CLI / TOML key | Environment | Default |
-| --- | --- | --- |
-| `cache-dir` | `SIPI_CACHE_DIR` | absent (disabled) |
-| `cache-max-bytes` | `SIPI_CACHE_MAX_BYTES` | `1073741824` (1 GiB) |
-| `cache-target-percent` | `SIPI_CACHE_TARGET_PERCENT` | `90` |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 `cache-dir` must be nonempty and contain no NUL; relative paths resolve against
 **the process working directory**, not the TOML file location. The server creates
@@ -297,8 +404,8 @@ Help/version validate CLI syntax but neither initialize the cache nor read its
 environment settings. Invalid selected settings fail startup; runtime storage
 initialization failure logs a warning and allows uncached operation.
 
-Startup initializes, recovers and locks the store. JPEG/PNG image GET/HEAD requests
-now reuse complete encoded results after current preflight, source/version, header,
+Startup initializes, recovers and locks the store. JPEG/PNG/WebP image GET/HEAD requests
+reuse complete encoded results after current preflight, source/version, header,
 geometry and capability checks. Hits skip pixel decoding/processing/encoding;
 unchanged headers are reused by the independent [metadata cache](metadata-cache.md).
 Its defaults are 256 entries / 64 MiB accounted resident storage;
@@ -309,10 +416,7 @@ See [HTTP cache integration](persistent-cache.md#http-integration).
 
 ## Metadata cache limits
 
-| CLI / TOML key | Environment | Default |
-| --- | --- | --- |
-| `metadata-cache-max-entries` | `SIPI_METADATA_CACHE_MAX_ENTRIES` | `256` |
-| `metadata-cache-max-bytes` | `SIPI_METADATA_CACHE_MAX_BYTES` | `67108864` (64 MiB) |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 Both settings independently follow **CLI > environment > TOML > default**.
 Use unsigned decimal integers, from zero to the platform's `size_t` maximum
@@ -331,16 +435,13 @@ The limits bound resident entry count and accounted metadata bytes (including IC
 profiles and directory/component vector capacities). Allocator overhead and
 caller-retained evicted snapshots are additional. See [metadata cache](metadata-cache.md).
 `MetadataCacheLimits` is the shared source of default values; startup passes the
-resolved value through the server into its single worker. A limit does not eagerly
+resolved value through the server into the shared worker pool. A limit does not eagerly
 allocate that amount of memory. Tests verify precedence and runtime zero/one-entry
 behavior, including environment wiring and CLI re-enablement.
 
 ## Watermark mask cache limits
 
-| CLI / TOML key | Environment | Default |
-| --- | --- | --- |
-| `mask-cache-max-entries` | `SIPI_MASK_CACHE_MAX_ENTRIES` | `64` |
-| `mask-cache-max-bytes` | `SIPI_MASK_CACHE_MAX_BYTES` | `33554432` (32 MiB) |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 Both follow **CLI > environment > TOML > default**, independently of metadata and
 persistent result caches. The unsigned-decimal validation, help/version and zero
@@ -358,10 +459,7 @@ mask-cache-max-bytes = 33554432
 
 ## Reduced public raster cache limits
 
-| CLI / TOML key | Environment | Default |
-| --- | --- | --- |
-| `variant-cache-max-entries` | `SIPI_VARIANT_CACHE_MAX_ENTRIES` | `16` |
-| `variant-cache-max-bytes` | `SIPI_VARIANT_CACHE_MAX_BYTES` | `67108864` (64 MiB) |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 Both follow CLI > environment > TOML > default. Either zero disables retention,
 not the public resolution restriction. `VariantCacheLimits` provides defaults.
@@ -373,9 +471,7 @@ the existing encoded result cache is unchanged. See
 
 ## IIIF worker concurrency
 
-| CLI / TOML key | Environment | Default | Valid values |
-| --- | --- | --- | --- |
-| `iiif-workers` | `SIPI_IIIF_WORKERS` | Detected logical CPU count capped at 4; fallback 1 | Integer 1..32 |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 Example: `--iiif-workers 2` or `iiif-workers = 2` in TOML. Priority remains
 CLI > environment > TOML > default; zero is invalid. One selects serial processing.
@@ -384,9 +480,7 @@ See [worker concurrency](worker-pool.md) for memory planning and cache coordinat
 
 ## Bitonal rendering
 
-| CLI | Environment | TOML | Default |
-| --- | --- | --- | --- |
-| `--bitonal-method` | `SIPI_BITONAL_METHOD` | `bitonal-method` | `threshold` |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 Allowed case-sensitive values are `threshold` and `floyd-steinberg`. Empty,
 unknown or duplicate selected values fail startup. Normal CLI > environment >
@@ -409,10 +503,7 @@ the shared geometry policy, rotated canvas checks and technical budget boundarie
 
 ## Browser origins and cookies
 
-| CLI / TOML key | Environment | Default |
-| --- | --- | --- |
-| cors-origins | SIPI_CORS_ORIGINS | `*` |
-| cors-credentials | SIPI_CORS_CREDENTIALS | `false` |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 Normal per-field priority applies: CLI > environment > TOML > default.
 Origins is a single comma-separated string of exact HTTP(S) origins, without
@@ -421,11 +512,7 @@ requires explicit origins. See [CORS contract and examples](iiif-http.md).
 
 ## Explicit Lua configuration and secrets
 
-| CLI (repeatable) | Environment | TOML root key |
-| --- | --- | --- |
-| `--preflight-config name=value` | `SIPI_PREFLIGHT_CONFIG_NAME` | `preflight-config = ["name=value"]` |
-| `--preflight-secret name=value` | `SIPI_PREFLIGHT_SECRETS_NAME` | `preflight-secret = ["name=value"]` |
-| `--preflight-secret-file name=path` | `SIPI_PREFLIGHT_SECRET_FILES_NAME` | `preflight-secret-file = ["name=path"]` |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 Lua sees strings in `sipi.config` and bytes in `sipi.secrets`, available already at
 initialization. Defaults are empty maps. Names are lower-case identifiers; environment
@@ -450,10 +537,7 @@ separately. Docker's image default sets SIPI_LISTEN_ADDRESS=0.0.0.0.
 
 ## JPEG encoding
 
-| CLI | Environment | TOML root key | Default |
-| --- | --- | --- | --- |
-| `--jpeg-quality` | `SIPI_JPEG_QUALITY` | `jpeg-quality` | `90` |
-| `--jpeg-sampling` | `SIPI_JPEG_SAMPLING` | `jpeg-sampling` | `"4:4:4"` |
+See the [complete option table](#complete-option-table) for names, defaults and ranges.
 
 Quality must be an integer from 1 to 100. Sampling accepts exactly `4:4:4` or
 `4:2:0`. Both resolve independently in CLI > environment > TOML > default order,
@@ -466,8 +550,8 @@ jpeg-sampling = "4:2:0"
 ```
 
 ```sh
-./build/debug/sipi-2 --jpeg-quality=85 --jpeg-sampling=4:2:0
-SIPI_JPEG_QUALITY=85 SIPI_JPEG_SAMPLING=4:2:0 ./build/debug/sipi-2
+./build/Debug/sipi-2 --jpeg-quality=85 --jpeg-sampling=4:2:0
+SIPI_JPEG_QUALITY=85 SIPI_JPEG_SAMPLING=4:2:0 ./build/Debug/sipi-2
 ```
 
 4:4:4 retains full chroma resolution; 4:2:0 halves chroma resolution horizontally
@@ -482,3 +566,22 @@ quality and effective sampling; switching settings cannot reuse incompatible JPE
 bytes. Original 4:4:4 keys remain valid, and switching back can reuse old entries.
 Unused variants are removed by normal LRU cleanup; no manual purge is needed.
 See [JPEG delivery](jpeg-delivery.md) and [cache identity](cache-key.md).
+
+## Tests and evolution
+
+`src/CommandLine.cpp` implements the CLI11 loader; `src/main.cpp` snapshots the
+selected environment variables and initializes runtime services. Configuration
+changes belong in the explicit `ServerConfig`/loader and corresponding tests.
+Defaults for cache/output/worker/codec behavior come from their shared value types,
+not an independent documentation registry.
+
+Run the existing focused configuration suites after building:
+
+```sh
+ctest --test-dir build/Debug --output-on-failure \
+  -R '^(startup-configuration|s3-configuration|script-configuration)$'
+```
+
+For HTTP startup and script-secret integration, see `script-config-http`,
+`cache-startup` and the broader [test workflow](makefile.md). These checks are not
+substitutes for a fresh-checkout build or for actual S3/deployment verification.

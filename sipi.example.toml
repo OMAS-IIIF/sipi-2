@@ -1,3 +1,7 @@
+# Annotated option template; load explicitly with --config sipi.example.toml.
+# For a runnable native demo, use examples/native/sipi.toml.
+# Relative paths use the process working directory, never this file's directory.
+
 # Log severity: trace, debug, info, warn, error, critical, off.
 log-level = "info"
 
@@ -11,12 +15,16 @@ port = 8080
 # Permit actual IIIF enlargement when the request explicitly uses ^.
 size-upscaling = false
 
-# Shared JPEG/PNG output limits before rotation; source dimensions stay unchanged.
+# Shared JPEG/PNG/WebP output limits before rotation; source dimensions stay unchanged.
 # Axes: 1..32768. Area: 1..8388608 pixels. No unlimited value.
 max-width = 8192
 # Omit max-height to inherit the effective max-width (including CLI/env overrides).
 # max-height = 8192
 max-area = 8388608
+
+# JPEG settings (server-wide); no equivalent WebP quality option.
+# jpeg-quality = 90                  # Integer 1..100.
+# jpeg-sampling = "4:4:4"            # Or "4:2:0"; ignored for grayscale JPEG.
 
 # Bitonal output: threshold or floyd-steinberg (per-request diffusion; tile patterns may differ).
 bitonal-method = "threshold"
@@ -57,7 +65,7 @@ bitonal-method = "threshold"
 
 # Optional persistent encoded-result storage. Separate from the image repository.
 # CLI > SIPI_CACHE_* environment > TOML > defaults. Relative to the working directory.
-# JPEG/PNG delivery reuses complete results after authorization/source checks.
+# JPEG/PNG/WebP delivery reuses complete results after authorization/source checks.
 # Database name inside this directory is fixed: cache.sqlite3.
 # cache-dir = "data/cache"
 # cache-max-bytes = 1073741824       # 1 GiB of encoded files; DB/overhead additional.

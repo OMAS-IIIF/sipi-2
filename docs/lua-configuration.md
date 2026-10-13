@@ -180,7 +180,6 @@ Lua/JWT execution, file overrides, restart semantics and startup/runtime redacti
 ctest --preset conan-debug -R '^(script-configuration|script-config-http)$' --output-on-failure
 ```
 
-Next: extend the request context with query parameters and an explicit IIIF
-request kind, so generic policies can distinguish information/base/image requests
-and consume query tokens without reparsing URLs. Then compose a separate deployment
-example using the generic JSON, HTTP, JWT and configuration capabilities.
+For decoded query parameters, route kind/method and runnable authorization examples,
+see the [preflight guide](preflight.md). The [OLDAP integration](oldap-preflight.md)
+combines these generic helpers in a separate deployment policy.

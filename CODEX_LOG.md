@@ -1,3 +1,15 @@
+### Update 2026-10-13 22:39
+- Decisions: Lead the preflight guide with operator workflows and explicit request/return contracts; retain detailed semantics and C++ integration notes.
+- Implementation: Added native alias/JWT walkthroughs, field/source/status tables and lifetime guidance; made examples/preflight.lua runnable with the public sample and added examples/preflight-jwt.lua. Updated navigation, obsolete configuration outlook, diagnostic documentation, master context and release plan.
+- Open: Operations guide, context consolidation and clean-checkout release checks. Existing native-configuration edits are preserved; no commit or push.
+- Risks/Assumptions: Four focused existing suites and 44 isolated native HTTP checks pass, including the documented token recipe, claim denials after cache fill and restart snapshots. Examples are application policies, not a general login service; existing Debug 0.1.3 used without rebuild or external backend/deployment tests.
+
+### Update 2026-10-13 22:32
+- Decisions: Make native configuration operator-facing while retaining one authoritative shared option reference and existing topic anchors.
+- Implementation: Reworked docs/command-line.md with quickstart, all 36 configurable keys and three command-only options, precedence, paths, restart/error semantics and focused checks. Added examples/native/sipi.toml; completed the annotated template's JPEG settings and updated navigation/master context/release plan.
+- Open: Operator-first Lua guidance, operations, context consolidation and clean-checkout release checks. No commit or push in this step.
+- Risks/Assumptions: Parser/environment/template coverage matched; three existing configuration suites and 16 isolated native startup/HTTP checks passed using the existing Debug 0.1.3 binary. No rebuild, Docker or S3 network retest; implementation unchanged.
+
 ### Update 2026-10-13 22:18
 - Decisions: Make Docker documentation usable with the published image independently of OLDAP; keep native option semantics authoritative and distinguish Docker paths, ports and environment precedence.
 - Implementation: Rewrote docs/docker.md with mounts/permissions, minimal/TOML/Lua/cache/Compose examples, S3/secrets, proxy paths, updates and troubleshooting. Added documented sample-only Lua policy/container TOML in examples/docker; preserved OLDAP trial notes in its guide, added Compose comments and updated index/master context/release plan.

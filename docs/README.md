@@ -11,7 +11,7 @@ reports record evidence for a particular revision, platform and workload.
 | --- | --- |
 | Compile, run and test natively; configure CLion | [Native build](building.md) |
 | Use container mounts, runtime settings and Compose; build images | [Docker](docker.md), [TOML/Lua example](docker.md#toml-lua-and-a-persistent-cache) and [Compose example](../docker/compose.example.yaml) |
-| Set CLI, environment and TOML options | [Configuration reference](command-line.md) and [example TOML](../sipi.example.toml) |
+| Configure native operation, paths, CLI/environment/TOML precedence and limits | [Native configuration and option reference](command-line.md), [runnable example](../examples/native/sipi.toml) and [annotated template](../sipi.example.toml) |
 | Map public identifiers to image sources | [Source resolution](source-resolution.md) |
 | Configure S3-compatible storage | [S3 source adapter and settings](s3-byte-source.md) |
 | Set up MinIO for local integration tests | [Development MinIO](minio-development.md) |
@@ -47,7 +47,7 @@ integration example; generic delivery does not depend on it.
 
 | Task | Reference |
 | --- | --- |
-| Write `preflight(request)` allow/deny and source decisions | [Preflight contract](preflight.md), [minimal example](../examples/preflight.lua) |
+| Write `preflight(request)` allow/deny and source decisions | [Preflight guide and contract](preflight.md), [minimal example](../examples/preflight.lua), [JWT policy](../examples/preflight-jwt.lua) |
 | Supply settings and secrets | [Lua configuration](lua-configuration.md) |
 | Parse and generate JSON | [JSON helpers](lua-json.md) |
 | Call an external HTTP(S) API | [HTTP helpers](lua-http.md) |
