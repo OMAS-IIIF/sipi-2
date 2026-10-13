@@ -1,6 +1,7 @@
 # SIPI-2 documentation
 
-Start with the [project overview and Docker quickstart](../README.md).
+Start with the [project overview and Docker quickstart](../README.md), then the
+[complete feature catalog](features.md) for supported behavior and boundaries.
 These guides describe the current implementation; dated audits and benchmark
 reports record evidence for a particular revision, platform and workload.
 

@@ -28,8 +28,8 @@ The HTTP layer currently supplies these fixed choices:
 In lossless mode quality controls compression effort rather than fidelity. Alpha
 compression is lossless in both modes. exact=1 preserves hidden transparent color
 in lossless encoding. Codec internal threading is off because SIPI's worker pool
-already bounds concurrent render jobs. These are deliberate fixed defaults, like
-the current JPEG encoder quality; no CLI/env/TOML encoding options were added.
+already bounds concurrent render jobs. These WebP settings are fixed; there are no CLI/env/TOML WebP encoding options.
+JPEG has separate [configurable quality/sampling](jpeg-delivery.md).
 Lossless refers to prepared encoder pixels, not to undoing resize/color conversion.
 Gray is stored as RGB, and bitonal WebP is not a one-bit PNG representation.
 

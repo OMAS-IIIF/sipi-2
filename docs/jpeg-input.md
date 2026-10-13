@@ -1,6 +1,6 @@
 # JPEG input
 
-JPEG sources support information JSON and JPEG/PNG image delivery, locally and
+JPEG sources support information JSON and JPEG/PNG/WebP image delivery, locally and
 through S3. The reader fully decodes an owning `RasterImage8`; the existing window
 resampler then crops and reduces it, followed by mirroring/rotation and encoding (see [arbitrary angles](arbitrary-rotation.md)).
 There is no ROI decoding or scaled IDCT yet: even a small crop requires the full raster.

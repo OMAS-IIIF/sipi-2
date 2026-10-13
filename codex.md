@@ -12,8 +12,13 @@ wordmarks in `logo/` are used for light/dark README display. Published image 0.1
 has AMD64/ARM64 manifests; its native ARM64 quickstart and the existing native
 Debug binary both passed health, info and JPEG/PNG checks. All 100 local references
 in the five edited/new guides resolve. A clean-checkout build and AMD64 runtime
-revalidation remain separate release gates. Next: full feature catalog, operator-
-first Docker/Lua/configuration guides, and compact master-context consolidation.
+revalidation remain separate release gates. `docs/features.md` now provides the
+full capability catalog: input/output matrices, IIIF, color, storage, policy,
+watermarks, Lua, caches, limits and deployment boundaries. It is linked from both
+entry points and checked against source plus 21 focused native HTTP probes.
+Superseded capability statements in six topic guides were corrected. Next:
+operator-first Docker/Lua/configuration guides, operations and compact master-context
+consolidation.
 
 ## Public release preparation (2026-10-13)
 

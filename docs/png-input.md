@@ -1,6 +1,6 @@
 # PNG input
 
-PNG sources support information JSON and JPEG/PNG image delivery, locally and via
+PNG sources support information JSON and JPEG/PNG/WebP image delivery, locally and via
 S3. The reader fully decodes a `RasterImage8`; existing window resampling performs
 crop/reduction, followed by mirroring/rotation and encoding (see [arbitrary angles](arbitrary-rotation.md)). Even small crops
 require full decoding. There is no PNG region decoding optimization.

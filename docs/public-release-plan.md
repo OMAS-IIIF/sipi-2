@@ -1,7 +1,8 @@
 # Public release preparation
 
-Status: inventory, third-party image history cleanup and README/navigation refresh
-completed on 2026-10-13; remaining documentation and release checks are listed below.
+Status: inventory, third-party image history cleanup, README/navigation refresh and
+feature catalog completed on 2026-10-13; remaining documentation and release checks
+are listed below.
 Baseline: commit `2d26200`, CMake version `0.1.3`. This is a preparation plan,
 not a release announcement or a claim that a registry tag has been verified.
 
@@ -173,8 +174,23 @@ or whether the target's contents are current.
   binary: health/version, 320 × 200 info with correct public ID, 160 × 100 JPEG
   preview, and full-size PNG. Test-owned container/process were stopped afterward.
 - Scope limits: existing native binary, not a clean rebuild; AMD64 manifest checked,
-  not runtime-tested in this step. Full feature catalog, Docker/Lua/operations
-  restructuring and clean-checkout verification remain open. No image/release push.
+  not runtime-tested in this step. The feature catalog was completed in the follow-up
+  below; Docker/Lua/operations restructuring and clean-checkout verification remain open. No image/release push.
+
+## Feature catalog completed (2026-10-13)
+
+`docs/features.md` catalogs input/output subsets, IIIF syntax/discovery, color and
+transparency, local/S3 storage, policy/resolution/watermarks, Lua helpers, caches,
+concurrency, configurable versus fixed bounds, HTTP/deployment and exclusions.
+README and the documentation index link to it. Six existing format/information
+pages were corrected where old text contradicted implemented capabilities.
+
+Source/default/contract review was supplemented by 21 focused HTTP probes against
+the existing native 0.1.3 Debug binary using the synthetic example: discovery,
+output limits, region/size forms, mirror/rotation, quality variants, all three
+encoders, rejected TIFF output, and disabled/enabled enlargement. No fresh build,
+full suite, S3/Docker retest or broad format conformance claim is implied. Local
+links and explicit anchors were checked; no runtime implementation changed.
 
 ## Execution order and completion criteria
 

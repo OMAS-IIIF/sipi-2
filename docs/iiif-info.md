@@ -57,9 +57,10 @@ Classic TIFF and BigTIFF follow the same path. No pixels are decoded.
 
 Lua-selected sources determine dimensions, but never replace the public identifier
 with a local path. For example, mapping `public-id` to `large.tif` reports that
-file's dimensions while keeping `/public-id` in `id`. Restricted virtual sources
-are not implemented; later their effective dimensions and separate service
-identity must be selected before building this document.
+file's dimensions while keeping `/public-id` in `id`. [Restricted public sources](restricted-resolution.md) report their effective
+reduced dimensions. Their separate stable public service identity is selected
+before building this document; original dimensions are not substituted back into
+public region coordinates.
 
 ## Public URL and encoding
 

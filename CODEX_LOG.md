@@ -1,3 +1,9 @@
+### Update 2026-10-13 21:59
+- Decisions: Publish a complete current capability catalog with supported subsets, configurable/fixed limits and explicit exclusions; distinguish header admission, pixel delivery, output limits and restricted public resolution.
+- Implementation: Added docs/features.md and linked it from README/docs index. Corrected stale Level-2/restricted-image claims and JPEG/PNG/WebP capability descriptions in six topic guides; updated master context and release progress.
+- Open: Operator-first Docker/configuration/Lua/operations guides, context consolidation and clean-checkout release verification. No commit or push in this step.
+- Risks/Assumptions: Cross-checked source/defaults and existing regression contracts; 21 focused native HTTP probes pass using synthetic PNG. Local link/anchor validation and diff check pass. No production code change, full-suite run, fresh build, S3/Docker retest or new certification claim.
+
 ### Update 2026-10-13 21:43
 - Decisions: Make README a public onboarding entry point; keep native build details and topic navigation in docs. Use an original reproducible image independent of the private corpus.
 - Implementation: Rewrote README with selected light/dark logos, current capabilities/limits, pinned 0.1.3 Docker quickstart and native/config/Lua links. Added docs/README.md, docs/building.md and examples/images/sample.png plus regeneration notes; updated Makefile guide, release plan and master context.

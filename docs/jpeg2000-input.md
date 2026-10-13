@@ -3,7 +3,7 @@
 JP2/JPH containers and raw J2K/HTJ2K codestreams are read through Grok 20.4.15 over the
 existing local/S3 ByteSource. Information requests, geometry validation and
 selective region/resolution decoding feed the common RasterImage8 -> area resize
--> JPEG/PNG pipeline. JPEG 2000 output remains outside this implementation.
+-> JPEG/PNG/WebP pipeline. JPEG 2000 output remains outside this implementation.
 
 Pixel delivery accepts unsigned 8-bit, equally sampled grayscale or RGB. JP2
 must declare a supported color model or carry a matching RGB/GRAY ICC header.

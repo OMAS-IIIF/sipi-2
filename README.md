@@ -23,6 +23,9 @@ certification. See [scope and limitations](docs/external-validation.md).
 
 ## Main capabilities
 
+See the [complete feature catalog](docs/features.md) for format matrices, IIIF
+operations, Lua integration, defaults and explicit limitations.
+
 | Area | Capabilities |
 | --- | --- |
 | Input | TIFF (tiled, pyramidal or strip-based), JPEG 2000 including HTJ2K, JPEG and PNG, within each reader's supported pixel layouts |

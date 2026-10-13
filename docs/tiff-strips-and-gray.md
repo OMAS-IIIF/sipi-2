@@ -36,8 +36,8 @@ conversion. Untagged sources remain untagged.
 
 For native grayscale, `default`, `color` and `gray` IIIF qualities all return the
 grayscale image. Information responses advertise `extraQualities: ["gray", "bitonal"]` when
-the source passes the metadata-level decode capability check. The existing
-omission of `profile` remains until compliance is reviewed. RGB-to-gray conversion and
+the source passes the metadata-level decode capability check. Admitted resources publish `profile: level2`; see the current
+[information contract](iiif-info.md). RGB-to-gray conversion and
 bitonal output follow the shared [color policy](color-management.md).
 
 CTest generates these fixtures under the HTTP test image directory:
