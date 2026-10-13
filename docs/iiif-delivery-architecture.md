@@ -1,8 +1,11 @@
 # IIIF delivery architecture
 
-Recorded 2026-10-03 after the architecture discussion with the owner.
-This document describes the agreed direction. See docs/http-server.md for the
-implemented preflight/source/metadata/geometry checks and the remaining delivery limitations.
+Historical architecture discussions recorded from 2026-10-03 onward. This page
+preserves design rationale and evolving plans; statements such as “planned” and
+“not implemented” describe their original stages and can be superseded.
+For the current architecture and invariants, start with
+[project context](../codex.md#architecture-and-invariants); for implemented behavior,
+use the [feature catalog](features.md) and its topic references.
 Upload/import remains a separate, deferred concern.
 
 ## Originals, delivery sources, and output (agreed 2026-10-04)

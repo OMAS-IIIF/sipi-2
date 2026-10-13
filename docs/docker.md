@@ -263,6 +263,9 @@ explicit origin list, credential mode and appropriate application cookie setup.
 SIPI does not issue login cookies. Internal result caching is separate from its
 `Cache-Control: no-store` responses to clients.
 
+For a complete proxy example, monitoring probes, cache recovery and maintenance,
+see the [operations guide](operations.md).
+
 ## Logs, updates and troubleshooting
 
 For a `docker run` example, inspect `docker logs sipi-2-config-demo`. For Compose,

@@ -7,7 +7,7 @@ source authorization. Source metadata reuse is provided by a separate [in-memory
 
 The executable initializes the configured store and shares ownership with the IIIF
 worker. JPEG/PNG/WebP image requests now use authorized lookup/fill for both local and
-S3-backed TIFF/JPEG 2000 sources. A hit skips pixel decoding, resizing and encoding;
+S3-backed supported TIFF/JPEG 2000/JPEG/PNG sources. A hit skips pixel decoding, resizing and encoding;
 source opening/version checks still run, while unchanged headers can come from the metadata cache. Browser/proxy responses
 retain `Cache-Control: no-store`; server-side reuse is independent of that policy.
 
@@ -184,11 +184,12 @@ operations -> construct key -> lookup. There is no shortcut around authorization
 source existence/version or today's renderer capabilities. `info.json` and errors
 are not stored in the encoded-result cache.
 
-The worker uses variant `original`, because today's Lua contract only supports
-allow/deny and source selection. Future virtual/restricted variants must pass their
-actual effective variant identity. JPEG quality 90 is supplied explicitly to both
-the key and encoder; PNG uses the current fixed recipe. Source layout selects the
-same native-gray quality normalization used by delivery.
+The key includes the effective original, watermarked or restricted-public variant,
+source version, rendering geometry, watermark identity and encoding settings.
+Configured JPEG quality/sampling and the PNG/WebP recipes are bound to that
+identity; obsolete variants age out normally. Source layout selects the same
+native-gray quality normalization used by delivery. See [cache identity](cache-key.md),
+[watermarks](watermarks.md) and [public resolution](restricted-resolution.md).
 
 On a hit, compare stored MIME/dimensions to the current output plan, then read the
 opened handle into the existing bounded response string (maximum 64 MiB). Complete

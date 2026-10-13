@@ -1,3 +1,15 @@
+### Update 2026-10-13 23:01
+- Decisions: Keep master context current and concise; preserve historical rationale separately and distinguish verified release evidence from unresolved owner choices.
+- Implementation: Consolidated codex.md from 1,532 to 155 lines; archived its original text with reversible relative-link adjustments and verified SHA-256. Added docs/release-readiness.md, labelled historical architecture scope, and updated navigation/release progress.
+- Open: Clean-checkout validation; source/tag/image provenance and OCI metadata; image/brand attribution, contributor/security channels, dependency notices, release notes, migration guidance and CI. No commit or push.
+- Risks/Assumptions: All 520 local inline Markdown links/anchors resolve; no runtime code changed or tests rerun. Local/remote Git tag lists are empty; locally inspected published image has only inherited Ubuntu version label, not SIPI revision. GitHub settings/releases were not queried (gh unavailable); no fresh credential scan or full licensing conclusion is implied. Prior pending operations edits and all assets remain intact.
+
+### Update 2026-10-13 22:53
+- Decisions: Document operational boundaries and recoverable caches; keep public identity explicit and private proxy routes blocked before mount stripping.
+- Implementation: Added docs/operations.md and examples/operations/Caddyfile, linked onboarding/Docker navigation, corrected obsolete persistent-cache variant/format statements, and updated master context/release plan.
+- Open: Context consolidation, remaining publication metadata and clean-checkout release checks. No commit or push.
+- Risks/Assumptions: Caddy 2.8.4 validation and 24 isolated HTTP checks against published native ARM64 SIPI 0.1.3 passed; four existing native suites plus two fixture setups passed. Test resources removed. Public DNS/ACME, browser-cookie behavior and production lifecycle remain deployment checks; no fresh build or external backend test.
+
 ### Update 2026-10-13 22:39
 - Decisions: Lead the preflight guide with operator workflows and explicit request/return contracts; retain detailed semantics and C++ integration notes.
 - Implementation: Added native alias/JWT walkthroughs, field/source/status tables and lifetime guidance; made examples/preflight.lua runnable with the public sample and added examples/preflight-jwt.lua. Updated navigation, obsolete configuration outlook, diagnostic documentation, master context and release plan.

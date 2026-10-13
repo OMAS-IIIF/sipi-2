@@ -1,11 +1,19 @@
 # Public release preparation
 
 Status: inventory, third-party image history cleanup, README/navigation refresh,
-feature catalog, Docker/native configuration and Lua-preflight guides completed
-on 2026-10-13; remaining
-documentation and release checks are listed below.
+feature catalog, Docker/native configuration, Lua-preflight and operations guides
+completed on 2026-10-13; remaining documentation and release checks are listed below.
 Baseline: commit `2d26200`, CMake version `0.1.3`. This is a preparation plan,
 not a release announcement. Later sections record registry/runtime verification.
+
+## Current follow-up
+
+The [readiness review](release-readiness.md) is the current remaining-gate list.
+The inventory and gap map below preserve the starting assessment; completed items
+are recorded in dated sections and are not reopened by historical wording.
+Master context consolidation is complete, with the old text archived intact apart
+from relative link adjustments. Remaining work concerns clean-checkout validation,
+release provenance, asset attribution, contribution/security channels and notices.
 
 ## Inventory and immediate decisions
 
@@ -59,7 +67,8 @@ Prepared derivatives remain private too. This does not assert that swisstopo
 prohibits reuse. Record attribution/license for the owner's other seven files.
 
 The owner approved the history cleanup, and the guarded push completed on
-2026-10-13. `main` on GitHub and in the local checkout now points to `d74258c`.
+2026-10-13. The cleaned `main` tip on GitHub and locally was `d74258c` immediately after
+that rewrite; subsequent ordinary commits advance it.
 Eight of 18 commits changed; every other file in every corresponding commit
 matches exactly. Both excluded paths and blob IDs are absent from the reachable
 `main` history. A private Git bundle outside the repository preserves the original
@@ -247,6 +256,40 @@ info/image/base, allowed/denied aliases, cached authorization, bad/expired token
 claim binding, no query fallback, script snapshots/restart and contract-error
 mapping. Temporary processes/files were cleaned up. Existing native Debug 0.1.3
 binary used; no rebuild, Docker/S3/OLDAP deployment or production-code change.
+
+## Operations guide completed (2026-10-13)
+
+Added `docs/operations.md` for deployment boundaries, proxy/TLS/public identity,
+liveness versus delivery monitoring, logging, diagnosis, concurrency/timeouts,
+shutdown, cache maintenance/recovery and updates/rollback. Added a configurable
+Caddyfile with explicit routing order, `/iiif` stripping and private health/demo
+routes; linked the guide from README/index/Docker. Corrected obsolete original-only
+variant and codec claims in the persistent-cache reference.
+
+Caddy 2.8.4 configuration validation and 24 isolated proxy HTTP checks passed with
+published SIPI 0.1.3 on native ARM64, including external identities, encoded prefix,
+GET/HEAD, CORS/OPTIONS, blocked routes and per-request JWT authorization after cache
+fill. Four selected existing native suites plus two required fixture setups passed.
+Only test-owned containers/networks were created and removed. No public DNS/ACME,
+production service-manager deployment, S3 backend, fresh build or image publication
+was performed; these are distinct acceptance checks.
+
+## Context consolidation and readiness review completed (2026-10-13)
+
+Reduced root `codex.md` from 1,532 to 155 lines, covering current architecture,
+invariants, key files, build/style conventions, preservation and next release gates.
+Archived the former text under `docs/history/`, adjusting only two relative links;
+reconstruction matches its recorded SHA-256. Marked the architecture discussion
+page as historical and linked the current overview.
+
+Added `docs/release-readiness.md` as the current actionable gap list. Read-only
+checks confirmed absent local/remote Git tags, missing contribution/security/release
+metadata and CI, seven tracked owner originals, ignored excluded paths with no
+locally reachable path history, and missing SIPI source/version labels in the
+locally inspected published image. Exact old image/source identity is unresolved;
+GitHub visibility/settings/releases were not inspected because gh is unavailable.
+All 520 local inline Markdown links/anchors resolve. No runtime changes or tests,
+asset deletion, history rewrite, tagging, publication or repository setting changes.
 
 ## Execution order and completion criteria
 

@@ -131,7 +131,9 @@ is a separate example, not a prerequisite for using SIPI-2.
 ## Documentation and development
 
 The [documentation index](docs/README.md) organizes the operator guides, format
-references, Lua APIs, architecture and validation evidence.
+references, Lua APIs, architecture and validation evidence. The
+[operations guide](docs/operations.md) covers reverse proxy/TLS, monitoring, cache
+maintenance, shutdown and troubleshooting.
 
 Useful development commands from the repository root:
 

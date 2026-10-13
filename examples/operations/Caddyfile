@@ -1,0 +1,20 @@
+# Host-side proxy example. Set SIPI_SITE to your public DNS name and SIPI_UPSTREAM
+# to the native listener or the Docker port published on the host's loopback.
+# SIPI must use public-base-url=https://<SIPI_SITE>/iiif.
+# For a container proxy, select the SIPI service name/port on a private network.
+{$SIPI_SITE:images.example.org} {
+	# Preserve this order: block private routes before stripping the mount.
+	route {
+		# Keep process-health and demo routes private, including their mounted aliases.
+		@private path /iiif/health /iiif/hello /iiif/hello/*
+		respond @private 404
+
+		# /iiif is a proxy mount, not a prefix passed to the Lua policy.
+		handle_path /iiif/* {
+			reverse_proxy {$SIPI_UPSTREAM:127.0.0.1:18080}
+		}
+		handle {
+			respond 404
+		}
+	}
+}

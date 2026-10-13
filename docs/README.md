@@ -12,6 +12,7 @@ reports record evidence for a particular revision, platform and workload.
 | Compile, run and test natively; configure CLion | [Native build](building.md) |
 | Use container mounts, runtime settings and Compose; build images | [Docker](docker.md), [TOML/Lua example](docker.md#toml-lua-and-a-persistent-cache) and [Compose example](../docker/compose.example.yaml) |
 | Configure native operation, paths, CLI/environment/TOML precedence and limits | [Native configuration and option reference](command-line.md), [runnable example](../examples/native/sipi.toml) and [annotated template](../sipi.example.toml) |
+| Operate behind TLS, monitor, recover caches and diagnose failures | [Operations](operations.md) and [Caddy example](../examples/operations/Caddyfile) |
 | Map public identifiers to image sources | [Source resolution](source-resolution.md) |
 | Configure S3-compatible storage | [S3 source adapter and settings](s3-byte-source.md) |
 | Set up MinIO for local integration tests | [Development MinIO](minio-development.md) |
@@ -83,3 +84,10 @@ measured scope. They are not universal speed rankings. Some archive measurements
 require private originals; use the [synthetic quickstart image](../examples/images/README.md)
 for onboarding instead. Raw JSON evidence accompanies reports under `benchmarks/`
 and `audits/` within this documentation directory.
+
+## Release preparation and project history
+
+- [Current release readiness](release-readiness.md): remaining gates, evidence and owner decisions.
+- [Release preparation record](public-release-plan.md): original inventory and completed documentation/verification steps.
+- [Current project context](../codex.md): architecture, workflows and preservation rules.
+- [Archived pre-consolidation context](history/codex-before-consolidation-2026-10-13.md): historical milestones and superseded plans.
