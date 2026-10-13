@@ -60,6 +60,8 @@ integration example; generic delivery does not depend on it.
 
 ## Architecture and development
 
+- [Release notes and 1.x compatibility](../CHANGELOG.md)
+
 - [Delivery architecture and boundaries](iiif-delivery-architecture.md)
 - [HTTP integration](http-server.md), [IIIF parser](iiif-parser.md), and [byte sources](byte-source.md)
 - [Encoded-result cache identities](cache-key.md) and [persistent cache lifecycle](persistent-cache.md)

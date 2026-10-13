@@ -5,6 +5,20 @@ operations documentation. This is a release-preparation assessment, not a releas
 announcement or a declaration that all gates pass. No visibility, source tag,
 registry tag or repository setting was changed.
 
+## Current release target
+
+The agreed release is **1.0.0**, with planned Git tag `v1.0.0` and Docker image
+`lrosenth/sipi-2:1.0.0`. CMake and current usage examples now target this version;
+[release notes](../CHANGELOG.md) describe scope and compatibility. No tag or image
+has been published by this preparation step. Historical evidence below retains
+its original version numbers.
+
+The clean pre-bump revision `cffd74d` matched remote main and passed all ten
+workflow regression cases and both container smoke suites (ARM64 native, AMD64
+emulated). OCI identity and all 410 Git archive files were verified. Evidence is
+retained locally in sibling `sipi-2-release-check-state/clean-release-results.json`.
+The final committed 1.0.0 snapshot and published artifacts still need verification.
+
 ## Completed foundations
 
 README/navigation, feature catalog, native build/configuration, Docker, Lua policy
@@ -27,13 +41,13 @@ untracked assets awaiting initial inclusion as described in the original invento
 | Area | Evidence / gap | Completion criterion | Type |
 | --- | --- | --- | --- |
 | Fresh checkout | Passed for macOS ARM64 Debug at `54f8e54`: isolated checkout/Conan cache, 69 CTests and 92 documented-example checks | Native gate complete; subsequent S3/external-validator/ARM64-container follow-up also passed below; other release platforms remain open | Verified, scoped |
-| Release provenance | Helper now emits/verifies OCI labels, rejects dirty publication, freezes Git input and records Buildx digests; local ARM64 development run and mocked release/failure tests pass | Commit the workflow and verify the intended clean release snapshot; choose Git tag/release policy and retain the eventual published digest. Old 0.1.3 image identity remains unresolved | Workflow implemented; final release decision open |
+| Release provenance | Helper now emits/verifies OCI labels, rejects dirty publication, freezes Git input and records Buildx digests; local ARM64 development run and mocked release/failure tests pass | Commit and verify the final 1.0.0 snapshot; create the planned v1.0.0 tag when publishing and retain the published digest. Old 0.1.3 image identity remains unresolved | Workflow implemented; final release decision open |
 | Platform acceptance | Both local source images at 54f8e54 pass build/smoke: ARM64 native, AMD64 emulated on ARM64 | Functional container gate complete for these artifacts; native x86 execution/performance and final published-artifact verification are not implied | Verified, scoped |
 | Image/brand attribution | Owner identified seven originals as their own; chosen public image attribution/license is still unspecified. Brand assets have no separate published attribution statement | Owner selects attribution and applicable image/brand terms; record them beside assets and keep excluded originals/derivatives private | Owner decision |
 | Code/dependency notices | Root AGPLv3 text and compact-ICC attribution are present; a complete shipped-component notice inventory is absent | Confirm intended project declaration/attribution, inventory distributed components and preserve their applicable notices in release artifacts | Maintainer review |
 | Contributions and support | No CONTRIBUTING.md or issue/PR templates; public docs explain builds but not contribution routing or expectations | Provide contribution/support entry point with scoped changes, test tiers and policy for reports; confirm the actual channel before publishing it | Documentation and owner decision |
 | Vulnerability reports | No SECURITY.md or confirmed private reporting channel/support window | Owner selects an available private channel and supported-release policy; document it without inventing an email or promising an SLA | Owner decision |
-| Release notes | No CHANGELOG.md or Git release tags found | Add a factual release summary with feature scope, known limits and upgrade/migration boundaries tied to the chosen revision | Documentation |
+| Release notes | Draft 1.0.0 summary and compatibility scope in CHANGELOG.md; no release tag created | Finalize publication date and bind notes to the verified release revision | Draft complete; publication pending |
 | Earlier SIPI compatibility | OLDAP integration describes one application's migration; no general compatibility guide | Explicitly describe the Lua/config/API differences that have been verified; state that SIPI-2 is not asserted to be a drop-in replacement | Documentation |
 | Automation | No tracked .github workflow exists | Decide CI scope and add a reproducible public-fixture build/test workflow; separate expensive S3/container/validator gates and keep release publication explicit | Engineering workflow |
 | Publication data review | Earlier credential scan was limited; tracked historical evidence contains workstation paths/private host references | Review intended publishable tree/history and asset scope; approve retention or produce labelled sanitized evidence. Keep original evidence private when sanitizing | Maintainer review |
@@ -47,8 +61,8 @@ image is inferred merely from the repository's source-code license file.
 `git tag` and `git ls-remote --tags origin` returned no tags during this review.
 The image reference inspected locally was `lrosenth/sipi-2:0.1.3`; its only OCI
 label was `org.opencontainers.image.version=24.04`, inherited from the base image.
-That is not the executable's version. `Dockerfile` and `scripts/docker_image.py`
-currently do not set SIPI source/revision labels or reject a dirty source tree
+That is not the executable's version. At the initial review, `Dockerfile` and `scripts/docker_image.py`
+did not set SIPI source/revision labels or reject a dirty source tree
 before publication. The workflow verifies builds before pushing, but a successful
 smoke test does not establish which Git commit a previous image came from.
 

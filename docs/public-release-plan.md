@@ -8,6 +8,11 @@ not a release announcement. Later sections record registry/runtime verification.
 
 ## Current follow-up
 
+The selected release target is **1.0.0**, with planned tag `v1.0.0`. Current
+configuration/examples and the [draft release notes](../CHANGELOG.md) reflect
+that target; dated observations below preserve their original 0.1.3 baseline.
+Publication and verification of the final 1.0.0 artifacts are pending.
+
 The [readiness review](release-readiness.md) is the current remaining-gate list.
 The inventory and gap map below preserve the starting assessment; completed items
 are recorded in dated sections and are not reopened by historical wording.

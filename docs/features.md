@@ -1,6 +1,6 @@
 # Feature catalog
 
-This catalog describes the implemented SIPI-2 **0.1.3** feature set, reviewed on
+This catalog describes the implemented SIPI-2 **1.0.0** feature set, reviewed on
 2026-10-13 against the source, configuration defaults and regression contracts.
 It distinguishes supported behavior from restrictions and configuration-dependent
 features. It is not a roadmap or a claim that every possible source encoding has

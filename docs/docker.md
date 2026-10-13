@@ -1,8 +1,10 @@
 # Running SIPI-2 with Docker
 
-Use the published image to run SIPI-2 without installing compilers, Conan or Lua
-on the host. The examples below use **`lrosenth/sipi-2:0.1.3`**, available for
-Linux AMD64 and ARM64. Docker selects the matching architecture automatically.
+Use a release image to run SIPI-2 without installing compilers, Conan or Lua
+on the host. The examples below target **`lrosenth/sipi-2:1.0.0`** for
+Linux AMD64 and ARM64. This release is being prepared; pull commands require
+its publication. See the [release notes](../CHANGELOG.md).
+Docker selects the matching architecture automatically.
 Generic image delivery does not require OLDAP.
 
 Commands assume a POSIX shell, Docker with Compose v2, and a checkout of this
@@ -35,8 +37,8 @@ cd sipi-2
 Pull and inspect the executable version:
 
 ```sh
-docker pull lrosenth/sipi-2:0.1.3
-docker run --rm lrosenth/sipi-2:0.1.3 --version
+docker pull lrosenth/sipi-2:1.0.0
+docker run --rm lrosenth/sipi-2:1.0.0 --version
 ```
 
 Run with the [synthetic example image](../examples/images/README.md):
@@ -47,7 +49,7 @@ docker run --rm --name sipi-2-demo \
   --mount "type=bind,src=$(pwd)/examples/images,dst=/data/images,readonly" \
   -e SIPI_IIIF_ROOT=/data/images \
   -e SIPI_PUBLIC_BASE_URL=http://127.0.0.1:18080 \
-  lrosenth/sipi-2:0.1.3
+  lrosenth/sipi-2:1.0.0
 ```
 
 In another terminal:
@@ -144,7 +146,7 @@ docker run --rm --name sipi-2-config-demo \
   --mount "type=bind,src=$(pwd)/examples/images,dst=/data/images,readonly" \
   --mount "type=bind,src=$(pwd)/examples/docker,dst=/etc/sipi,readonly" \
   --mount type=volume,src=sipi-2-demo-cache,dst=/var/cache/sipi \
-  lrosenth/sipi-2:0.1.3 --config /etc/sipi/sipi.toml
+  lrosenth/sipi-2:1.0.0 --config /etc/sipi/sipi.toml
 ```
 
 The volume is created automatically if absent. Repeat the first-image `curl`
@@ -182,7 +184,7 @@ single-file policy mount; it does **not** load the preceding TOML example.
 From the repository root:
 
 ```sh
-export SIPI_IMAGE=lrosenth/sipi-2:0.1.3
+export SIPI_IMAGE=lrosenth/sipi-2:1.0.0
 export SIPI_MEDIA_DIRECTORY="$(pwd)/examples/images"
 export SIPI_LUA_SCRIPT="$(pwd)/examples/docker/preflight.lua"
 export SIPI_HOST_PORT=18080
@@ -291,7 +293,7 @@ host or your monitoring system.
 | S3 connection failure | Endpoint resolves from the container/network; credentials, bucket, region and addressing mode match |
 
 Pin a version tag for routine use. For exact reproducibility, inspect the registry
-index with `docker buildx imagetools inspect lrosenth/sipi-2:0.1.3` and use
+index with `docker buildx imagetools inspect lrosenth/sipi-2:1.0.0` and use
 `lrosenth/sipi-2@sha256:<verified-index-digest>` as the image reference. Do not copy
 that placeholder literally. A tag/version string alone does not prove source
 identity, and `latest` can move.

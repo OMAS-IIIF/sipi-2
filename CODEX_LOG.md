@@ -1,3 +1,9 @@
+### Update 2026-10-13 23:56
+- Decisions: Prepare the owner-selected first stable release 1.0.0 with planned v1.0.0 tag; retain historical version/evidence records and existing published 0.1.3 artifacts.
+- Implementation: Bumped the sole CMake version, updated current Docker commands/feature catalog, added draft CHANGELOG.md with release scope and 1.x compatibility, and synchronized navigation/master context/readiness. Usage guides explicitly mark publication as pending.
+- Open: Commit/push and verify the final clean 1.0.0 source/artifacts; resolve asset/contact/notice gates, then finalize release date/tag and publish when authorized.
+- Risks/Assumptions: Ten release workflow regression tests pass; make show-version returns 1.0.0. Runtime code is unchanged; no native rebuild or 1.0.0 container verification claimed. No commit, tag, registry push or running-service change.
+
 ### Update 2026-10-13 23:38
 - Decisions: Bind helper-built images to explicit Git/CMake metadata; refuse dirty publication and freeze committed build input without changing existing tag/push authorization semantics.
 - Implementation: Added OCI labels/default unknown provenance, architecture/label checks, fixed Git-archive publication input, inter-stage source checks and build/releases reports with Buildx digests/failure state. Extended release regression coverage and documented workflow/limits; updated master context/readiness.

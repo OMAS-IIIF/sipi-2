@@ -138,7 +138,7 @@ digests are different identities, so use the recorded published digest for a
 published multi-platform reference.
 
 ```sh
-docker image inspect lrosenth/sipi-2:verify-0.1.3-arm64 \
+docker image inspect lrosenth/sipi-2:verify-1.0.0-arm64 \
   --format '{{json .Config.Labels}}'
 ```
 

@@ -48,15 +48,17 @@ for exact restrictions, including PNG color declarations and JPEG 2000 layouts.
 
 ## Quickstart with Docker
 
-Prerequisites: Git, Docker and `curl`. The published image
-`lrosenth/sipi-2:0.1.3` supports `linux/amd64` and `linux/arm64`.
+Prerequisites: Git, Docker and `curl`. These examples target the upcoming
+`lrosenth/sipi-2:1.0.0` image for `linux/amd64` and `linux/arm64`.
+Version 1.0.0 is being prepared; the pull commands require its publication.
+See the [release notes](CHANGELOG.md) for scope and compatibility.
 
 Clone the repository to obtain the small, synthetic example image:
 
 ```sh
 git clone https://github.com/OMAS-IIIF/sipi-2.git
 cd sipi-2
-docker pull lrosenth/sipi-2:0.1.3
+docker pull lrosenth/sipi-2:1.0.0
 ```
 
 From the repository root, run:
@@ -67,7 +69,7 @@ docker run --rm --name sipi-2-demo \
   --mount "type=bind,src=$(pwd)/examples/images,dst=/data/images,readonly" \
   -e SIPI_IIIF_ROOT=/data/images \
   -e SIPI_PUBLIC_BASE_URL=http://127.0.0.1:18080 \
-  lrosenth/sipi-2:0.1.3
+  lrosenth/sipi-2:1.0.0
 ```
 
 In another terminal:

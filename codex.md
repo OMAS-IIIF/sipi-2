@@ -10,9 +10,11 @@ Supported pixel/layout subsets matter: consult the [feature catalog](docs/featur
 not a container extension alone. No upload/import API, original-download API,
 streaming encoder response or application login service is implemented.
 
-CMake defines version **0.1.3**. The remote is `OMAS-IIIF/sipi-2`; the documented
-published image is `lrosenth/sipi-2:0.1.3`. Matching version strings are not proof of
-source/image identity. Release preparation is active; no new release or visibility
+CMake defines version **1.0.0**, the agreed first stable release, with planned Git
+tag `v1.0.0` and image `lrosenth/sipi-2:1.0.0`. These artifacts are not yet
+published; the existing 0.1.3 image is historical. The remote is `OMAS-IIIF/sipi-2`.
+The [release notes](CHANGELOG.md) define the 1.x compatibility scope. Matching
+version strings are not proof of source/image identity. Release preparation is active; no new release or visibility
 change is implied. The [readiness review](docs/release-readiness.md) lists remaining
 gates; the [release work record](docs/public-release-plan.md) preserves evidence.
 
@@ -131,9 +133,10 @@ reports separately. Raw Docker builds use unknown provenance defaults. No Git ta
 is created and no old-image provenance is inferred. Final multi-platform publication
 still uses Buildx/cache and records its actual digest; independent reproducible
 rebuilds are not promised. See [release evidence](docs/makefile.md#image-identity-and-release-evidence).
-The workflow has mocked publication/failure regression coverage and a real local
-ARM64 dirty-source smoke run; commit and verify the intended clean release snapshot
-before a future explicitly requested publication.
+The clean pre-version-bump snapshot `cffd74d` passed ten workflow regression cases
+and both platform container smoke suites (AMD64 emulated), with verified labels
+and Git archive contents. This evidence does not certify the pending 1.0.0
+artifacts: commit and verify the final release snapshot before publication.
 
 ## Working conventions and preservation
 
