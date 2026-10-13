@@ -1,8 +1,62 @@
+### Update 2026-10-13 21:43
+- Decisions: Make README a public onboarding entry point; keep native build details and topic navigation in docs. Use an original reproducible image independent of the private corpus.
+- Implementation: Rewrote README with selected light/dark logos, current capabilities/limits, pinned 0.1.3 Docker quickstart and native/config/Lua links. Added docs/README.md, docs/building.md and examples/images/sample.png plus regeneration notes; updated Makefile guide, release plan and master context.
+- Open: Full feature catalog, operator-first Docker/config/Lua/operations guides, context consolidation and clean-checkout compilation. No documentation commit or push yet.
+- Risks/Assumptions: Registry index 84f810e8b886 has AMD64/ARM64 manifests; native ARM64 published image and existing native Debug binary pass health/info/JPEG/PNG quickstarts. Checked 100 local references/anchors and byte-identical sample regeneration. No fresh compile, AMD64 runtime check, broad test rerun or source/tag equivalence claim in this documentation step.
+
+### Update 2026-10-13 21:35
+- Decisions: Execute the owner's explicit approval to remove both third-party originals from published main history; preserve local originals and pending work.
+- Implementation: Pushed prepared d74258c with an exact force-with-lease against 73254b7; verified remote and local main. Reconciled the local branch by guarded update-ref after identical tip-tree verification. Eight of 18 commits changed; other per-commit file trees match. All 400 working-file snapshots, pending diff and status matched before documentation updates; original hashes and ignore rules verified.
+- Open: Remaining public-release documentation/cleanup work; other existing clones must avoid reintroducing old history.
+- Risks/Assumptions: Old history remains in a private external backup and local reflogs. Reachable main excludes both paths/blob IDs; GitHub-retained objects and third-party copies are outside the guarantee. No backup refs were pushed.
+
+### Update 2026-10-13 21:27
+- Decisions: Complete current-tree GitHub removal now; separate the prepared history rewrite because it changes published commit IDs.
+- Implementation: Pushed scoped commit 73254b7 with two untracked originals and exact ignores; preserved both local hashes and unrelated pending work. Prepared private bare clone plus backup bundle; eight of 18 commits change, all other per-commit file trees match, excluded paths/blob IDs are absent from prepared main. Updated corpus/release context.
+- Open: Owner approval for guarded main force-push; then reconcile the original checkout preserving pending work. GitHub-retained objects and third-party clones cannot be guaranteed erased by a branch rewrite.
+- Risks/Assumptions: Prepared push requires remote main to equal 73254b77b1a3123dc54b1b6bf49d195d9c5b7809. Never push mirror/backup refs. No history rewrite has been pushed.
+
 ### Update 2026-10-13 21:26
 - Decisions: Keep two third-party benchmark originals locally while excluding them from the public repository, as requested by the owner.
 - Implementation: Untracked test-images/sample-tiff-02.tif and test-images/swiss-map-raster500_500_komb_25_2056.tif; added exact root-anchored ignore entries. Local SHA-256 hashes remain unchanged. Ignore Finder metadata at every depth as part of release cleanup.
 - Open: Remove the two blobs from older published commits using a separately prepared and reviewed history rewrite; normal deletion does not erase Git history.
 - Risks/Assumptions: Existing clones and GitHub-retained objects may survive a rewrite. Keep local originals and benchmark evidence; unrelated pending documentation and branding work remains outside this commit.
+
+### Update 2026-10-13 12:37
+- Decisions: Record owner-reported provenance: seven originals are their own; sample-tiff-02.tif is third-party and the map is from swisstopo. Hold the two third-party sources/derivatives from publication pending a final corpus decision or documented terms.
+- Implementation: Updated corpus attribution, public-release plan and master context. Preserved every image, derivative and Git history.
+- Open: Source/terms for sample-tiff-02, exact swisstopo dataset/terms if retained publicly, owner attribution/license, and public-history handling if excluded.
+- Risks/Assumptions: Attribution is owner-reported; no claim that swisstopo forbids reuse and no license inferred. Historical benchmark inputs/results remain unchanged.
+
+### Update 2026-10-13 12:28
+- Decisions: Start public-release preparation with a preservation-first inventory; retain original corpus and benchmark evidence pending provenance/publication decisions. Use logo/ as selected wordmark location.
+- Implementation: Added docs/public-release-plan.md with measured inventory, documentation gap map, publication issues, execution order and verification criteria. Removed root/test-images Finder metadata, made .DS_Store ignore recursive, and added current release workflow to master context.
+- Open: Original image redistribution/source information requested; corpus/public-history strategy, documentation restructuring, context consolidation, registry verification and fresh-checkout validation remain.
+- Risks/Assumptions: Limited historical scan of 692 text blobs found no selected private-key/AWS/GitHub signatures; not a complete secret audit. Current relative Markdown file targets exist; anchors/remote links not checked. No image/build-data deletion, implementation change, history rewrite, commit or publication.
+
+### Update 2026-10-13 00:00
+- Decisions: Use the colorful S as the first letter of SIPI-2, followed by IPI-2, as requested by the user.
+- Implementation: Removed the duplicate S path from all concept-02 lockups, tightened the icon/lettering spacing, reduced logo canvases to 642 × 256, regenerated transparent PNGs at 1926 × 768 and recentered board examples. Updated export notes.
+- Open: Final user visual review.
+- Risks/Assumptions: Standalone icons and concept 01 remain unchanged. Updated SVGs parse and render with librsvg; no runtime changes.
+
+### Update 2026-10-12 23:58
+- Decisions: Refine concept 02 in place following user feedback: balance upper/lower S widths and slightly increase icon weight.
+- Implementation: Made the S contour rotationally symmetric about (128,128), increased its stroke from 39 to 43 units, and regenerated all seven SVG/PNG pairs. Palette, seams and wordmark remain unchanged; updated asset notes.
+- Open: User visual review of revised proportions.
+- Risks/Assumptions: Small-icon simplification remains pending. All SVGs parse and render with librsvg; no runtime changes.
+
+### Update 2026-10-12 23:56
+- Decisions: Follow user feedback toward a softer, flowing, more colorful tile-S; preserve concept 01 for comparison.
+- Implementation: Added concept 02 in assets/branding/flowing-s: curved six-tile mark, rounded path-based wordmark, turquoise-to-magenta palette, light/dark/mono SVG masters and transparent PNG exports, presentation board and editing notes.
+- Open: User review; final identity adoption and tiny favicon treatment remain undecided.
+- Risks/Assumptions: Vector masks require unique IDs when inlining multiple assets. XML parsing and librsvg exports succeed; inspect visual small-size samples. No runtime changes.
+
+### Update 2026-10-12 23:54
+- Decisions: Explore the user-selected tile-S direction as editable SVG masters; keep this first concept separate from adopted product branding.
+- Implementation: Added seven-tile mark, original path-based SIPI-2 lettering, light/dark/monochrome SVG and transparent PNG variants, presentation board and export notes in assets/branding/kachel-s.
+- Open: User design review; refine geometry and small-icon treatment before adoption.
+- Risks/Assumptions: Draft identity; fine tile gaps lose detail below 32 px. PNGs rendered from SVG with librsvg; no runtime changes.
 
 ### Update 2026-10-12 22:31
 - Decisions: Compare lossless HTJ2K with the unchanged six classic JP2/LZW TIFF pairs; retain source normalization/ICC, wavelet geometry and single-worker settings. No repository conversion or runtime changes.

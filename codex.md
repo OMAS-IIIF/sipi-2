@@ -1,5 +1,37 @@
 # SIPI-2 project context
 
+## Public onboarding documentation (2026-10-13)
+
+The root README is now a product overview with capabilities/limits, a pinned
+Docker quickstart, native entry point, configuration/Lua guidance and license links.
+`docs/README.md` indexes existing guides; `docs/building.md` holds native compiler,
+Debug/Release, test and CLion instructions formerly mixed into the root README.
+`examples/images/sample.png` is a reproducible public RGB8 pattern independent of
+private benchmark images; its source recipe is in the adjacent README. Selected
+wordmarks in `logo/` are used for light/dark README display. Published image 0.1.3
+has AMD64/ARM64 manifests; its native ARM64 quickstart and the existing native
+Debug binary both passed health, info and JPEG/PNG checks. All 100 local references
+in the five edited/new guides resolve. A clean-checkout build and AMD64 runtime
+revalidation remain separate release gates. Next: full feature catalog, operator-
+first Docker/Lua/configuration guides, and compact master-context consolidation.
+
+## Public release preparation (2026-10-13)
+
+Inventory and the ordered release-preparation plan are in
+`docs/public-release-plan.md`. Current phase: safe cleanup and documentation
+planning; the owner-approved third-party image history cleanup is complete. The owner identified seven original
+images as their own; `sample-tiff-02.tif` and the swisstopo map are third-party.
+The owner requested keeping those two locally and removing them from GitHub.
+Both are untracked/ignored; local bytes are unchanged. The approved eight-commit
+history cleanup is pushed at d74258c and the local checkout is reconciled without
+losing pending work. A private backup retains the old history outside this repo.
+Do not reintroduce old history; keep derived images private too. See the corpus attribution
+table. Ignored `build/` contains benchmark evidence that must not be deleted wholesale. User-selected wordmarks live in
+`logo/`; draft assets additionally contain icon/mono variants. Next: resolve corpus
+publication, consolidate this master context, and restructure public onboarding
+around verified native/container examples. Keep current contracts separate from
+dated benchmark/audit history. Only Finder metadata was removed in the inventory.
+
 ## HTJ2K repository input (2026-10-12)
 
 The existing pinned Grok 20.4.15 runtime already handles HTJ2K/JPH through the

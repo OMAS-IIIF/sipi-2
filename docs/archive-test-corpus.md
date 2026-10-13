@@ -7,9 +7,35 @@ or an extension of the server's supported input formats. No performance run is
 part of preparation.
 
 The corpus now includes the five initial TIFFs, three historical JP2 files and
-a subsequently supplied 229-megapixel Swiss palette GeoTIFF. External download
-URLs/licences have not been recorded yet; the manifest does not imply permission
-to redistribute the original images. Keep raw assets out of release images.
+a subsequently supplied 229-megapixel Swiss palette GeoTIFF. Keep raw assets out
+of release images. The manifest records technical provenance, not a redistribution
+license.
+
+### Source attribution and publication review (2026-10-13)
+
+The project owner identified the source groups as follows:
+
+| Original files | Source reported by the owner | Publication status |
+| --- | --- | --- |
+| `pharch_01`, `pharch_02`, `pharch_03` (TIFF and JP2), `sample-tif-01.tif` | Owner's own images | Record chosen attribution/license before public distribution |
+| `sample-tiff-02.tif` | Third-party image; exact source not yet identified | Hold from publication pending source/terms review; retain locally |
+| `swiss-map-raster500_500_komb_25_2056.tif` | swisstopo | Hold from publication pending exact dataset/source/terms review; retain locally |
+
+The owner requested keeping both third-party originals locally for tests while
+removing them from GitHub and ignoring them in Git. This is not a finding that swisstopo forbids redistribution;
+the applicable dataset terms have not been established. The seven owner-supplied
+files are not automatically assigned a license by this attribution statement.
+
+All nine originals remain locally available. The two third-party originals were
+untracked and given exact root-anchored ignore entries. The owner-approved history
+cleanup was pushed on 2026-10-13; both paths and their original blob IDs are absent
+from the reachable public `main` history at `d74258c`. The local checkout was
+reconciled without changing either original or pending work. The former history
+is preserved in a private backup outside the repository. Existing external clones
+and GitHub-retained objects are not guaranteed erased by this branch rewrite. Publication exclusion must also cover prepared
+derivatives, including benchmark image bundles. Preserve historical measurements and clearly state which optional corpus
+is required to reproduce them; never silently replace inputs under old results.
+See the [release plan](public-release-plan.md#original-image-provenance).
 
 ## Results
 

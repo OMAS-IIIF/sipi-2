@@ -22,7 +22,8 @@ Rebuild afterward so `--version` and `/health` adopt the changed CMake definitio
 
 ## Native build and tests
 
-The initial Conan compiler profile must exist (see README). On this Mac:
+The initial Conan compiler profile must exist (see the [native build guide](building.md)).
+For the documented macOS profile:
 
 ```sh
 make dependencies

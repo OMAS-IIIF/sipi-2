@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+<title id="title">SIPI-2 tile S</title><desc id="desc">Seven image tiles form an S; the upper-right tile is lifted from the grid.</desc>
+<g fill="#142B3B"><rect x="48" y="24" width="104" height="36" rx="3"/><rect x="48" y="68" width="40" height="36" rx="3"/><rect x="48" y="112" width="152" height="36" rx="3"/><rect x="160" y="156" width="40" height="36" rx="3"/><rect x="48" y="200" width="48" height="36" rx="3"/><rect x="104" y="200" width="96" height="36" rx="3"/></g><rect x="160" y="16" width="40" height="40" rx="3" fill="#20BFA9"/>
+</svg>
