@@ -8,7 +8,11 @@
 
 # Drogon default runtime upload directory.
 /uploads/
-/.DS_Store
+.DS_Store
 
 # Python test module bytecode
 __pycache__/
+
+# Private benchmark originals: retain locally, exclude from public Git history.
+/test-images/sample-tiff-02.tif
+/test-images/swiss-map-raster500_500_komb_25_2056.tif

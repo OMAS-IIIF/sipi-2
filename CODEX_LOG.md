@@ -1,3 +1,9 @@
+### Update 2026-10-13 21:26
+- Decisions: Keep two third-party benchmark originals locally while excluding them from the public repository, as requested by the owner.
+- Implementation: Untracked test-images/sample-tiff-02.tif and test-images/swiss-map-raster500_500_komb_25_2056.tif; added exact root-anchored ignore entries. Local SHA-256 hashes remain unchanged. Ignore Finder metadata at every depth as part of release cleanup.
+- Open: Remove the two blobs from older published commits using a separately prepared and reviewed history rewrite; normal deletion does not erase Git history.
+- Risks/Assumptions: Existing clones and GitHub-retained objects may survive a rewrite. Keep local originals and benchmark evidence; unrelated pending documentation and branding work remains outside this commit.
+
 ### Update 2026-10-12 22:31
 - Decisions: Compare lossless HTJ2K with the unchanged six classic JP2/LZW TIFF pairs; retain source normalization/ICC, wavelet geometry and single-worker settings. No repository conversion or runtime changes.
 - Implementation: Extended offline preparation with verbatim reference input, HT encoding and separate full-pixel/ICC verification; added JPH benchmark input, byte-level coding inspection and two-order comparison runner. All 280,961,064 source pixels verified. Completed 1,242 timed outputs/972 JPEG outputs with stable fingerprints and exact JP2/JPH request equivalence. Saved report/raw JSON and updated context/docs.
