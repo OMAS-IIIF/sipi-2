@@ -7,13 +7,15 @@ BUILD_PROFILE ?= sipi-2-local
 JOBS ?= 4
 DOCKER_IMAGE ?= lrosenth/sipi-2
 PLATFORMS ?= linux/amd64,linux/arm64
+SOURCE_OUTPUT ?= build/source-releases
+SOURCE_IMAGE_REPORT ?=
 VALIDATOR_DIR ?= build/external-image-validator
 VALIDATOR_PYTHON ?= build/iiif-validator-venv/bin/python
 # scripts/version.py reads VERSION directly from CMake for bumps and image tags.
 
 .PHONY: help show-version bump-patch-level bump-minor-level bump-major-level \
         dependencies configure build minio test test-core test-external \
-        test-prerequisites docker-local docker-test docker-build
+        test-prerequisites docker-local docker-test docker-build source-package
 
 help:
 	@printf '%s\n' \
@@ -26,10 +28,12 @@ help:
 	  'make test               All CTests including MinIO, external IIIF, native Docker smoke' \
 	  'make test-core          CTests including MinIO (starts the development MinIO)' \
 	  'make test-external      Unmodified external IIIF validator; no automatic install' \
+	  'make source-package     Package committed sources/dependency recipes; no publication' \
 	  'make docker-local       Build/test a native runtime image, without publishing' \
 	  'make docker-test        Build/test amd64 and arm64, without publishing' \
 	  'make docker-build       Build/test both architectures, push VERSION and latest' \
-	  'Overrides: DOCKER_IMAGE, PLATFORMS, JOBS, BUILD_DIR, HOST_PROFILE, BUILD_PROFILE'
+	  'Overrides: DOCKER_IMAGE, PLATFORMS, JOBS, BUILD_DIR, HOST_PROFILE, BUILD_PROFILE' \
+	  'Source overrides: SOURCE_OUTPUT, SOURCE_IMAGE_REPORT'
 
 show-version:
 	@$(PYTHON) scripts/version.py show
@@ -81,3 +85,8 @@ test-external: build
 docker-local docker-test docker-build:
 	$(PYTHON) scripts/docker_image.py $(if $(filter docker-local,$@),local,$(if $(filter docker-test,$@),test,publish)) \
 	  --image "$(DOCKER_IMAGE)" --platforms "$(PLATFORMS)" --jobs "$(JOBS)"
+
+# Optional SOURCE_IMAGE_REPORT binds exported dependencies to verified image IDs.
+source-package:
+	$(PYTHON) scripts/source_package.py --output "$(SOURCE_OUTPUT)" --jobs "$(JOBS)" \
+	  $(if $(SOURCE_IMAGE_REPORT),--image-report "$(SOURCE_IMAGE_REPORT)",)

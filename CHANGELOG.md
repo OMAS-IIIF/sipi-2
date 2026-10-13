@@ -22,6 +22,15 @@ The version change itself does not add runtime features or change configuration.
 See the [feature catalog](docs/features.md) for exact support and limitations,
 and the [documentation index](docs/README.md) for operational contracts.
 
+### Licensing and attribution
+
+Software and code examples are explicitly AGPL-3.0-only; documentation prose and
+seven credited photographs are CC BY 4.0. Photographs by Dölf Rosenthaler and
+Lukas Rosenthaler have file-specific attribution. Logo usage has separate terms.
+Runtime packaging now includes dependency license texts, supplemental upstream
+notices, checksums and an Ubuntu package inventory. `make source-package` creates
+source release archives with both Linux dependency graphs, recipes and patches. See [licensing](LICENSING.md).
+
 ### Compatibility and upgrades
 
 Within 1.x, documented CLI options, environment/TOML settings and Lua preflight

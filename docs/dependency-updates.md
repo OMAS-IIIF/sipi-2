@@ -72,3 +72,14 @@ Clear stale `libjpeg-turbo_DIR` CMake cache entries before configuring an existi
 build if they point outside Conan. The migration verified one Conan JPEG archive
 and matching 3.2.0 headers in both local configurations. See
 [JPEG backend notes](jpeg-delivery.md#jpeg-backend-and-rebuilds).
+
+## License review
+
+When changing a dependency, review its upstream license and bundled components.
+Refresh `THIRD_PARTY_NOTICES.md` and the exact-reference, checksum-verified
+supplements under `third_party/notices/`; do not bypass collector failures by
+changing reference strings alone. Docker captures `conan install --format=json`
+and uses `scripts/collect_licenses.py` for every host package, including static
+and header-only dependencies. A recipe's license label is not a substitute for
+its full terms or notices. Preserve the required sources, patches and recipes
+for publication with the release; the notice inventory is not a source bundle.

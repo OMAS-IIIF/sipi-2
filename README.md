@@ -156,6 +156,10 @@ in the [benchmark references](docs/README.md#validation-and-performance).
 
 ## License
 
-See [LICENSE](LICENSE) for the GNU Affero General Public License version 3 text.
-Embedded ICC profile attribution is recorded in
-[third_party/compact-icc](third_party/compact-icc/README.md).
+Software: **AGPL-3.0-only** ([full text](LICENSE)). Documentation prose:
+**CC BY 4.0**; code examples remain under AGPL-3.0-only.
+The [photograph credits](test-images/README.md) name Dölf Rosenthaler and Lukas
+Rosenthaler and specify CC BY 4.0 for the seven listed files. Logos have
+[separate usage terms](logo/README.md).
+See [licensing scope](LICENSING.md) and [third-party notices](THIRD_PARTY_NOTICES.md)
+for exceptions, embedded ICC profiles, dependency notices and source obligations.

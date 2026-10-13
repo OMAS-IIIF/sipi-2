@@ -61,6 +61,8 @@ integration example; generic delivery does not depend on it.
 ## Architecture and development
 
 - [Release notes and 1.x compatibility](../CHANGELOG.md)
+- [Create, restore and publish a source release package](source-package.md)
+- [License scope](../LICENSING.md), [photograph credits](../test-images/README.md) and [third-party notices](../THIRD_PARTY_NOTICES.md)
 
 - [Delivery architecture and boundaries](iiif-delivery-architecture.md)
 - [HTTP integration](http-server.md), [IIIF parser](iiif-parser.md), and [byte sources](byte-source.md)

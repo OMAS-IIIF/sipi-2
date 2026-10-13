@@ -16,7 +16,8 @@ RUN --mount=type=cache,target=/root/.conan2,sharing=locked \
     conan lock create . -pr:h docker/conan-profile -pr:b docker/conan-profile \
       --lockfile=conan.lock --lockfile-partial --lockfile-out=/tmp/docker.lock && \
     conan install . -pr:h docker/conan-profile -pr:b docker/conan-profile --lockfile=/tmp/docker.lock --build=missing -s build_type=Release \
-      -s compiler.cppstd=20 -c tools.build:jobs=${BUILD_JOBS}
+      -s compiler.cppstd=20 -c tools.build:jobs=${BUILD_JOBS} \
+      --format=json > /tmp/conan-installed.json
 COPY CMakeLists.txt ./
 COPY src/ src/
 COPY benchmarks/ benchmarks/
@@ -27,6 +28,26 @@ RUN --mount=type=cache,target=/root/.conan2,sharing=locked \
     mkdir -p /out/lib && cp build/Release/sipi-2 /out/ && \
     ldd /out/sipi-2 | awk '/=> \/root\/\.conan2/ {print $3}' | xargs -r -I '{}' cp -L '{}' /out/lib/ && \
     find /out -type f -exec strip --strip-unneeded '{}' +
+
+# Preserve notices for static/header-only dependencies as well as shared libraries.
+COPY scripts/collect_licenses.py scripts/collect_licenses.py
+COPY LICENSE LICENSING.md THIRD_PARTY_NOTICES.md ./
+COPY LICENSES/ LICENSES/
+COPY third_party/ third_party/
+RUN --mount=type=cache,target=/root/.conan2,sharing=locked \
+    python3 scripts/collect_licenses.py /tmp/conan-installed.json /out/licenses
+
+# Optional source-only export. Restore archives with Conan 2.33.0; no binaries.
+FROM build AS source-export-build
+COPY scripts/export_sources.py scripts/export_sources.py
+RUN --mount=type=cache,target=/root/.conan2,sharing=locked \
+    conan install . -pr:h docker/conan-profile -pr:b docker/conan-profile \
+      --lockfile=/tmp/docker.lock --build=never -s build_type=Release \
+      -s compiler.cppstd=20 -c tools.build:jobs=${BUILD_JOBS} \
+      -c tools.build:download_source=True --format=json > /tmp/conan-sources.json && \
+    python3 scripts/export_sources.py /tmp/conan-sources.json /source-export
+FROM scratch AS source-export
+COPY --from=source-export-build /source-export/ /
 
 # Opt-in offline comparison. The normal runtime target below stays the default.
 FROM build AS resize-benchmark-build
@@ -56,6 +77,7 @@ FROM ubuntu:24.04 AS runtime
 # labels from CMake/Git and verifies them after building each architecture.
 LABEL org.opencontainers.image.title="SIPI-2" \
       org.opencontainers.image.source="https://github.com/OMAS-IIIF/sipi-2" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.version="unknown" \
       org.opencontainers.image.revision="unknown" \
       org.omas-iiif.sipi.source-state="unknown"
@@ -65,6 +87,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && mkdir -p /var/cache/sipi /data/images && chown sipi:sipi /var/cache/sipi
 COPY --from=build /out/ /opt/sipi/
 COPY examples/oldap/ /opt/sipi/examples/oldap/
+# Ubuntu's per-package copyright files remain in /usr/share/doc.
+RUN dpkg-query -W -f='${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n' \
+    > /opt/sipi/licenses/ubuntu-packages.tsv
 ENV LD_LIBRARY_PATH=/opt/sipi/lib SIPI_LISTEN_ADDRESS=0.0.0.0
 USER sipi
 WORKDIR /home/sipi

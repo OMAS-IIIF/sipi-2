@@ -15,3 +15,13 @@
 !examples/oldap/docker-entrypoint.sh
 !docker/
 !docker/conan-profile
+!scripts/
+!scripts/collect_licenses.py
+!LICENSE
+!LICENSING.md
+!THIRD_PARTY_NOTICES.md
+!LICENSES/
+!LICENSES/**
+!third_party/
+!third_party/**
+!scripts/export_sources.py

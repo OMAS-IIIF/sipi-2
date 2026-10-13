@@ -357,3 +357,13 @@ for this generic Docker guide; do not replace an existing deployment with a demo
 For source/version labels, immutable publication source snapshots, clean-tree
 requirements and recorded image digests, see [release evidence](makefile.md#image-identity-and-release-evidence).
 Raw Docker builds use unknown provenance labels; the helper fills and verifies them.
+
+## Licenses and corresponding source
+
+Software is AGPL-3.0-only; see [license scope](../LICENSING.md). Runtime images
+include `/opt/sipi/licenses/inventory.json`, full collected dependency notices,
+and an Ubuntu package inventory. Ubuntu copyright files remain under
+`/usr/share/doc`. See [third-party notices](../THIRD_PARTY_NOTICES.md) for details.
+The smoke test verifies the collected files' checksums as the non-root runtime
+user. Notices alone do not fulfill corresponding-source obligations; a release
+must also provide the required source associated with its actual image digest.

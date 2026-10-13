@@ -138,6 +138,27 @@ and both platform container smoke suites (AMD64 emulated), with verified labels
 and Git archive contents. This evidence does not certify the pending 1.0.0
 artifacts: commit and verify the final release snapshot before publication.
 
+## License scope and artifact notices
+
+Software/scripts/configuration/code snippets are AGPL-3.0-only; documentation
+prose is CC BY 4.0. Photographs have file-specific Dölf/Lukas Rosenthaler credits;
+logos have separate identification/no-endorsement terms. See LICENSING.md.
+Docker captures the actual Conan install graph and collects all host package
+licenses, including static/header-only code, into `/opt/sipi/licenses`. Reviewed
+supplemental Grok/AWS/XZ notices are tied to exact recipe references and hashes;
+dependency changes require a notice review. Ubuntu retains its copyright files
+and an installed-package/source-identity list is added. Tests check notice bytes
+and failures. Inventory/source URLs are not a corresponding-source bundle:
+provide required dependency sources, patches and recipes with final releases.
+`make source-package` now archives a clean Git snapshot plus exact Conan recipes,
+patches and host-library sources for both Linux platforms. It uses a dedicated
+Docker source-export target and Conan cache save/restore without binary packages.
+A missing host source fails; the result includes locks, notices and checksums.
+`SOURCE_IMAGE_REPORT` additionally verifies the same commit/version and exact
+runtime dependency inventories against immutable local image IDs. Outputs remain
+local under `build/source-releases/`; publishing/linking them is a separate step.
+See docs/source-package.md for prerequisites, restoration and build scope.
+
 ## Working conventions and preservation
 
 Use English in code/docs and German with the owner. Prefer small, explainable
@@ -159,7 +180,9 @@ non-reproducible benchmark evidence as well as build outputs. Keep the two exclu
 originals (`sample-tiff-02.tif` and `swiss-map-raster500_500_komb_25_2056.tif`) local
 and ignored, including derivatives. Their approved public-main history rewrite
 completed in October 2026; do not reintroduce the old history or publish private
-backup refs. Attribution/license choices for the other seven originals remain open.
+backup refs. The seven tracked photograph files are CC BY 4.0: Dölf Rosenthaler created
+pharch_02 (TIFF/JP2) and sample-tif-01; Lukas Rosenthaler created pharch_01 and
+pharch_03 (TIFF/JP2) and confirmed authority for his father's photographs.
 See [corpus provenance](docs/archive-test-corpus.md#source-attribution-and-publication-review-2026-10-13).
 
 Selected wordmarks are in `logo/`. `assets/branding/` contains retained design
@@ -170,7 +193,7 @@ must be explicitly labelled, not silently presented as original measurements.
 ## Next steps
 
 1. Resolve the concrete publication gates in the [readiness review](docs/release-readiness.md):
-   asset attribution, maintainer/security channels and dependency notice inventory.
+   maintainer/security channels and final corresponding-source distribution.
 2. Complete contributor/release/migration entry points and current architecture
    documentation without importing outdated chronological claims.
 3. Complete remaining platform/integration gates using the fresh-checkout evidence,

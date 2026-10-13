@@ -17,14 +17,17 @@ The project owner identified the source groups as follows:
 
 | Original files | Source reported by the owner | Publication status |
 | --- | --- | --- |
-| `pharch_01`, `pharch_02`, `pharch_03` (TIFF and JP2), `sample-tif-01.tif` | Owner's own images | Record chosen attribution/license before public distribution |
+| `pharch_01`, `pharch_03` (TIFF and JP2) | Lukas Rosenthaler | CC BY 4.0; see the photograph credits |
+| `pharch_02` (TIFF and JP2), `sample-tif-01.tif` | Dölf Rosenthaler | CC BY 4.0, authorized by Lukas Rosenthaler as rights holder |
 | `sample-tiff-02.tif` | Third-party image; exact source not yet identified | Hold from publication pending source/terms review; retain locally |
 | `swiss-map-raster500_500_komb_25_2056.tif` | swisstopo | Hold from publication pending exact dataset/source/terms review; retain locally |
 
 The owner requested keeping both third-party originals locally for tests while
 removing them from GitHub and ignoring them in Git. This is not a finding that swisstopo forbids redistribution;
-the applicable dataset terms have not been established. The seven owner-supplied
-files are not automatically assigned a license by this attribution statement.
+the applicable dataset terms have not been established. On 2026-10-14 the owner
+corrected the earlier collective “own images” description to distinguish his
+father's photographs from his own, and confirmed the CC BY 4.0 grant. Exact
+filenames, creator credits and terms are in [test-images/README.md](../test-images/README.md).
 
 All nine originals remain locally available. The two third-party originals were
 untracked and given exact root-anchored ignore entries. The owner-approved history

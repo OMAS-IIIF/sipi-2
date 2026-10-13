@@ -46,6 +46,7 @@ def image_labels(version, identity):
     """Keep development output distinct from an image of exactly the recorded commit."""
     return {
         'org.opencontainers.image.title': 'SIPI-2',
+        'org.opencontainers.image.licenses': 'AGPL-3.0-only',
         'org.opencontainers.image.source': SOURCE_URL,
         'org.opencontainers.image.version': version,
         'org.opencontainers.image.revision': identity['revision'] + ('-dirty' if identity['dirty'] else ''),

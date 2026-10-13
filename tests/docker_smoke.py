@@ -33,6 +33,21 @@ def runtime_contents(image):
         'for tool in c++ g++ gcc cmake ninja conan; do '
         'if command -v "$tool" >/dev/null; then echo "Unexpected build tool: $tool"; exit 1; fi; done; '
         r'test -z "$(find /opt/sipi -type f \( -name "*.cpp" -o -name "*.h" -o -name "*.a" \))"'],check=True)
+    inventory = json.loads(subprocess.check_output(
+        ['docker', 'run', '--rm', '--entrypoint', 'cat', image,
+         '/opt/sipi/licenses/inventory.json'], text=True))
+    assert {'grok', 'libjpeg-turbo', 'aws-sdk-cpp'} <= inventory['components'].keys()
+    required = {'LICENSE', 'LICENSING.md', 'THIRD_PARTY_NOTICES.md',
+                'compact-icc/LICENSE', 'supplemental-manifest.json'}
+    assert required <= inventory['files'].keys()
+    checksums = ''.join(f'{digest}  {path}\n' for path, digest in inventory['files'].items())
+    subprocess.run(['docker', 'run', '--rm', '-i', '--entrypoint', '/bin/sh', image, '-ec',
+                    'cd /opt/sipi/licenses; sha256sum -c - >/dev/null; '
+                    'test -s ubuntu-packages.tsv; '
+                    'test -s /usr/share/doc/libstdc++6/copyright'],
+                   input=checksums, text=True, check=True)
+    assert inspected['Config']['Labels']['org.opencontainers.image.licenses'] == 'AGPL-3.0-only'
+    print(f'License inventory: {len(inventory["components"])} host packages; checksums verified')
     print(f'Runtime image: {inspected["Architecture"]}, {inspected["Size"]} bytes; no source/build toolchain')
 
 

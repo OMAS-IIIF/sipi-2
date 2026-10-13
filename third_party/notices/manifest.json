@@ -1,0 +1,314 @@
+{
+  "description": "Supplemental upstream notices omitted by Conan packages; full texts and identified verbatim source-header excerpts from pinned sources.",
+  "files": [
+    {
+      "reference": "xz_utils/5.8.4#8f8f25b0e4c422a4469a6f7ead5b355c",
+      "file": "xz_utils-5.8.4/src/COPYING.LGPLv2.1",
+      "source_path": "src/COPYING.LGPLv2.1",
+      "sha256": "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95",
+      "source_archives": {
+        "sha256": "4ce24038fd4221e0d13bc1a2de7a4db56e90b92b3bf75321f6c14be73f65de4b",
+        "url": [
+          "https://github.com/tukaani-project/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz",
+          "https://codeberg.org/tukaani/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz",
+          "https://sourceforge.net/projects/lzmautils/files/xz-5.8.4.tar.xz"
+        ]
+      }
+    },
+    {
+      "reference": "xz_utils/5.8.4#8f8f25b0e4c422a4469a6f7ead5b355c",
+      "file": "xz_utils-5.8.4/src/COPYING.0BSD",
+      "source_path": "src/COPYING.0BSD",
+      "sha256": "0b01625d853911cd0e2e088dcfb743261034a091bb379246cb25a14cc4c74bf1",
+      "source_archives": {
+        "sha256": "4ce24038fd4221e0d13bc1a2de7a4db56e90b92b3bf75321f6c14be73f65de4b",
+        "url": [
+          "https://github.com/tukaani-project/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz",
+          "https://codeberg.org/tukaani/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz",
+          "https://sourceforge.net/projects/lzmautils/files/xz-5.8.4.tar.xz"
+        ]
+      }
+    },
+    {
+      "reference": "xz_utils/5.8.4#8f8f25b0e4c422a4469a6f7ead5b355c",
+      "file": "xz_utils-5.8.4/src/COPYING.GPLv2",
+      "source_path": "src/COPYING.GPLv2",
+      "sha256": "edaef632cbb643e4e7a221717a6c441a4c1a7c918e6e4d56debc3d8739b233f6",
+      "source_archives": {
+        "sha256": "4ce24038fd4221e0d13bc1a2de7a4db56e90b92b3bf75321f6c14be73f65de4b",
+        "url": [
+          "https://github.com/tukaani-project/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz",
+          "https://codeberg.org/tukaani/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz",
+          "https://sourceforge.net/projects/lzmautils/files/xz-5.8.4.tar.xz"
+        ]
+      }
+    },
+    {
+      "reference": "xz_utils/5.8.4#8f8f25b0e4c422a4469a6f7ead5b355c",
+      "file": "xz_utils-5.8.4/src/COPYING.GPLv3",
+      "source_path": "src/COPYING.GPLv3",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "source_archives": {
+        "sha256": "4ce24038fd4221e0d13bc1a2de7a4db56e90b92b3bf75321f6c14be73f65de4b",
+        "url": [
+          "https://github.com/tukaani-project/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz",
+          "https://codeberg.org/tukaani/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz",
+          "https://sourceforge.net/projects/lzmautils/files/xz-5.8.4.tar.xz"
+        ]
+      }
+    },
+    {
+      "reference": "grok/20.4.15#e9510fffada60ef0d1c616b55ef63e6b",
+      "file": "grok-20.4.15/src/include/spdlog/LICENSE",
+      "source_path": "src/include/spdlog/LICENSE",
+      "sha256": "4ccecab18d1ff0b61174fe3d6c430541625d3ddb865b0d5887db296f883c76e7",
+      "source_archives": {
+        "grok": {
+          "url": "https://github.com/GrokImageCompression/grok/archive/v20.4.15.tar.gz",
+          "sha256": "01bb691dd64f1917b0bba867659f2b7e0ae07a856833b81ae8bdb904149d7277",
+          "destination": "."
+        },
+        "spdlog": {
+          "url": "https://github.com/gabime/spdlog/archive/ce0424bb375805955c0c5482a32ddb821708eb47.tar.gz",
+          "sha256": "6efddb9c922df1fc548a0f3ec067d744103e6a2783d290df1b221f2186041b78",
+          "destination": "src/include/spdlog"
+        },
+        "taskflow": {
+          "url": "https://github.com/boxerab/taskflow/archive/8e85ff949e54664efe19b3df0763a6bc24aa421d.tar.gz",
+          "sha256": "a09b3d3742121bb1ba7d3d17aa1ec0bf77ca9c22edd1abcbffe8f75d8c82e4a6",
+          "destination": "src/include/taskflow"
+        },
+        "highway": {
+          "url": "https://github.com/google/highway/archive/05230e7c367405e05215d61c1426aea0e3858cec.tar.gz",
+          "sha256": "50bfa634575e0efa85471a3ba96120ea3d0be2a5ffd154dabc465dbedf466142",
+          "destination": "src/lib/core/highway"
+        }
+      }
+    },
+    {
+      "reference": "grok/20.4.15#e9510fffada60ef0d1c616b55ef63e6b",
+      "file": "grok-20.4.15/src/include/taskflow/LICENSE",
+      "source_path": "src/include/taskflow/LICENSE",
+      "sha256": "92fae921103efcda4c4f9bebd76a40e29574cc07729abd01ec3cf83c22e61f97",
+      "source_archives": {
+        "grok": {
+          "url": "https://github.com/GrokImageCompression/grok/archive/v20.4.15.tar.gz",
+          "sha256": "01bb691dd64f1917b0bba867659f2b7e0ae07a856833b81ae8bdb904149d7277",
+          "destination": "."
+        },
+        "spdlog": {
+          "url": "https://github.com/gabime/spdlog/archive/ce0424bb375805955c0c5482a32ddb821708eb47.tar.gz",
+          "sha256": "6efddb9c922df1fc548a0f3ec067d744103e6a2783d290df1b221f2186041b78",
+          "destination": "src/include/spdlog"
+        },
+        "taskflow": {
+          "url": "https://github.com/boxerab/taskflow/archive/8e85ff949e54664efe19b3df0763a6bc24aa421d.tar.gz",
+          "sha256": "a09b3d3742121bb1ba7d3d17aa1ec0bf77ca9c22edd1abcbffe8f75d8c82e4a6",
+          "destination": "src/include/taskflow"
+        },
+        "highway": {
+          "url": "https://github.com/google/highway/archive/05230e7c367405e05215d61c1426aea0e3858cec.tar.gz",
+          "sha256": "50bfa634575e0efa85471a3ba96120ea3d0be2a5ffd154dabc465dbedf466142",
+          "destination": "src/lib/core/highway"
+        }
+      }
+    },
+    {
+      "reference": "grok/20.4.15#e9510fffada60ef0d1c616b55ef63e6b",
+      "file": "grok-20.4.15/src/lib/core/highway/LICENSE",
+      "source_path": "src/lib/core/highway/LICENSE",
+      "sha256": "e340270d4f64384569a91d546acb5b094d69ce47f0c015db77abb74dc6f815af",
+      "source_archives": {
+        "grok": {
+          "url": "https://github.com/GrokImageCompression/grok/archive/v20.4.15.tar.gz",
+          "sha256": "01bb691dd64f1917b0bba867659f2b7e0ae07a856833b81ae8bdb904149d7277",
+          "destination": "."
+        },
+        "spdlog": {
+          "url": "https://github.com/gabime/spdlog/archive/ce0424bb375805955c0c5482a32ddb821708eb47.tar.gz",
+          "sha256": "6efddb9c922df1fc548a0f3ec067d744103e6a2783d290df1b221f2186041b78",
+          "destination": "src/include/spdlog"
+        },
+        "taskflow": {
+          "url": "https://github.com/boxerab/taskflow/archive/8e85ff949e54664efe19b3df0763a6bc24aa421d.tar.gz",
+          "sha256": "a09b3d3742121bb1ba7d3d17aa1ec0bf77ca9c22edd1abcbffe8f75d8c82e4a6",
+          "destination": "src/include/taskflow"
+        },
+        "highway": {
+          "url": "https://github.com/google/highway/archive/05230e7c367405e05215d61c1426aea0e3858cec.tar.gz",
+          "sha256": "50bfa634575e0efa85471a3ba96120ea3d0be2a5ffd154dabc465dbedf466142",
+          "destination": "src/lib/core/highway"
+        }
+      }
+    },
+    {
+      "reference": "aws-sdk-cpp/1.11.692#bd7bb8c05feab8e962413aef0768bb37",
+      "file": "aws-sdk-cpp-1.11.692/src/NOTICE.txt",
+      "source_path": "src/NOTICE.txt",
+      "sha256": "8f43c4888a1e14f48c102b3f5556d581d02ea3afc9cbe31a2b714dae9383ef36",
+      "source_archives": {
+        "sha256": "48af03fe2b19b439344f422015c6f37296920f1972422d94f404001bd9781949",
+        "url": "https://github.com/aws/aws-sdk-cpp/archive/refs/tags/1.11.692.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-sdk-cpp/1.11.692#bd7bb8c05feab8e962413aef0768bb37",
+      "file": "aws-sdk-cpp-1.11.692/src/LICENSE.txt",
+      "source_path": "src/LICENSE.txt",
+      "sha256": "d721f7df04e3f82ff104de91a734c4e2ea40e8e4bb2f89dc4d4c7dd6ebbecb40",
+      "source_archives": {
+        "sha256": "48af03fe2b19b439344f422015c6f37296920f1972422d94f404001bd9781949",
+        "url": "https://github.com/aws/aws-sdk-cpp/archive/refs/tags/1.11.692.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-crt-cpp/0.35.2#e11cf5e3d2a9273d4413bb5f8c6e502e",
+      "file": "aws-crt-cpp-0.35.2/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "90f9b4a63a71d4a70420242c414b2fe24ee809c094c2dbac3b8871a646469293",
+      "source_archives": {
+        "sha256": "9d53d7018994a5f7fc879d397032b72ad88b1585a8cc07e2c8c339ae427f0577",
+        "url": "https://github.com/awslabs/aws-crt-cpp/archive/v0.35.2.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-c-common/0.12.5#4f0643c1a427cbd9bcc6e3e178c04669",
+      "file": "aws-c-common-0.12.5/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "f43576ad8c3330cd2647c8e8dc3572d8bf7dfc47a13d56dbdb8c1abbef900367",
+      "source_archives": {
+        "sha256": "02d1ab905d43a33008a63f273b27dbe4859e9f090eac6f0e3eeaf8c64a083937",
+        "url": "https://github.com/awslabs/aws-c-common/archive/v0.12.5.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-c-sdkutils/0.2.4#28bd313b2eb6609e6c12b0e5c966f4fa",
+      "file": "aws-c-sdkutils-0.2.4/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "d4290ed64c2edd0fce1d84e3f9dfb2881240fe534def76b8cd29ed6af683e287",
+      "source_archives": {
+        "sha256": "493cbed4fa57e0d4622fcff044e11305eb4fc12445f32c8861025597939175fc",
+        "url": "https://github.com/awslabs/aws-c-sdkutils/archive/v0.2.4.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-c-io/0.23.2#62b5405910d4a92b41332a6aa3c5daeb",
+      "file": "aws-c-io-0.23.2/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "f0604df9ed45fb474874f8b363700aa2e493705799ffd6e1362b899aa70653e4",
+      "source_archives": {
+        "sha256": "3a335b812411c30bcc64072f148ddf6cd632d8261799cd04e54051b44506feb9",
+        "url": "https://github.com/awslabs/aws-c-io/archive/v0.23.2.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-c-cal/0.9.8#80a1504f3d10259f41593130ce74bd04",
+      "file": "aws-c-cal-0.9.8/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "06da05ec640017cc2bc80e4856cf14a9002efdd57b1ed4655714bfe5e777d216",
+      "source_archives": {
+        "sha256": "4a2a0918c763639f18d971367df6b528a1f3a0660f1c66d5791e435e8e671db9",
+        "url": "https://github.com/awslabs/aws-c-cal/archive/v0.9.8.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-c-compression/0.3.1#3fa42a49f3346b7a5a580fa9e19b32a5",
+      "file": "aws-c-compression-0.3.1/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "758db6c88293e55e9790adc73e9e58066405c408797afa9d48bef18d308eb49e",
+      "source_archives": {
+        "sha256": "d89fca17a37de762dc34f332d2da402343078da8dbd2224c46a11a88adddf754",
+        "url": "https://github.com/awslabs/aws-c-compression/archive/v0.3.1.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-c-http/0.10.5#7c4c37b412a1ff7e78798776abcca170",
+      "file": "aws-c-http-0.10.5/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "2d1f498ef5ec8f71a7590ad3447688de6f0276434c619b5c4ce6e53c068ea33e",
+      "source_archives": {
+        "sha256": "02e8e67f5f03fa6458f8921232dc7a9076792d2822ad86f19c3f984fc1a073a8",
+        "url": "https://github.com/awslabs/aws-c-http/archive/v0.10.5.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-c-auth/0.9.1#170e7b039f1966625c54205104f161a1",
+      "file": "aws-c-auth-0.9.1/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "f228f9b9f0405035d8bc2dbd9f018533b641136c7110f9e6a34edec7dd52e310",
+      "source_archives": {
+        "sha256": "adae1e725d9725682366080b8bf8e49481650c436b846ceeb5efe955d5e03273",
+        "url": "https://github.com/awslabs/aws-c-auth/archive/v0.9.1.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-c-mqtt/0.13.3#c2768514f32e7f696ef8d2a096a8c7f3",
+      "file": "aws-c-mqtt-0.13.3/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "09211ec471e551c78cd57aba8344847091f297a6ae389288beb5d55076ab2c76",
+      "source_archives": {
+        "sha256": "1dfc11d6b3dc1a6d408df64073e8238739b4c50374078d36d3f2d30491d15527",
+        "url": "https://github.com/awslabs/aws-c-mqtt/archive/v0.13.3.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-c-event-stream/0.5.7#0f5c58ea7feef1e92df78e07bac95cff",
+      "file": "aws-c-event-stream-0.5.7/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "ca6098641e6982418933b0eb3973e56f544e94932f1244cb9352db60321a040f",
+      "source_archives": {
+        "sha256": "5d92abed2ed89cc1efaba3963e888d9df527296f1dbfe21c569f84ea731aa3c2",
+        "url": "https://github.com/awslabs/aws-c-event-stream/archive/v0.5.7.tar.gz"
+      }
+    },
+    {
+      "reference": "aws-c-s3/0.9.2#7e6609e49d0eee71a2a9a86d961c4007",
+      "file": "aws-c-s3-0.9.2/src/NOTICE",
+      "source_path": "src/NOTICE",
+      "sha256": "d4290ed64c2edd0fce1d84e3f9dfb2881240fe534def76b8cd29ed6af683e287",
+      "source_archives": {
+        "sha256": "70ddd1e69fed7788ff5499b03158f36fb8137d82bd7b1af7bcdf57facbdb1557",
+        "url": "https://github.com/awslabs/aws-c-s3/archive/v0.9.2.tar.gz"
+      }
+    },
+    {
+      "reference": "grok/20.4.15#e9510fffada60ef0d1c616b55ef63e6b",
+      "file": "grok-20.4.15/EMBEDDED_NOTICES.txt",
+      "source_path": "src/lib/core (verbatim license headers; file paths listed in notice)",
+      "sha256": "7e9e8aef10a44a94fdceaac9bf1d23d9dda9f3d0404fc708fc48b88bc46ff05c",
+      "source_archives": {
+        "grok": {
+          "url": "https://github.com/GrokImageCompression/grok/archive/v20.4.15.tar.gz",
+          "sha256": "01bb691dd64f1917b0bba867659f2b7e0ae07a856833b81ae8bdb904149d7277",
+          "destination": "."
+        },
+        "spdlog": {
+          "url": "https://github.com/gabime/spdlog/archive/ce0424bb375805955c0c5482a32ddb821708eb47.tar.gz",
+          "sha256": "6efddb9c922df1fc548a0f3ec067d744103e6a2783d290df1b221f2186041b78",
+          "destination": "src/include/spdlog"
+        },
+        "taskflow": {
+          "url": "https://github.com/boxerab/taskflow/archive/8e85ff949e54664efe19b3df0763a6bc24aa421d.tar.gz",
+          "sha256": "a09b3d3742121bb1ba7d3d17aa1ec0bf77ca9c22edd1abcbffe8f75d8c82e4a6",
+          "destination": "src/include/taskflow"
+        },
+        "highway": {
+          "url": "https://github.com/google/highway/archive/05230e7c367405e05215d61c1426aea0e3858cec.tar.gz",
+          "sha256": "50bfa634575e0efa85471a3ba96120ea3d0be2a5ffd154dabc465dbedf466142",
+          "destination": "src/lib/core/highway"
+        }
+      }
+    },
+    {
+      "reference": "s2n/1.5.27#d3f92c7e6873000d69ce09eefa5b7cdb",
+      "file": "s2n-1.5.27/NOTICE",
+      "source_path": "NOTICE",
+      "sha256": "b009d59fea9a0d7fed87b24f6b174a6ac41e1cf94ce77a8160e29997a4c7883c",
+      "source_archives": {
+        "sha256": "95d6e5ada2d66108653e91de3ceea800987fde9eb190ef219034ab4fd06b114c",
+        "url": "https://github.com/aws/s2n-tls/archive/refs/tags/v1.5.27.tar.gz"
+      },
+      "retrieved_from": "https://raw.githubusercontent.com/aws/s2n-tls/v1.5.27/NOTICE"
+    }
+  ]
+}

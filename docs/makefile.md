@@ -155,3 +155,12 @@ verified platforms; its actual returned digest is recorded separately. Mutable
 base-image/package repositories and cache behavior mean this is not a promise of
 bit-identical independent rebuilds. See Docker's
 [build metadata reference](https://docs.docker.com/reference/cli/docker/buildx/build/#write-build-result-metadata-to-a-file---metadata-file).
+
+## Source release archive
+
+`make source-package` creates the committed project's source archive plus the
+exact Conan library sources, recipes, patches and notices for both Linux
+architectures. It requires a clean checkout and never publishes. Use
+`SOURCE_IMAGE_REPORT=/absolute/path/to/report.json` to compare the dependency
+inventories with verified images. See [source packaging](source-package.md) for
+output paths, restoration/build instructions and release scope.
