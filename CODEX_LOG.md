@@ -1,3 +1,9 @@
+### Update 2026-10-13 22:18
+- Decisions: Make Docker documentation usable with the published image independently of OLDAP; keep native option semantics authoritative and distinguish Docker paths, ports and environment precedence.
+- Implementation: Rewrote docs/docker.md with mounts/permissions, minimal/TOML/Lua/cache/Compose examples, S3/secrets, proxy paths, updates and troubleshooting. Added documented sample-only Lua policy/container TOML in examples/docker; preserved OLDAP trial notes in its guide, added Compose comments and updated index/master context/release plan.
+- Open: Operator-first native configuration/Lua and operations guides, context consolidation and clean-checkout verification. No commit or push in this step.
+- Risks/Assumptions: Published 0.1.3 native ARM64 runtime passed sample delivery/deny, readonly/UID/GID, persisted-cache restart, Compose retention, precedence and missing-bind checks; test-owned containers/volumes removed. AMD64 manifest inspected, not runtime retested; no S3/proxy/deployment/update operation or rebuild. Link/anchor and diff checks pass.
+
 ### Update 2026-10-13 21:59
 - Decisions: Publish a complete current capability catalog with supported subsets, configurable/fixed limits and explicit exclusions; distinguish header admission, pixel delivery, output limits and restricted public resolution.
 - Implementation: Added docs/features.md and linked it from README/docs index. Corrected stale Level-2/restricted-image claims and JPEG/PNG/WebP capability descriptions in six topic guides; updated master context and release progress.

@@ -1,0 +1,11 @@
+# Container paths: mount examples/images at /data/images and this directory at /etc/sipi.
+# Load explicitly with: --config /etc/sipi/sipi.toml
+port = 8080
+iiif-root = "/data/images"
+preflight-script = "/etc/sipi/preflight.lua"
+cache-dir = "/var/cache/sipi"
+public-base-url = "http://127.0.0.1:18080"
+log-level = "info"
+
+# Conservative demo worker count, not automatic container-resource detection.
+iiif-workers = 2

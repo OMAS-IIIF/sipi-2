@@ -16,8 +16,15 @@ revalidation remain separate release gates. `docs/features.md` now provides the
 full capability catalog: input/output matrices, IIIF, color, storage, policy,
 watermarks, Lua, caches, limits and deployment boundaries. It is linked from both
 entry points and checked against source plus 21 focused native HTTP probes.
-Superseded capability statements in six topic guides were corrected. Next:
-operator-first Docker/Lua/configuration guides, operations and compact master-context
+Superseded capability statements in six topic guides were corrected.
+`docs/docker.md` now leads with published-image usage, mounts/UID 10001, Docker
+configuration precedence, TOML/Lua/cache and Compose examples, proxy URLs, S3,
+updates and troubleshooting. `examples/docker/` supplies a sample-only allow/deny
+policy and explicit container TOML; these are host-mounted, not image contents.
+Native ARM64 image checks passed minimal/configured/Compose starts, 403 policy,
+cache persistence, readonly root, precedence and missing-bind failure; all owned
+resources were cleaned up. OLDAP-specific trial details moved to its own guide.
+Next: operator-first Lua/configuration guides, operations and compact master-context
 consolidation.
 
 ## Public release preparation (2026-10-13)

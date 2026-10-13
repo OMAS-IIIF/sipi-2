@@ -10,7 +10,7 @@ reports record evidence for a particular revision, platform and workload.
 | Task | Guide |
 | --- | --- |
 | Compile, run and test natively; configure CLion | [Native build](building.md) |
-| Use container mounts, runtime settings and Compose; build images | [Docker](docker.md) and [Compose example](../docker/compose.example.yaml) |
+| Use container mounts, runtime settings and Compose; build images | [Docker](docker.md), [TOML/Lua example](docker.md#toml-lua-and-a-persistent-cache) and [Compose example](../docker/compose.example.yaml) |
 | Set CLI, environment and TOML options | [Configuration reference](command-line.md) and [example TOML](../sipi.example.toml) |
 | Map public identifiers to image sources | [Source resolution](source-resolution.md) |
 | Configure S3-compatible storage | [S3 source adapter and settings](s3-byte-source.md) |

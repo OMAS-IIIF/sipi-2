@@ -175,3 +175,25 @@ proxy logging to avoid recording query tokens; the script itself logs no secrets
 
 See [preflight.md](preflight.md), [lua-jwt.md](lua-jwt.md),
 [lua-http.md](lua-http.md), and [lua-configuration.md](lua-configuration.md).
+
+## Container deployment notes
+
+For generic image usage and mounts, see the [Docker guide](docker.md). The
+packaged OLDAP environment adapter is optional and must be selected explicitly;
+it is not the image's default entrypoint.
+
+The earlier integration trial in the separate oldap-mediaserver project used its
+`docker-compose.sipi-test.yml` together with its base Compose file. That override
+reused service `imageserver`, its container name and port 8182, allowing the
+existing Caddy `/iiif/*` routing to remain in place. SIPI received `/iiif/3/...`
+as a retained prefix. In that setup `SIPI_TEST_PUBLIC_ORIGIN` must contain only
+the external origin (for example `http://localhost:8088`), without `/iiif/3`, or
+service IDs and canonical URLs duplicate the prefix. Other proxy setups must use
+the [forwarded-path rules](docker.md#reverse-proxy-and-public-urls) instead of
+copying that deployment-specific setting blindly.
+
+Use the sibling project's `docs/sipi-test.md` for its activation and rollback
+procedure. The image repository is mounted read-only; the policy does not convert
+original files. Container recreation adopts changed environment and policy
+snapshots. This historical trial description is not a statement that the current
+deployment has been changed by SIPI-2 documentation work.

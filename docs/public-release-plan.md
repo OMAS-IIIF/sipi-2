@@ -1,10 +1,10 @@
 # Public release preparation
 
 Status: inventory, third-party image history cleanup, README/navigation refresh and
-feature catalog completed on 2026-10-13; remaining documentation and release checks
-are listed below.
+feature catalog and Docker operator guide completed on 2026-10-13; remaining
+documentation and release checks are listed below.
 Baseline: commit `2d26200`, CMake version `0.1.3`. This is a preparation plan,
-not a release announcement or a claim that a registry tag has been verified.
+not a release announcement. Later sections record registry/runtime verification.
 
 ## Inventory and immediate decisions
 
@@ -191,6 +191,26 @@ output limits, region/size forms, mirror/rotation, quality variants, all three
 encoders, rejected TIFF output, and disabled/enabled enlargement. No fresh build,
 full suite, S3/Docker retest or broad format conformance claim is implied. Local
 links and explicit anchors were checked; no runtime implementation changed.
+
+## Docker operator guide completed (2026-10-13)
+
+Rewrote `docs/docker.md` around published-image use rather than image building or
+an OLDAP trial. Added mount/permission and Docker-setting tables, three executable
+paths, secret/S3 networking guidance, proxy-prefix rules, cache persistence,
+update/rollback and troubleshooting. The new `examples/docker/sipi.toml` and
+`preflight.lua` use the public synthetic sample only. The existing Compose service
+configuration remains unchanged apart from explanatory comments. Historical OLDAP
+trial specifics were preserved in `docs/oldap-preflight.md`.
+
+Verified published image 0.1.3 on native ARM64: minimal/configured/Compose delivery,
+health/version/info/JPEG/PNG, explicit 403 denial, UID/GID 10001, read-only root and
+writable cache, two persisted encoded objects, identical PNG after restart,
+Compose volume retention on down, CLI-over-environment and environment-over-TOML,
+and missing bind failure without directory creation. The image has no HEALTHCHECK,
+Python or curl; probes run on the host. All test-owned containers/volumes were
+removed. Registry AMD64/ARM64 manifests were rechecked; AMD64 execution, full S3,
+proxy/TLS and actual upgrade/rollback were not rerun or enacted. No image rebuild,
+push or deployment modification.
 
 ## Execution order and completion criteria
 

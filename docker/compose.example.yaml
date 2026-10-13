@@ -1,5 +1,6 @@
 # Generic runtime example, independent of OLDAP. Host paths must already exist.
-# Select a version tag for deployments; verify-* tags can be used for local tests.
+# See docs/docker.md for runnable exports using examples/docker/preflight.lua.
+# Select a published version tag for deployments; verify-* tags are local test images.
 name: sipi-2-runtime
 services:
   sipi:
