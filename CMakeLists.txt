@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(sipi-2 VERSION 1.0.0 LANGUAGES CXX)
+project(sipi-2 VERSION 1.0.1 LANGUAGES CXX)
 
 find_package(Threads REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -174,8 +174,12 @@ if(BUILD_TESTING)
     target_link_libraries(metadata-cache-tests PRIVATE metadatacache)
     set_target_properties(metadata-cache-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME metadata-cache COMMAND metadata-cache-tests)
-    add_executable(result-cache-tests tests/ResultCacheTests.cpp)
-    target_link_libraries(result-cache-tests PRIVATE resultcache SQLite::SQLite3 Threads::Threads)
+    # Compile the cache with a synchronization seam only in this test executable.
+    # The production library contains neither the hook nor a callback/API surface.
+    add_executable(result-cache-tests tests/ResultCacheTests.cpp src/cache/ResultCache.cpp)
+    target_compile_definitions(result-cache-tests PRIVATE SIPI_RESULT_CACHE_TEST_HOOKS)
+    target_link_libraries(result-cache-tests PRIVATE cachekey imagestorage SQLite::SQLite3 Threads::Threads)
+    set_target_properties(result-cache-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME result-cache COMMAND result-cache-tests)
     add_executable(cache-key-tests tests/CacheKeyTests.cpp)
     target_link_libraries(cache-key-tests PRIVATE cachekey iiifparser Threads::Threads)

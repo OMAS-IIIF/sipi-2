@@ -1,13 +1,21 @@
 #include "cache/ResultCache.h"
 #include <sqlite3.h>
 #include <array>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <functional>
 #include <iostream>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
+
+namespace sipi::cache {
+// Each writer controls only its own hook; ordinary calls run without a callback.
+thread_local std::function<void()> body_write_hook;
+void before_result_cache_body_write() { if (body_write_hook) body_write_hook(); }
+}
 
 namespace {
 namespace fs = std::filesystem;
@@ -181,6 +189,77 @@ void concurrency() {
         }
     }));
     for (auto& task : tasks) task.get();
+    std::size_t temporaries = 0;
+    for (const auto& entry : fs::recursive_directory_iterator(dir.path/"objects"))
+        temporaries += entry.path().filename().string().starts_with(".tmp-");
+    require(temporaries == 0, "no temporary files after concurrent publication");
+}
+/** Bodies written concurrently outside the mutex are reserved, so parallel
+ * admissions never exceed the encoded-byte maximum. */
+void concurrent_capacity() {
+    Directory dir;
+    constexpr std::uint64_t maximum = 40; // Ten 4-byte payloads.
+    {
+        ResultCache store(dir.path, {maximum, 50});
+        std::vector<std::future<void>> tasks;
+        for (unsigned i=0; i<8; ++i) tasks.push_back(std::async(std::launch::async,[&,i] {
+            for (unsigned j=0; j<32; ++j) (void)store.put(key("cap-"+std::to_string(i)+"-"+std::to_string(j)), metadata, payload);
+        }));
+        for (auto& task : tasks) task.get();
+    }
+    std::uint64_t bytes = 0;
+    for (const auto& entry : fs::recursive_directory_iterator(dir.path/"objects"))
+        if (entry.is_regular_file()) bytes += entry.file_size();
+    require(bytes > 0 && bytes <= maximum, "concurrent puts respect the byte maximum");
+}
+/** WAL avoids per-commit synchronization; automatic checkpoints still sync. */
+void journal_mode() {
+    Directory dir;
+    { ResultCache store(dir.path); require(store.put(key(), metadata, payload), "seed journal mode"); }
+    sqlite3* db = nullptr;
+    require(sqlite3_open((dir.path/"cache.sqlite3").c_str(), &db) == SQLITE_OK, "journal database open");
+    sqlite3_stmt* query = nullptr;
+    require(sqlite3_prepare_v2(db, "PRAGMA journal_mode", -1, &query, nullptr) == SQLITE_OK, "journal pragma");
+    const bool wal = sqlite3_step(query) == SQLITE_ROW &&
+        std::string_view(reinterpret_cast<const char*>(sqlite3_column_text(query, 0))) == "wal";
+    sqlite3_finalize(query);
+    sqlite3_close(db);
+    require(wal, "persistent cache index uses WAL");
+}
+/** Hold a writer at the unlocked body-I/O boundary and require a hit to finish.
+ * Release the writer before inspecting outcomes so a lock regression fails
+ * within the timeout instead of deadlocking future destruction. */
+void lookup_during_publication() {
+    Directory dir;
+    ResultCache store(dir.path);
+    const auto ready = key("ready"), pending = key("pending");
+    require(store.put(ready, metadata, payload), "seed hit for parallel lookup");
+    std::promise<void> entered, release;
+    auto entered_future = entered.get_future();
+    auto release_future = release.get_future().share();
+    // Declaration order releases a paused writer even if launching the reader
+    // or another operation throws before the explicit release below.
+    std::future<bool> writer;
+    struct ReleaseWriter {
+        std::promise<void>& signal;
+        bool released = false;
+        void release() { if (!released) { signal.set_value(); released = true; } }
+        ~ReleaseWriter() { release(); }
+    } unblock{release};
+    writer = std::async(std::launch::async, [&] {
+        body_write_hook = [&] { entered.set_value(); release_future.wait(); };
+        return store.put(pending, metadata, payload);
+    });
+    require(entered_future.wait_for(std::chrono::seconds(5)) == std::future_status::ready,
+            "writer reached body I/O");
+    auto reader = std::async(std::launch::async, [&] { return store.get(ready); });
+    const bool completed = reader.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
+    unblock.release();
+    auto hit = reader.get();
+    require(writer.get(), "publication succeeds after release");
+    require(completed, "get() completes while body I/O is paused");
+    require(hit.has_value(), "hit while another body is written");
+    verify(*hit);
 }
 }
 int main() {
@@ -190,6 +269,9 @@ int main() {
         std::cout << "capacity" << std::endl; capacity();
         std::cout << "failures" << std::endl; failures();
         std::cout << "concurrency" << std::endl; concurrency();
+        std::cout << "concurrent capacity" << std::endl; concurrent_capacity();
+        std::cout << "journal mode" << std::endl; journal_mode();
+        std::cout << "lookup during publication" << std::endl; lookup_during_publication();
     }
     catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
     std::cout << "Persistent cache tests passed\n";

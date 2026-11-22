@@ -158,12 +158,41 @@ HttpFailure failure(CURLcode code) {
 }
 }
 
-struct HttpSession::Impl {
-    std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> handle{curl_easy_init(), curl_easy_cleanup};
-    Impl() { if (!handle) throw std::bad_alloc(); }
+/** One libcurl easy handle together with its connection and TLS session caches. */
+struct HttpHandlePool::Handle {
+    std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl{curl_easy_init(), curl_easy_cleanup};
+    Handle() { if (!curl) throw std::bad_alloc(); }
 };
-HttpSession::HttpSession() = default;
-HttpSession::~HttpSession() = default;
+
+HttpHandlePool::HttpHandlePool() = default;
+HttpHandlePool::~HttpHandlePool() = default;
+
+/** Prefer the most recently returned handle: its connections are the least
+ * likely to have been closed by the server's keep-alive timeout. */
+std::unique_ptr<HttpHandlePool::Handle> HttpHandlePool::acquire() {
+    {
+        std::lock_guard lock(mutex_);
+        if (!idle_.empty()) {
+            auto handle = std::move(idle_.back());
+            idle_.pop_back();
+            return handle;
+        }
+    }
+    return std::make_unique<Handle>(); // Created outside the lock.
+}
+
+/** A handle that is not retained (pool full, or allocation failure) is
+ * destroyed after the lock is released and closes its connections. */
+void HttpHandlePool::release(std::unique_ptr<Handle> handle) noexcept {
+    if (!handle) return;
+    const std::lock_guard lock(mutex_);
+    if (idle_.size() >= max_idle) return;
+    try { idle_.push_back(std::move(handle)); }
+    catch (...) { /* Dropping the handle only loses its open connections. */ }
+}
+
+HttpSession::HttpSession(HttpHandlePool& pool) : pool_(pool) {}
+HttpSession::~HttpSession() { pool_.release(std::move(handle_)); }
 
 HttpResult HttpSession::request(const HttpRequest& request) {
     require(enabled_, "HTTP requests are only available inside preflight(request)");
@@ -173,9 +202,12 @@ HttpResult HttpSession::request(const HttpRequest& request) {
     if (!deadline_) deadline_ = now + std::chrono::seconds(10);
     if (calls_ >= 4 || now >= *deadline_) return {{}, HttpFailure{"budget", "Preflight HTTP budget exhausted"}};
     ++calls_;
-    if (!impl_) impl_ = std::make_unique<Impl>();
-    auto* handle = impl_->handle.get();
-    curl_easy_reset(handle); // Retains connections, resets all request options.
+    if (!handle_) handle_ = pool_.acquire();
+    auto* handle = handle_->curl.get();
+    // Retains connections and TLS sessions; resets every request option. The
+    // ResetOptions guard below repeats this after the transfer, so a handle
+    // returned to the pool never carries this request's headers or body.
+    curl_easy_reset(handle);
     const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(*deadline_ - now).count();
     Transfer transfer{{}, request.max_response_bytes};
     std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)> headers(nullptr, curl_slist_free_all);

@@ -19,6 +19,7 @@
 
 namespace sipi::preflight {
 class SharedCache;
+class HttpHandlePool;
 
 /** Transport-independent request context; all strings are owned by the request. */
 using QueryParameters = std::map<std::string, std::vector<std::string>>;
@@ -92,7 +93,8 @@ private:
 /** Snapshot of a trusted operator-written Lua script.
  * Construction reads the file; evaluate compiles and executes it in a fresh state
  * and invokes preflight(request). Lua states remain isolated; only explicitly cached JSON-compatible values survive calls.
- * Concurrent const evaluations share only the synchronized explicit cache; destruction must not race a call.
+ * Concurrent const evaluations share only the synchronized explicit cache and a pool of
+ * idle HTTP connections (transport state only, see HttpHandlePool); destruction must not race a call.
  *
  * Each state is limited to 16 MiB of Lua allocations and one million VM instructions.
  * Native HTTP has separate per-call and aggregate limits; see docs/lua-http.md.
@@ -121,6 +123,7 @@ private:
     std::string chunk_name_;
     ScriptConfig config_;
     std::shared_ptr<SharedCache> cache_; // Copies of the same immutable policy share its cache.
+    std::shared_ptr<HttpHandlePool> http_pool_; // Keep-alive connections reused across evaluations.
 };
 
 } // namespace sipi::preflight

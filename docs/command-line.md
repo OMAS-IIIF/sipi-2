@@ -255,8 +255,8 @@ The script snapshot lives for the server lifetime; changes require a restart.
 Request-dependent failures remain detectable only during evaluation. Trusted script
 initialization has the same Lua memory/instruction budgets as request evaluation.
 Native-call wall-clock limits remain separate. A configured script authorizes IIIF
-image/info/base GET and HEAD requests on the worker before source lookup. Health and
-hello are outside this policy. Without a script, delivery uses the repository's default mapping.
+image/info/base GET and HEAD requests on the worker before source lookup. The health
+route is outside this policy. Without a script, delivery uses the repository's default mapping.
 See [the preflight contract](preflight.md).
 
 ## Repository root

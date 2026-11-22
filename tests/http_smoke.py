@@ -6,7 +6,6 @@ working directory on a free loopback port and always reaps the child process.
 
 from png_check import decode_png
 import concurrent.futures
-import html
 import http.client
 import json
 import os
@@ -147,21 +146,15 @@ end
                     finally:
                         connection.close()
 
-                for path in ("/hello", "/hello/"):
+                # The former diagnostic /hello route is gone: no path echoes request
+                # text as HTML. /hello is an ordinary IIIF base URI now (redirect when
+                # the policy maps it to an image, otherwise a missing source).
+                for path in ("/hello", "/hello/", "/hello/id", '/hello/id?q=<script>'):
                     status, headers, body = request(path)
-                    assert status == 200 and "text/html" in headers.get("content-type", ""), (status, headers)
-                    assert "<p>Hello World</p>" in body, body
-                for path in ("/hello/id", "/hello/path1/path2/id", "/hello/a%20b?id=42&name=test"):
-                    status, _, body = request(path)
-                    expected = f"You called me with the URL http://127.0.0.1:{port}{path}"
-                    assert status == 200 and expected in html.unescape(body), body
-                status, _, body = request('/hello/id?q=<script>&x="value"')
-                assert status == 200 and "<script>" not in body, body
-                assert "&lt;script&gt;" in body and "&amp;" in body and "&quot;" in body, body
-                status, _, body = request("/hello/id", headers={"Host": "example.test:9090"})
-                assert status == 200 and "http://example.test:9090/hello/id" in body, body
-                status, _, body = request("/hello/id", headers={"X-Forwarded-Proto": "https"})
-                assert status == 200 and "http://127.0.0.1:" in body, body
+                    # Drogon labels an empty redirect body text/html; no page is served.
+                    assert not (status == 200 and "text/html" in headers.get("content-type", "")), (path, status)
+                    assert "<script>" not in body and "Hello World" not in body, (path, body)
+                assert request("/hello")[0] == (303 if configured else 404)
                 def json_request(path: str, expected_status: int, method: str = "GET"):
                     """Check HTTP status/content type before returning parsed JSON."""
                     status, headers, body = request(path, method)
@@ -171,9 +164,11 @@ end
 
                 _, health = json_request("/health", 200)
                 assert health == {"status": "ok", "message": "I'm alive", "version": version}, health
-                # Explicit routes beat IIIF, even when their suffix is valid IIIF.
-                assert request("/hello/id/full/max/0/default.jpg")[0] == 200
-                assert request("/HELLO/id/full/max/0/default.jpg")[0] == 200
+                # Only the exact /health route is reserved; "hello" is just an IIIF
+                # prefix, and default mapping uses the identifier only.
+                for path in ("/hello/id/full/max/0/default.jpg", "/HELLO/id/full/max/0/default.jpg"):
+                    status, headers, _ = request(path)
+                    assert status == 200 and headers.get("content-type") == "image/jpeg", (path, status, headers)
                 assert request("/HEALTH")[0] == 200  # Drogon route matching is case-insensitive.
 
                 for path in ("/id/full/max/0/default.jpg", "/myproj/subpart/id/full/max/0/default.jpg",
@@ -425,13 +420,12 @@ end
                     assert body["error"] == "invalid_iiif_syntax", (path, body)
                     assert body["component"] == component and body["message"], (path, body)
 
-                for path in ("/health", "/hello", "/hello/id/full/max/0/default.jpg",
-                             "/id/full/max/0/default.jpg", "/id/info.json", "/missing"):
+                for path in ("/health", "/id/full/max/0/default.jpg", "/id/info.json", "/missing"):
                     for method in ("POST", "PUT", "DELETE", "PATCH"):
                         headers, body = json_request(path, 405, method)
                         assert headers.get("allow") == "GET, HEAD, OPTIONS", headers
                         assert body["error"] == "method_not_allowed", body
-                for path, expected_status in (("/hello", 200), ("/health", 200),
+                for path, expected_status in (("/health", 200),
                                                ("/id/full/max/0/default.jpg", 200),
                                                ("/id/info.json", 200), ("/id/no-region/max/0/default.jpg", 400)):
                     status, _, body = request(path, "HEAD")
@@ -489,9 +483,10 @@ end
                     _, alternate = json_request("/project/use-large/info.json", 200)
                     assert (alternate["width"], alternate["height"]) == (1000, 800)
                     assert alternate["id"] == public_base + "/project/use-large"
-                    # Syntax validation and explicit routes precede preflight.
+                    # Syntax validation precedes preflight. A former /hello prefix no
+                    # longer bypasses the policy: it is an ordinary IIIF prefix.
                     assert request("/denied/bad/max/0/default.jpg")[0] == 400
-                    assert request("/hello/denied/info.json")[0] == 200
+                    assert request("/hello/denied/info.json")[0] == 403
                     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
                         pending = [executor.submit(request, "/loop/info.json") for _ in range(16)]
                         assert request("/health")[0] == 200

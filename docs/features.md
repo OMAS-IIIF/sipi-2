@@ -153,7 +153,7 @@ References: [source resolution](source-resolution.md), [byte sources](byte-sourc
 Lua `preflight(request)` runs for IIIF image, information and base-URI GET/HEAD
 requests, before request-specific source access and before encoded-cache hits.
 No preflight script is enabled by default; configured source access is then
-unrestricted by Lua. Health, hello and OPTIONS do not execute image preflight.
+unrestricted by Lua. Health and OPTIONS do not execute image preflight.
 
 | Capability | Behavior / boundary |
 | --- | --- |
@@ -287,8 +287,7 @@ Reference: [complete configuration reference](command-line.md),
 
 CORS is browser policy, not authentication. No built-in image-management/admin API,
 Prometheus endpoint, hot reload, streaming image encoder response or distributed
-cache service is provided. Diagnostic hello routes also exist but are not image
-management endpoints. Generic container usage is independent of the optional
+cache service is provided. Generic container usage is independent of the optional
 OLDAP example. References: [HTTP contract](iiif-http.md),
 [server integration](http-server.md), [Docker](docker.md), [native build](building.md).
 

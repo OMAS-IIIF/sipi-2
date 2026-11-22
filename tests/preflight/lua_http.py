@@ -32,6 +32,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             time.sleep(4)
         if self.path == "/target":
             self.server.redirect_hits += 1
+        if self.path == "/reuse":
+            self.server.reuse_connections.add(self.client_address[1])
         if self.path == "/interim":
             self.wfile.write(b"HTTP/1.1 103 Early Hints\r\nX-Interim: ignored\r\n\r\n")
         if self.path == "/trailers":
@@ -90,6 +92,7 @@ def main():
         context.load_cert_chain(cert, key)
         tls.socket = context.wrap_socket(tls.socket, server_side=True)
         http.redirect_hits = tls.redirect_hits = 0
+        http.reuse_connections, tls.reuse_connections = set(), set()
         servers = [http, tls]
         for server in servers:
             threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -97,7 +100,7 @@ def main():
         secure = f"https://localhost:{tls.server_port}"
         checks = 0
 
-        def run(code, parallel=1, top="", success=True):
+        def run(code, parallel=1, top="", success=True, sequential=False):
             nonlocal checks
             script = directory / "test.lua"
             script.write_text(f"local base={json.dumps(base)}\nlocal secure={json.dumps(secure)}\n"
@@ -105,7 +108,8 @@ def main():
                               + top + "\nfunction preflight(request)\n" + code + "\nreturn {decision='allow'}\nend\n")
             env = dict(os.environ, http_proxy="http://127.0.0.1:1", https_proxy="http://127.0.0.1:1",
                        ALL_PROXY="http://127.0.0.1:1", NO_PROXY="")
-            result = subprocess.run([binary, str(script), str(parallel)], env=env,
+            arguments = [binary, str(script), str(parallel)] + (["sequential"] if sequential else [])
+            result = subprocess.run(arguments, env=env,
                                     capture_output=True, text=True, timeout=25)
             assert (result.returncode == 0) == success, result.stderr + result.stdout
             checks += 1
@@ -144,6 +148,19 @@ def main():
                 assert(trailer.trailers['x-trailer'][2]=='two')
             ''')
             assert http.redirect_hits == 0
+            # Later evaluations reuse the keep-alive connections of earlier ones
+            # (HTTP and TLS), but never their headers: each evaluation first sends
+            # a plain request after the previous one ended with an Authorization.
+            run('''
+                local plain = json.decode(assert(http{url=base..'/reuse'}).body)
+                assert(plain.auth == json.null and plain.cookie == json.null)
+                assert(http{url=base..'/reuse', headers={Authorization='Bearer previous-evaluation'}})
+                local secure_plain = json.decode(assert(http{url=secure..'/reuse', ca_file=ca}).body)
+                assert(secure_plain.auth == json.null)
+                assert(http{url=secure..'/reuse', ca_file=ca, headers={Authorization='Bearer previous-evaluation'}})
+            ''', parallel=5, sequential=True)
+            assert len(http.reuse_connections) == 1, http.reuse_connections
+            assert len(tls.reuse_connections) == 1, tls.reuse_connections
             run('''
                 for _,path in ipairs({'/large','/headers','/count'}) do
                     local r,e=http{url=base..path}; assert(r==nil and e.code=='response_limit',e and e.code)

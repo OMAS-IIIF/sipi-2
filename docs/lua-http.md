@@ -124,18 +124,17 @@ such as local permission APIs. Scripts are trusted operator code: they should
 choose approved endpoints instead of accepting arbitrary user-provided URLs.
 This facility is not an SSRF sandbox or a general untrusted-code execution service.
 
-Each evaluation owns one lazily created HTTP session. Its connection cache can be
-reused by up to **four requests** in that evaluation, with a **ten-second aggregate
-deadline measured from the first request**. Individual transfer timeouts are
-clamped to the remaining time. Failed transfers count too; argument validation
+Each evaluation owns one HTTP session, limited to **four requests** with a
+**ten-second aggregate deadline measured from the first request**. Individual
+transfer timeouts are clamped to the remaining time. Failed transfers count too; argument validation
 errors do not. Requests block a worker, never the Drogon I/O thread. libcurl must
 provide asynchronous DNS so DNS resolution can observe the transfer timeout;
 a build without that capability fails explicitly.
 
-Lua states/sessions remain isolated between evaluations and threads. There is no
-cross-request connection pool, token cache, authorization cache or shared cookie
-state. Source/image cache hits still require preflight authorization. Both request
-and response buffers are native C++ storage outside the Lua 16 MiB allocator;
+Lua states remain isolated between evaluations and threads. There is no token
+cache, authorization cache or shared cookie state beyond the explicit
+[value cache](lua-cache.md). Source/image cache hits still require preflight
+authorization. Both request and response buffers are native C++ storage outside the Lua 16 MiB allocator;
 conversion into Lua briefly holds both copies. Native work is bounded separately,
 not by Lua's instruction hook; deadlines do not preempt arbitrary local allocation
 or operator-configured CA-file I/O.
@@ -148,10 +147,26 @@ outside evaluation. HTTP callbacks never call Lua or let C++ exceptions escape.
 Response conversion occurs beneath a protected Lua call and destroys native owners
 before propagating allocation errors.
 
+### Connection reuse
+
+On its first request a session borrows a libcurl handle from a pool owned by the
+policy and returns it when the evaluation ends. A handle keeps its open
+keep-alive connections and TLS sessions, so repeated calls to the same
+authorization service, within one evaluation or across later image requests,
+reuse a connection instead of performing a new TCP and TLS handshake each time.
+At most 32 idle handles (the worker limit) are retained; libcurl closes
+connections that the server has dropped or that have been idle too long.
+
+Only transport state is shared. Every request ends with `curl_easy_reset`, which
+clears all options, headers, bodies and credentials, and libcurl's cookie engine
+is never enabled. libcurl reuses a connection only for the same scheme, host,
+port and TLS settings (including `ca_file`). A handle serves one evaluation at a
+time.
+
 ## Files, tests and next step
 
 - `src/preflight/HttpClient.*`: owning request/response values, per-evaluation
-  session, bounded libcurl transport and header handling.
+  session, shared pool of idle handles, bounded libcurl transport and header handling.
 - `src/preflight/LuaHttp.*`: strict Lua argument/result conversion.
 - `tests/preflight/lua_http.py` and `LuaHttpTests.cpp`: offline loopback HTTP/TLS
   fixtures with a generated short-lived certificate; requires Python and the
@@ -162,8 +177,9 @@ cmake --build --preset conan-debug
 ctest --preset conan-debug -R '^lua-(http|preflight)$' --output-on-failure
 ```
 
-Tests cover methods, JSON/binary bodies, header multiplicity, connection reuse,
-credential isolation, parallel evaluations, redirects, informational responses,
+Tests cover methods, JSON/binary bodies, header multiplicity, connection reuse
+within and across evaluations (HTTP and TLS), credential isolation between
+evaluations sharing a connection, parallel evaluations, redirects, informational responses,
 trailers, truncated responses, limits/deadlines, TLS trust/hostname rejection,
 invalid options, startup prohibition and Lua allocation-failure recovery.
 

@@ -9,9 +9,6 @@ are later steps. No TLS listener or certificates are configured in SIPI-2.
 
 | Request | Result |
 | --- | --- |
-| GET `/hello` or `/hello/` | HTML containing `Hello World` |
-| GET `/hello/id` | HTML containing the reconstructed request URL |
-| GET `/hello/path1/path2/id?a=1&b=2` | Same, including path and query |
 | GET `/health` | JSON: `{"status":"ok","message":"I'm alive","version":"0.1.0"}` |
 | GET `/id/full/max/0/default.jpg` | 200 JPEG for supported tiled or strip-based gray/RGB/RGBA8 TIFF; otherwise explicit error |
 | GET `/project/id/info.json` | 200 JSON: authorized TIFF dimensions and public service identity |
@@ -25,12 +22,14 @@ The version in `/health` comes from `SIPI_VERSION`, defined by CMake; it is not
 hardcoded in the handler. Health is a **liveness** check, not a check of storage,
 codecs, or readiness to process images.
 
-Exact `/health` wins over regex routes. The `/hello(?:/.*)?` regex is registered
-before the IIIF `/.*` catch-all. Thus `/hello/id/full/max/0/default.jpg` remains
-an HTML hello request. `/health/id/info.json` is an IIIF request with prefix
-`health`; only the exact health route is reserved. `/health/` currently produces
-400. Drogon matches registered routes case-insensitively, so `/HEALTH` also works;
-IIIF parameter keywords retain the parser's case-sensitive semantics.
+Exact `/health` wins over the IIIF `/.*` catch-all, which owns every other path.
+`/health/id/info.json` is an IIIF request with prefix `health`; only the exact
+health route is reserved; `/health/` currently produces 400. The former
+diagnostic `/hello` route was removed before 1.0.0:
+`/hello/id/full/max/0/default.jpg` is an ordinary IIIF request with prefix
+`hello` and passes through the configured policy like any other. Drogon matches
+registered routes case-insensitively, so `/HEALTH` also works; IIIF parameter
+keywords retain the parser's case-sensitive semantics.
 
 All current application endpoints accept GET/HEAD plus OPTIONS discovery. A pre-routing advice
 rejects other methods before they can fall through to IIIF or trigger automatic
@@ -58,16 +57,10 @@ There is no temporary success JSON representation of parsed requests. Debug logs
 record the identifier and prefix count, plus rotation/mirroring/upscaling for image
 requests (`--log-level debug`). See [the parser contract](iiif-parser.md).
 
-Static file serving is disabled. URI text in hello responses is HTML-escaped
-before insertion into a text node; JSON responses use Drogon's JSON serializer.
-
-The displayed URL is reconstructed as `http://` + Host (including any supplied
-port) + original encoded path + raw nonempty query. An absent Host falls back to
-the local socket address. URL fragments are not sent by browsers and cannot be
-shown. An empty trailing `?` is not preserved. Host is echoed as untrusted text,
-not used as an authorization decision. Forwarded headers are intentionally not
-used until a trusted-proxy policy exists; behind Caddy this is the backend URL,
-not necessarily the public HTTPS URL.
+Static file serving is disabled. No route returns HTML or echoes request text;
+JSON responses use Drogon's JSON serializer. Forwarded headers are intentionally
+not used until a trusted-proxy policy exists; public identities come from
+`public-base-url`.
 
 ## Code and lifecycle
 
@@ -107,7 +100,7 @@ remain untested and are separate increments.
 
 For both image and info requests, including HEAD: parse syntax, run the configured
 preflight if present, resolve and open one byte source, read TIFF metadata, and validate geometry.
-Format probing and pixel decoding reuse that source (see [byte sources](byte-source.md)). Health/hello and rejected methods
+Format probing and pixel decoding reuse that source (see [byte sources](byte-source.md)). Health and rejected methods
 never enter preflight. Authorization is evaluated on each request, including encoded-result cache hits.
 The Authorization header is copied without validation by the HTTP layer. Drogon
 parses Cookie separately and does not retain its raw header: use request.cookies

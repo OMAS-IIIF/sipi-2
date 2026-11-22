@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
+#include <condition_variable>
 #include <fcntl.h>
 #include <limits>
 #include <map>
@@ -15,6 +16,10 @@
 #include <utility>
 
 namespace sipi::cache {
+#ifdef SIPI_RESULT_CACHE_TEST_HOOKS
+// Defined by the test driver; pauses or fails body I/O without production hooks.
+void before_result_cache_body_write();
+#endif
 namespace {
 namespace fs = std::filesystem;
 constexpr std::uint64_t disk_headroom = 64ULL * 1024 * 1024;
@@ -96,12 +101,13 @@ void sync_file(int fd) {
     do { result = ::fsync(fd); } while (result < 0 && errno == EINTR);
     if (result < 0) throw CacheError("Cache synchronization failed");
 }
-void sync_directory(const fs::path& path) {
-    Descriptor fd{::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY)};
-    if (fd.value < 0) throw CacheError("Cache directory could not be opened");
-    sync_file(fd.value);
-}
-/** Own the temporary pathname even when writing, syncing or closing throws. */
+/** Own the temporary pathname even when writing, syncing or closing throws.
+ *
+ * Publication has two steps so that the slow part runs without the store mutex:
+ * write() copies and fsyncs the body (no shared state touched), publish() only
+ * renames it to its final name. Until publish() succeeds, the destructor
+ * unlinks the temporary file.
+ */
 class TemporaryFile {
 public:
     explicit TemporaryFile(const fs::path& parent) {
@@ -116,7 +122,11 @@ public:
         }
     }
     ~TemporaryFile() { if (!path_.empty()) ::unlink(path_.c_str()); }
-    void publish(std::span<const std::byte> bytes, const fs::path& final) {
+    TemporaryFile(const TemporaryFile&) = delete;
+    TemporaryFile& operator=(const TemporaryFile&) = delete;
+
+    /** Write all bytes, make them durable and close the descriptor. */
+    void write(std::span<const std::byte> bytes) {
         while (!bytes.empty()) {
             const auto count = ::write(descriptor_.value, bytes.data(),
                 std::min(bytes.size(), static_cast<std::size_t>(1048576)));
@@ -124,12 +134,19 @@ public:
             if (count <= 0) throw CacheError("Cache file write failed");
             bytes = bytes.subspan(static_cast<std::size_t>(count));
         }
+        // Body data must be durable before its final name can appear: a name
+        // surviving a crash must never refer to unwritten blocks.
         sync_file(descriptor_.value);
         const auto fd = std::exchange(descriptor_.value, -1);
         if (::close(fd) != 0) throw CacheError("Cache file close failed");
+    }
+    /** Atomically give the written body its final name. Requires write(). */
+    void publish(const fs::path& final) {
+        if (descriptor_.value >= 0) throw std::logic_error("Cache body was not written");
         fs::rename(path_, final);
         path_.clear();
-        sync_directory(final.parent_path());
+        // No directory fsync: if a crash loses the rename, recovery drops the
+        // index row whose body is missing. Losing a fill is an accepted miss.
     }
 private:
     Descriptor descriptor_;
@@ -145,6 +162,10 @@ struct ResultCache::Impl {
     std::mutex mutex;
     std::map<std::string, std::weak_ptr<const ByteSource>> readers;
     std::map<std::string, std::uint64_t> accesses;
+    /** Bodies admitted by put() but not yet indexed, by digest. Their bytes
+     * count against capacity, and a digest in flight is not admitted twice. */
+    std::map<std::string, std::uint64_t> publishing;
+    std::condition_variable published; // Signalled whenever publishing shrinks.
     unsigned hits = 0;
     bool writable = true;
 
@@ -179,7 +200,11 @@ struct ResultCache::Impl {
         } else if (id != application_id || schema != 1) {
             throw CacheError("Unsupported cache database identity or version");
         }
-        execute(db, "PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL;");
+        // WAL with NORMAL synchronization: commits append to the log without an
+        // fsync (checkpoints still sync). A power loss may forget the newest
+        // rows, never corrupt the index; recovery then removes their bodies as
+        // unindexed orphans. This keeps commits cheap while the store mutex is held.
+        execute(db, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;");
         directory(root / "objects");
         recover();
         // Honor a reduced budget on restart, before serving requests.
@@ -309,6 +334,67 @@ struct ResultCache::Impl {
         std::erase_if(readers, [](const auto& pair) { return pair.second.expired(); });
         return CachedResult{std::move(metadata), std::move(source)};
     }
+
+    std::uint64_t reserved() const {
+        std::uint64_t total = 0;
+        for (const auto& [digest, size] : publishing) total += size;
+        return total;
+    }
+
+    enum class Admission { present, declined, admitted };
+    /** First locked phase of put(): decide whether a body may be written and,
+     * if so, reserve its bytes. Eviction happens here, before any slow I/O.
+     * If another put is writing the same identity, wait for its outcome so
+     * that a duplicate still reports "present" instead of writing twice. */
+    Admission admit(std::unique_lock<std::mutex>& guard, const CacheKey& key,
+                    const ResultMetadata& metadata, std::uint64_t size) {
+        const std::string digest(key.digest());
+        published.wait(guard, [&] { return !publishing.contains(digest); });
+        if (!writable) return Admission::declined;
+        if (const auto present = lookup(key, false)) {
+            if (present->metadata != metadata || present->bytes->info().size != size)
+                throw CacheError("Conflicting cache result for the same identity");
+            return Admission::present;
+        }
+        const auto in_flight = reserved();
+        if (size > limits.max_bytes || in_flight > limits.max_bytes - size) return Admission::declined;
+        if (usage() > limits.max_bytes - size - in_flight) {
+            // A single entry larger than the lower target may occupy the cache
+            // alone, provided it still fits the hard maximum.
+            const auto needed = size + in_flight;
+            const auto desired = target() > needed ? target() - needed : 0;
+            if (!evict_to(desired)) return Admission::declined;
+        }
+        const auto available = fs::space(root).available;
+        if (available < disk_headroom || size + in_flight > available - disk_headroom)
+            return Admission::declined;
+        directory(file(digest).parent_path());
+        publishing.emplace(digest, size);
+        return Admission::admitted;
+    }
+    /** Drop a reservation (success or failure) and wake waiting duplicates. */
+    void release(const std::string& digest) {
+        publishing.erase(digest);
+        published.notify_all();
+    }
+
+    /** Final locked phase of put(): name the durable body and index it. */
+    bool index(const CacheKey& key, const ResultMetadata& metadata,
+               std::uint64_t size, TemporaryFile& body) {
+        // A concurrent failure may have left unaccounted files; stay read-only.
+        if (!writable) return false;
+        body.publish(file(key.digest()));
+        // A failure after rename leaves a complete orphan; startup
+        // reconciliation reclaims it.
+        Transaction transaction(database.value);
+        Statement insert(database.value,
+            "INSERT INTO entries(digest,identity,bytes,media,width,height,last_access) VALUES(?,?,?,?,?,?,?)");
+        insert.bind(1, key.digest()); insert.bind(2, key.serialized()); insert.bind(3, size);
+        insert.bind(4, metadata.media_type); insert.bind(5, metadata.width);
+        insert.bind(6, metadata.height); insert.bind(7, now()); insert.row();
+        transaction.commit();
+        return true;
+    }
 };
 
 ResultCache::ResultCache(const fs::path& directory, CacheLimits limits)
@@ -328,41 +414,46 @@ bool ResultCache::put(const CacheKey& key, const ResultMetadata& metadata, std::
     if (bytes.empty() || !metadata.width || !metadata.height ||
         (metadata.media_type != "image/jpeg" && metadata.media_type != "image/png" && metadata.media_type != "image/webp"))
         throw CacheError("Invalid encoded cache result");
-    const std::lock_guard guard(impl_->mutex);
     auto& state = *impl_;
-    if (!state.writable) return false;
+    const std::string digest(key.digest());
+    // Phase 1 (locked): existing entry, capacity, eviction and reservation.
+    {
+        std::unique_lock guard(state.mutex);
+        try {
+            switch (state.admit(guard, key, metadata, bytes.size())) {
+            case Impl::Admission::present: return true;
+            case Impl::Admission::declined: return false;
+            case Impl::Admission::admitted: break;
+            }
+        } catch (...) {
+            state.writable = false;
+            throw;
+        }
+    }
+    // Phases 2 and 3 release the reservation on every exit. Any failure after
+    // admission may leave an unaccounted file, so it also disables writes.
+    bool stored = false;
     try {
-        if (const auto present = state.lookup(key, false)) {
-            if (present->metadata != metadata || present->bytes->info().size != bytes.size())
-                throw CacheError("Conflicting cache result for the same identity");
-            return true;
-        }
-        if (bytes.size() > state.limits.max_bytes) return false;
-        if (state.usage() > state.limits.max_bytes - bytes.size()) {
-            // A single entry larger than the lower target may occupy the cache
-            // alone, provided it still fits the hard maximum.
-            const auto desired = state.target() > bytes.size() ? state.target() - bytes.size() : 0;
-            if (!state.evict_to(desired)) return false;
-        }
-        const auto available = fs::space(state.root).available;
-        if (available < disk_headroom || bytes.size() > available - disk_headroom) return false;
-        const auto final = state.file(key.digest());
-        directory(final.parent_path());
-        TemporaryFile temporary(final.parent_path());
-        temporary.publish(bytes, final);
-        // No transaction is held while writing encoded bytes. A failure after
-        // rename leaves a complete orphan; startup reconciliation reclaims it.
-        Transaction transaction(state.database.value);
-        Statement insert(state.database.value,
-            "INSERT INTO entries(digest,identity,bytes,media,width,height,last_access) VALUES(?,?,?,?,?,?,?)");
-        insert.bind(1, key.digest()); insert.bind(2, key.serialized()); insert.bind(3, bytes.size());
-        insert.bind(4, metadata.media_type); insert.bind(5, metadata.width);
-        insert.bind(6, metadata.height); insert.bind(7, now()); insert.row();
-        transaction.commit();
-        return true;
+        // Phase 2 (unlocked): the slow write and fsync. Lookups, hits and other
+        // admissions proceed meanwhile; the reservation keeps accounting exact.
+        TemporaryFile body(state.file(digest).parent_path());
+#ifdef SIPI_RESULT_CACHE_TEST_HOOKS
+        before_result_cache_body_write();
+#endif
+        body.write(bytes);
+        // Phase 3 (locked): rename and index. WAL/NORMAL avoids per-commit
+        // syncs, but automatic checkpoints can still sync under this lock.
+        // The row and the reservation change together, so a woken duplicate
+        // sees either the in-flight write or the finished entry.
+        const std::lock_guard guard(state.mutex);
+        stored = state.index(key, metadata, bytes.size(), body);
+        state.release(digest);
     } catch (...) {
+        const std::lock_guard guard(state.mutex);
         state.writable = false;
+        state.release(digest);
         throw;
     }
+    return stored;
 }
 } // namespace sipi::cache

@@ -102,7 +102,7 @@ some bare resource names. Base-URI handling therefore needs an explicit routing 
 resource-resolution policy instead of silently treating failed image parsing as a
 successful base request.
 
-HTTP routing reserves `/health` and `/hello` before handing other paths to IIIF.
+HTTP routing reserves only `/health` before handing other paths to IIIF.
 Future application endpoints such as `/upload` must also take precedence. This parser itself has no routing or
 HTTP-method responsibilities.
 

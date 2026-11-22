@@ -314,7 +314,8 @@ std::string_view error_name(ErrorCode code) noexcept {
 }
 
 LuaPreflight::LuaPreflight(const std::filesystem::path& script_path, ScriptConfig config)
-    : chunk_name_("@" + script_path.string()), config_(std::move(config)), cache_(std::make_shared<SharedCache>()) {
+    : chunk_name_("@" + script_path.string()), config_(std::move(config)),
+      cache_(std::make_shared<SharedCache>()), http_pool_(std::make_shared<HttpHandlePool>()) {
     validate_script_config(config_);
     std::ifstream input(script_path, std::ios::binary);
     if (!input) throw PreflightError(ErrorCode::script_file, "cannot open preflight script");
@@ -370,7 +371,8 @@ struct Runtime {
     HttpSession http; // Must outlive Lua-state finalizers.
     CacheSession cache; // Also outlives Lua finalizers.
     LuaState state{lua_newstate(allocate, &budget), &lua_close};
-    explicit Runtime(SharedCache& shared) : cache{shared, false, false, 0, {}} {
+    Runtime(SharedCache& shared, HttpHandlePool& connections)
+        : http{connections}, cache{shared, false, false, 0, {}} {
         if (!state) throw PreflightError(ErrorCode::memory, "cannot create Lua state");
         *static_cast<Budget**>(lua_getextraspace(state.get())) = &budget;
         lua_sethook(state.get(), instruction_limit, LUA_MASKCOUNT, 1000);
@@ -475,12 +477,12 @@ void execute(Runtime& runtime, const std::string& script, const std::string& chu
 } // namespace
 
 void LuaPreflight::validate() const {
-    Runtime runtime(*cache_);
+    Runtime runtime(*cache_, *http_pool_);
     execute(runtime, script_, chunk_name_, nullptr, config_);
 }
 
 Decision LuaPreflight::evaluate(const Request& request) const {
-    Runtime runtime(*cache_);
+    Runtime runtime(*cache_, *http_pool_);
     execute(runtime, script_, chunk_name_, &request, config_);
     auto& state = runtime.state;
     if (is_string(state.get(), 1, "deny")) return Deny{};

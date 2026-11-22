@@ -12,7 +12,7 @@ that resource's info.json. Missing/denied/unsupported sources retain their error
 The public base URL comes only from configuration; encoded prefix segments and
 identifier are retained. Source paths never become public service identifiers.
 
-Exact health and hello routes take precedence. The strict core parser still
+The exact health route takes precedence. The strict core parser still
 accepts image/info requests only; HttpProtocol classifies base URIs separately.
 With arbitrary prefixes, base and malformed image paths can overlap. Valid
 image/info syntax wins. A path with at least five segments is reserved as an

@@ -10,7 +10,7 @@
 
 namespace sipi::cache {
 
-/** Encoded file budget, including the one possible in-progress file. Database,
+/** Encoded file budget, including bodies still being written. Database,
  * journal and filesystem overhead are additional; leave free disk headroom.
  * Oversized entries and admissions blocked by active readers are declined. */
 struct CacheLimits {
@@ -44,11 +44,15 @@ struct CachedResult {
  * never the image repository, shared network storage or an untrusted directory.
  *
  * Constructor reconciles abandoned files/missing rows before admitting work.
- * put accepts only a COMPLETE successful encoding, writes a temporary file,
- * synchronizes/closes/renames it, then commits the ready SQLite row. The caller
- * owns encoding and authorization; this class does not interpret image contents.
- * All methods serialize index/file mutations with one mutex; returned file reads
- * run independently. No decoding/encoding runs under this mutex.
+ * put accepts only a COMPLETE successful encoding. It admits and reserves the
+ * body under the store mutex, writes and fsyncs a temporary file WITHOUT holding
+ * the mutex, then renames it and commits the ready SQLite row under the mutex
+ * again. Body writes/fsync do not hold up get(); admission, eviction and index
+ * operations (including automatic WAL checkpoints) still serialize callers.
+ * Concurrent puts of one identity wait for publication and return true when
+ * the matching entry is present.
+ * The caller owns encoding and authorization; this class does not interpret
+ * image contents. Returned file reads run independently of the mutex.
  *
  * Cache misses return nullopt. Capacity/headroom rejections return false. I/O,
  * database and collision failures throw CacheError (filesystem/allocation errors

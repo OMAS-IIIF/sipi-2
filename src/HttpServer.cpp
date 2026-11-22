@@ -155,51 +155,6 @@ void iiif_request(const drogon::HttpRequestPtr& request,
     return;
 }
 
-/** Escape untrusted request text for an HTML text node, not a URL or script. */
-std::string escape_html(std::string_view text) {
-    std::string escaped;
-    escaped.reserve(text.size());
-    for (const char character : text) {
-        switch (character) {
-        case '&': escaped += "&amp;"; break;
-        case '<': escaped += "&lt;"; break;
-        case '>': escaped += "&gt;"; break;
-        case '"': escaped += "&quot;"; break;
-        case '\'': escaped += "&#39;"; break;
-        default: escaped += character;
-        }
-    }
-    return escaped;
-}
-
-/**
- * Return a small HTML response immediately. Drogon retains shared ownership of
- * the response for asynchronous transmission after the callback returns.
- * Reconstruct the backend URL from Host, original encoded path, and raw query;
- * proxy headers are intentionally not trusted without a proxy trust policy.
- */
-void hello(const drogon::HttpRequestPtr& request,
-           std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
-    std::string message = "Hello World";
-    if (request->path() != "/hello" && request->path() != "/hello/") {
-        auto host = request->getHeader("host");
-        if (host.empty()) {
-            host = request->getLocalAddr().toIpPort();
-        }
-        std::string url = "http://" + host + request->getOriginalPath();
-        if (!request->query().empty()) {
-            url += "?" + request->query();
-        }
-        message = "You called me with the URL " + escape_html(url);
-    }
-    auto response = drogon::HttpResponse::newHttpResponse();
-    response->setContentTypeCode(drogon::CT_TEXT_HTML);
-    response->setBody("<!doctype html><html lang=\"en\"><head>"
-                      "<meta charset=\"utf-8\"><title>SIPI-2</title>"
-                      "</head><body><p>" + message + "</p></body></html>");
-    callback(response);
-}
-
 } // namespace
 
 void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPreflight> policy,
@@ -237,9 +192,9 @@ void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPre
         }
     });
     app.registerPreRoutingAdvice(&read_only_methods);
+    // The exact /health route wins over the IIIF catch-all, which owns every
+    // other path. Register future application routes (e.g. /upload) before it.
     app.registerHandler("/health", &health, {drogon::Get});
-    // Exact routes win; regex routes are tried in registration order.
-    app.registerHandlerViaRegex("/hello(?:/.*)?", &hello, {drogon::Get});
     app.registerHandlerViaRegex("/.*", [worker](const drogon::HttpRequestPtr& request,
         std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
         iiif_request(request, std::move(callback), worker);

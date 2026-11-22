@@ -36,11 +36,12 @@ directories. See [configuration](command-line.md) for ranges and validation.
 <cache-dir>/
     cache.lock
     cache.sqlite3
-    cache.sqlite3-journal       # transient SQLite rollback journal
+    cache.sqlite3-wal           # SQLite write-ahead log (while open)
+    cache.sqlite3-shm           # SQLite WAL index (while open)
     objects/
         ab/
             ab…<64 hex characters total>….bin
-            .tmp-XXXXXX        # exists only during publication
+            .tmp-XXXXXX        # exists only while a body is written
 ```
 
 The filename is derived from the digest, with its first two characters as the
@@ -89,25 +90,41 @@ entries against eviction, so reclaimed bytes actually leave the filesystem.
 Finish deliveries before destroying/reopening the owner for predictable budget
 accounting; a handle still survives an unlink through POSIX file semantics.
 
-One mutex serializes store operations, including the single possible temporary
-write. Returned file reads run independently. Encoding remains outside the store
-and outside SQLite transactions. Two puts of the same key preserve the first
-published result; incompatible metadata/length or unequal serialized identity
-under the same digest raises `CacheError`, never overwrites it. Equal identity,
-metadata and length assume deterministic rendering; bodies are not compared.
-This prevents duplicate stored entries but does not coalesce image generation.
+One mutex protects the index and the in-memory bookkeeping, but it is **not**
+held while a body is written: lookups, hits and other admissions proceed while
+`put` copies and synchronizes a file. Returned file reads run independently.
+Encoding remains outside the store and outside SQLite transactions. Two puts of
+the same key preserve the first published result; a second put that arrives
+while the first is still writing waits for it and then reports the existing
+entry. Incompatible metadata/length or unequal serialized identity under the
+same digest raises `CacheError`, never overwrites it. Equal identity, metadata
+and length assume deterministic rendering; bodies are not compared. This
+prevents duplicate stored entries but does not coalesce image generation.
 
 ## Publication and recovery
 
-1. Check the full identity on an existing entry; reject digest collisions.
-2. Admit against capacity, pinned entries and free-space headroom.
-3. Write a uniquely created temporary file in the final shard directory.
-4. Synchronize file data, close successfully, rename atomically, sync the directory.
-5. Commit the complete ready entry to SQLite in a short transaction.
+Steps marked *locked* hold the store mutex; the slow file write does not.
 
-SQLite uses DELETE journaling and FULL synchronization. The image filesystem and
-SQLite remain two separate resources: a crash between rename and commit can leave
-an orphan. Before accepting calls, constructor recovery removes abandoned `.tmp-*`
+1. *Locked:* wait if the same identity is being written; check the full identity
+   on an existing entry; reject digest collisions.
+2. *Locked:* admit against capacity (including bodies other puts are still
+   writing), pinned entries and free-space headroom; reserve the body's bytes.
+3. *Unlocked:* write a uniquely created temporary file in the final shard
+   directory, synchronize its data and close it successfully.
+4. *Locked:* rename it atomically and commit the complete ready entry to SQLite
+   in a short transaction; release the reservation.
+
+SQLite uses WAL journaling with NORMAL synchronization, so a commit appends to
+the log without a per-commit fsync. Automatic checkpoints run on the committing
+thread and still synchronize under the store mutex. Admission also retains
+filesystem space checks, directory creation and eviction under that mutex. This
+change removes body-write contention, not all possible lookup latency spikes.
+A power loss may forget
+the newest committed rows but cannot corrupt the index. The image filesystem and
+SQLite remain two separate resources: a crash between rename and commit, or a
+lost row, leaves an orphan body; a lost rename (the directory is not
+synchronized) leaves a row without a body. Body data is always synchronized
+before the rename, so a surviving name never refers to unwritten blocks. Before accepting calls, constructor recovery removes abandoned `.tmp-*`
 files and unindexed hash-named bodies, and drops rows with missing/nonregular or
 wrong-sized bodies. It only traverses the reserved hash namespace and never follows
 shard symlinks. Unrelated filenames are preserved. After publication failure,
@@ -129,7 +146,7 @@ exit after committed publication are covered by tests.
 
 ## Capacity and approximate LRU
 
-The maximum counts ready encoded bodies plus the one possible in-progress body.
+The maximum counts ready encoded bodies plus all bodies still being written.
 Before a write would exceed it, evict oldest entries until existing bytes plus the
 incoming body fit the lower target. Pinned entries are skipped; if the target
 cannot be reached, decline admission. Earlier evictions can still have occurred.
@@ -143,7 +160,7 @@ A crash may lose recent touches; this affects eviction ordering, not correctness
 Wall-clock timestamps make this approximate LRU, including during clock changes.
 There is no background timer or maintenance thread.
 
-Database, rollback journal, directory blocks and allocation-unit overhead are
+Database, write-ahead log, directory blocks and allocation-unit overhead are
 **additional** to the encoded-byte maximum. Admission checks available filesystem
 space for the incoming body plus 64 MiB headroom. This is not a disk quota or an
 exclusive reservation against other processes; database growth and concurrent
@@ -165,7 +182,9 @@ retain their normal HTTP error responses.
 The CTest `result-cache` suite verifies binary/metadata round trips, source-version
 misses, duplicate publication, locking, restart, abrupt process exit, incomplete
 publication recovery, injected index errors, collision checks, unsupported schema,
-LRU/hysteresis, pinned reads, capacity changes and concurrent callers.
+LRU/hysteresis, pinned reads, capacity changes and concurrent callers. It also
+checks that concurrent writes respect the byte maximum, that the index uses WAL,
+and deterministically holds a writer at its body-I/O boundary while a hit completes.
 `startup-configuration` checks all config layers and validation; `cache-startup`
 launches the real server to verify environment wiring, relative paths, restart,
 help without I/O and graceful unavailable-cache fallback.

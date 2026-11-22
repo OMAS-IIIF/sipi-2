@@ -10,13 +10,14 @@ Supported pixel/layout subsets matter: consult the [feature catalog](docs/featur
 not a container extension alone. No upload/import API, original-download API,
 streaming encoder response or application login service is implemented.
 
-CMake defines version **1.0.0**, the agreed first stable release, with planned Git
-tag `v1.0.0` and image `lrosenth/sipi-2:1.0.0`. These artifacts are not yet
-published; the existing 0.1.3 image is historical. The remote is `OMAS-IIIF/sipi-2`.
-The [release notes](CHANGELOG.md) define the 1.x compatibility scope. Matching
-version strings are not proof of source/image identity. Release preparation is active; no new release or visibility
-change is implied. The [readiness review](docs/release-readiness.md) lists remaining
-gates; the [release work record](docs/public-release-plan.md) preserves evidence.
+CMake defines version **1.0.1**, the cleanup patch following the prepared 1.0.0
+baseline. The owner authorized committing/pushing the cleanup and publishing
+`lrosenth/sipi-2:1.0.1` and `latest` through the verified multi-platform Docker
+workflow. The remote is `OMAS-IIIF/sipi-2`. Publication outcome and immutable
+digests are recorded under `build/releases/`; authorization is not evidence of
+successful publication. No Git tag is created by that workflow. The
+[release notes](CHANGELOG.md) define the 1.x compatibility scope; broader release
+gates remain in [readiness](docs/release-readiness.md).
 
 The established delivery feature freeze remains the default: prioritize correctness,
 security, documentation and release verification. New formats, upload, streaming
@@ -57,6 +58,8 @@ Public origin/proxy mount come from `public-base-url`, not forwarded headers.
 
 Lua 5.4 uses a fresh state for initialization/every evaluation. Only explicit
 `sipi.cache` values are shared between evaluations; globals are not persistent.
+A policy-owned pool retains up to 32 idle libcurl handles for HTTP/TLS reuse;
+request options and credentials are reset, and cookies remain disabled.
 Limits and restricted libraries do not make operator scripts an untrusted-code
 sandbox. HTTP/cache helpers are request-only; JSON/JWT and configuration have their
 own contracts. Native Lua callback boundaries must respect longjmp and C++ lifetimes.
@@ -70,6 +73,9 @@ whole-process memory quota is promised. See [worker ownership](docs/worker-pool.
 All decoding for one request uses a consistent opened source/version. Local inputs
 must not be overwritten in place while read; S3 uses version/conditional reads
 and bounded range reuse. Metadata/pixel work stays outside cache locks where possible.
+Result-cache fills reserve capacity under the mutex, write/fsync bodies outside
+it, then rename and index under it. SQLite uses WAL/NORMAL; checkpoints and
+admission/eviction can still delay lookups. Recovery permits lost recent fills.
 One process owns each persistent cache directory; encoded bodies and SQLite are
 regenerable and separate from original media. Cache failures permit uncached delivery;
 source or policy failures do not. Key identity includes source version, effective

@@ -57,7 +57,7 @@ sources** instead use `iiif-root`. For container paths and mounted policies, see
    applies the policy. Only then may an authorized request reuse an encoded result.
 5. SIPI returns the image, information document, or base-URI redirect.
 
-Health/hello and CORS OPTIONS do not invoke this policy. All IIIF request kinds
+Health and CORS OPTIONS do not invoke this policy. All IIIF request kinds
 need authorization: allowing `info` or `base` also exposes resource information.
 A cache hit does not replace the next request's policy check. Policy-dependent
 responses use `Cache-Control: no-store`.

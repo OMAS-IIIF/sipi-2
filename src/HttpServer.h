@@ -7,7 +7,7 @@
 namespace sipi {
 
 /**
- * Serve health JSON, hello HTML, and an IIIF metadata/geometry catch-all on loopback HTTP.
+ * Serve health JSON and an IIIF catch-all for every other path on loopback HTTP.
  * GET/HEAD are accepted; other methods receive 405. Invalid IIIF paths receive
  * 400. Optional preflight runs off the I/O thread: deny=403, failure=500,
  * missing source=404; invalid geometry=400. Supported TIFF/JPEG 2000 crops return JPEG/PNG;

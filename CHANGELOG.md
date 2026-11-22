@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.1 — 2026-11-22
+
+- Removed the diagnostic `/hello` route. It echoed the request URL and Host
+  header as HTML and is not part of the image service. `/hello/...` paths are
+  now ordinary IIIF requests and are subject to the configured policy.
+- The persistent result cache no longer holds its mutex while writing and
+  synchronizing a body. Admission, eviction and SQLite operations still hold
+  the mutex, including occasional automatic WAL checkpoints.
+  Its SQLite index now uses WAL with NORMAL synchronization; existing cache
+  directories are converted automatically on open.
+- Lua `sipi.http.request` reuses keep-alive HTTP/TLS connections across
+  preflight evaluations through a bounded pool of idle libcurl handles. Only
+  transport state is shared; headers, bodies and credentials are not.
+
 ## 1.0.0 — Unreleased
 
 First stable SIPI-2 release, prepared for public use. Planned Git tag: `v1.0.0`;
