@@ -19,6 +19,16 @@ import tempfile
 import time
 
 
+class CapturedLog(list):
+    """Retain final output as before and permit offset-independent live reads."""
+    def __init__(self, output):
+        super().__init__()
+        self.output = output
+
+    def snapshot(self):
+        return os.pread(self.output.fileno(), os.fstat(self.output.fileno()).st_size, 0).decode()
+
+
 @contextlib.contextmanager
 def server(executable, root, extra=(), cache="cache", variables=None):
     """Own one listener; retain its log for hit/miss assertions after shutdown."""
@@ -27,8 +37,8 @@ def server(executable, root, extra=(), cache="cache", variables=None):
         port = sock.getsockname()[1]
     env = {k: v for k, v in os.environ.items() if not k.startswith("SIPI_")}
     env.update(variables or {})
-    log = []
     with tempfile.TemporaryFile(mode="w+") as output:
+        log = CapturedLog(output)
         args = [str(executable), "--port", str(port), "--iiif-root", "images",
                 "--preflight-script", "policy.lua", "--log-level", "debug", *extra]
         if cache is not None:
@@ -188,8 +198,14 @@ def main():
         with server(executable, root, cache="fault") as (port, fault_log):
             change_index(root,"CREATE TRIGGER fail_insert BEFORE INSERT ON entries BEGIN SELECT RAISE(FAIL,'test'); END",cache="fault")
             assert success(get(port,path)) == original
+            # Writes are now disabled: a later miss is declined, not reported again.
+            assert success(get(port, "/tiled.tif/full/max/0/default.png"))
             assert rows(root,"fault") == []
-        assert "publication failed" in fault_log[0]
+        # One explicit error with the cause and the operational consequence.
+        assert fault_log[0].count("IIIF result cache publication failed") == 1, fault_log[0]
+        assert "[error] IIIF result cache publication failed (Cache database statement failed: " in fault_log[0]
+        assert "writes stay disabled until restart" in fault_log[0]
+        assert "IIIF result cache admission declined" in fault_log[0]
         change_index(root,"DROP TRIGGER fail_insert",cache="fault")
         with server(executable, root, cache="fault") as (port, fault_log):
             assert success(get(port,path)) == original

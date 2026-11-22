@@ -22,9 +22,11 @@ max-width = 8192
 # max-height = 8192
 max-area = 8388608
 
-# JPEG settings (server-wide); no equivalent WebP quality option.
+# JPEG settings (server-wide).
 # jpeg-quality = 90                  # Integer 1..100.
 # jpeg-sampling = "4:4:4"            # Or "4:2:0"; ignored for grayscale JPEG.
+# WebP quality (server-wide), integer 1..100; compression effort for lossless output.
+# webp-quality = 85
 
 # Bitonal output: threshold or floyd-steinberg (per-request diffusion; tile patterns may differ).
 bitonal-method = "threshold"
@@ -89,6 +91,8 @@ bitonal-method = "threshold"
 # Optional override: 1..32 processing workers. If omitted, detected CPUs capped at 4.
 # More workers multiply per-request memory; this is not an RSS budget.
 # iiif-workers = 4
+# Waiting requests beyond the active workers, 1..1024; more answer 503 iiif_busy.
+# iiif-queue-limit = 64
 
 # Public CORS by default. Cookie-based cross-origin viewers require explicit origins.
 cors-origins = "*"

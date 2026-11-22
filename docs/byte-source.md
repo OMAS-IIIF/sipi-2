@@ -68,8 +68,10 @@ no C++ exception crosses the C boundary. Existing TIFF memory limits remain.
 
 After preflight and path resolution, `IiifWorker` opens one `LocalFileSource` and
 uses it for the magic probe, metadata/geometry planning and pixel decoding.
-Missing sources at open produce 404; other storage failures produce 500
-`source_error`. Codec errors retain their separate mapping. Public responses
+Missing sources at open produce 404. A source that changes while it is read
+(`ByteSourceErrorCode::changed`: shrunk local file, new S3 version) produces 503
+`source_changed` with `Retry-After: 1`, because a new request opens the new
+version. Other storage failures produce 500 `source_error`. Codec errors retain their separate mapping. Public responses
 expose neither paths nor source identities. JPEG delivery is otherwise unchanged.
 
 ## Verification and next step

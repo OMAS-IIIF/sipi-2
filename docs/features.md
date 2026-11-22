@@ -62,7 +62,7 @@ References: [TIFF planning](tiff-metadata-and-geometry.md),
 | --- | --- | --- |
 | `.jpg` | JPEG gray or RGB; ICC retained or assigned according to the color contract | Alpha composited on white. Server-wide quality 1–100, default 90; sampling 4:4:4 (default) or 4:2:0; gray ignores chroma sampling |
 | `.png` | Lossless encoding of processed samples; gray/gray-alpha/RGB/RGBA; bitonal encoded as packed 1-bit gray | Alpha retained except after bitonal compositing; ICC or explicit sRGB declarations preserved as appropriate |
-| `.webp` | Color default/color output is lossy, quality 85; native gray, gray and bitonal output use lossless encoding | Alpha retained and encoded losslessly. Fixed encoder settings; no CLI quality/sampling option for WebP. Gray is converted to an RGB representation appropriate for WebP |
+| `.webp` | Color default/color output is lossy; native gray, gray and bitonal output use lossless encoding | Alpha retained and encoded losslessly. Server-wide quality 1–100, default 85 (compression effort for lossless output). Gray is converted to an RGB representation appropriate for WebP |
 
 Lossless output encoding does not undo losses introduced by source compression,
 resizing, conversion or thresholding. JPEG bitonal output can contain values other
@@ -235,8 +235,9 @@ to uncached delivery. Cache hits do not bypass policy or required-mask validatio
 
 A bounded worker pool handles policy, storage and rendering separately from HTTP I/O.
 Default workers are detected logical CPUs clamped to 1–4; configurable range is
-1–32. The queue allows 64 waiting jobs; overload returns HTTP 503 with
-`Retry-After: 1`. Capacity is not automatically scaled to container memory. Shutdown
+1–32. The queue allows 64 waiting jobs by default (configurable 1–1024); overload
+returns HTTP 503 with `Retry-After: 1`. Queued work of clients that already
+disconnected is skipped. Capacity is not automatically scaled to container memory. Shutdown
 rejects new work, discards queued jobs and joins active workers.
 References: [result cache](persistent-cache.md), [cache keys](cache-key.md),
 [metadata](metadata-cache.md), [mask cache](watermarks.md#decoded-mask-memory-cache),

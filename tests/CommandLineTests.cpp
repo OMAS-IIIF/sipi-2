@@ -47,6 +47,9 @@ struct Case {
     std::string listen_address = "127.0.0.1";
     sipi::JpegEnvironment jpeg_environment;
     sipi::JpegOptions jpeg;
+    sipi::DeliveryEnvironment delivery_environment = {};
+    std::size_t queue_limit = sipi::http::default_queue_limit;
+    int webp_quality = sipi::default_webp_quality;
 };
 
 /** Check either a complete typed result or a nonempty diagnostic. */
@@ -69,7 +72,7 @@ bool check(const Case& test) {
     std::optional<std::string_view> url_environment;
     if (test.url_environment) url_environment = *test.url_environment;
     const auto result = sipi::load_startup_options(arguments, environment, port_environment,
-        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment, test.workers_environment, test.bitonal_environment, test.output_environment, test.cors_environment, {}, test.listen_environment, test.jpeg_environment);
+        upscale_environment, preflight_environment, root_environment, url_environment, {}, {}, test.cache_environment, test.workers_environment, test.bitonal_environment, test.output_environment, test.cors_environment, {}, test.listen_environment, test.jpeg_environment, test.delivery_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&result)) {
         if (test.error && !error->message.empty()) {
             return true;
@@ -82,6 +85,8 @@ bool check(const Case& test) {
                          options.config.listen_address == test.listen_address &&
                          options.config.jpeg.quality == test.jpeg.quality &&
                          options.config.jpeg.sampling == test.jpeg.sampling &&
+                         options.config.iiif_queue_limit == test.queue_limit &&
+                         options.config.webp_quality == test.webp_quality &&
                          options.config.cors_origins == test.cors_origins &&
                          options.config.cors_credentials == test.cors_credentials &&
                          options.config.output_limits.max_width == test.output_limits.max_width &&
@@ -580,6 +585,35 @@ int main(int argc, char* argv[]) {
     jpeg_case({"--help","--jpeg-sampling=bad"}, {}, {}, true);
     for (const auto command : {Command::help, Command::version}) {
         jpeg_case({command == Command::help ? "--help" : "--version"}, {"bad", "bad"}, {});
+        cases.back().command = command;
+    }
+    // Queue limit and WebP quality: same precedence, ranges and duplicate rules.
+    const auto delivery_case = [&](std::vector<std::string> args, sipi::DeliveryEnvironment env,
+                                   std::size_t queue, int webp, bool error=false) {
+        Case test{"Delivery configuration", std::move(args)};
+        test.delivery_environment = env; test.queue_limit = queue; test.webp_quality = webp;
+        test.error = error; cases.push_back(std::move(test));
+    };
+    delivery_case({}, {}, 64, 85);
+    delivery_case({"--config",file("delivery.toml")}, {}, 16, 70);
+    delivery_case({"--config",file("delivery.toml")}, {"8", "60"}, 8, 60);
+    delivery_case({"--config",file("delivery.toml"),"--iiif-queue-limit=1024","--webp-quality=1"},
+                  {"bad", "bad"}, 1024, 1);
+    delivery_case({"--webp-quality=100"}, {"1", {}}, 1, 100);
+    for (const char* bad : {"", "0", "1025", "-1", "+8", "8.5", "many"}) {
+        delivery_case({"--iiif-queue-limit",bad}, {}, 0, 0, true);
+        delivery_case({}, {bad, {}}, 0, 0, true);
+    }
+    for (const char* bad : {"", "0", "101", "-1", "+85", "85.5", "best"}) {
+        delivery_case({"--webp-quality",bad}, {}, 0, 0, true);
+        delivery_case({}, {{}, bad}, 0, 0, true);
+    }
+    delivery_case({"--config",file("invalid-delivery.toml")}, {}, 0, 0, true);
+    delivery_case({"--iiif-queue-limit=8","--iiif-queue-limit=9"}, {}, 0, 0, true);
+    delivery_case({"--webp-quality=80","--webp-quality=90"}, {}, 0, 0, true);
+    delivery_case({"--help","--webp-quality=0"}, {}, 0, 0, true);
+    for (const auto command : {Command::help, Command::version}) {
+        delivery_case({command == Command::help ? "--help" : "--version"}, {"bad", "bad"}, 64, 85);
         cases.back().command = command;
     }
     int failures = 0;

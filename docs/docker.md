@@ -272,9 +272,23 @@ see the [operations guide](operations.md).
 
 For a `docker run` example, inspect `docker logs sipi-2-config-demo`. For Compose,
 use the `logs` command above. `/health` reports liveness/version; it is not a
-repository/backend readiness check. The image does not define a Docker HEALTHCHECK
-and does not bundle `curl` for in-container probes; run the shown probes from the
-host or your monitoring system.
+repository/backend readiness check. The image does not bundle `curl`; run
+readiness probes (an authorized `info.json` or image) from the host or your
+monitoring system.
+
+### Health check
+
+The image defines a Docker `HEALTHCHECK` that runs `/opt/sipi/healthcheck.sh`
+every 30 s (timeout 5 s, start period 10 s, 3 retries). The script sends
+`GET /health` to `127.0.0.1` inside the container using bash's `/dev/tcp`, so no
+additional packages are needed. `docker ps` shows `healthy` or `unhealthy`;
+Compose can use it with `depends_on: condition: service_healthy`.
+
+The probe uses `SIPI_PORT` (default 8080), the same variable the server reads.
+If you change the port only with `--port` or in a TOML file, also set `SIPI_PORT`
+or override the check (`--health-cmd`, `--no-healthcheck`, or `healthcheck:` in
+Compose). Liveness means the HTTP loop answers; it does not test storage, codecs,
+the Lua policy backend, or whether the image worker queue is full.
 
 | Symptom | Check |
 | --- | --- |

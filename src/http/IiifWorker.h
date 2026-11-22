@@ -4,6 +4,7 @@
 #include "http/WorkerLimits.h"
 #include "image/Bitonal.h"
 #include "imgformats/JpegOptions.h"
+#include "imgformats/WebpWriter.h"
 #include "cache/ResultCache.h"
 #include "cache/MetadataCache.h"
 #include "cache/MaskCache.h"
@@ -45,6 +46,10 @@ public:
         preflight::RequestMethod method = preflight::RequestMethod::get;
         // Validated raw query, used only to preserve credentials on the base redirect.
         std::string redirect_query{};
+        /** Optional liveness probe of the client connection, called on a worker
+         * thread; the probe must be thread-safe. False skips policy evaluation and rendering for a client that
+         * has already gone away; absent means "assume connected". */
+        std::function<bool()> client_connected{};
     };
     /** Take ownership of policy/source settings and start the pool.
      * public_base_url must be validated configuration without a trailing slash;
@@ -57,7 +62,9 @@ public:
      * size_policy is bounded by the buffered renderer's public defaults/ceilings;
      * the same policy is advertised and enforced, with source admission on full/max.
      * jpeg_options are validated and shared immutably by cache lookup and encoding.
-     * worker_count must be 1..32. Construction joins started threads if startup fails. */
+     * worker_count must be 1..32 and queue_limit 1..1024 (waiting requests beyond
+     * the active ones). webp_quality is 1..100 and, like jpeg_options, is part of
+     * the cache identity. Construction joins started threads if startup fails. */
     IiifWorker(std::optional<preflight::LuaPreflight> policy, SourceResolver sources,
                iiif::SizePolicy size_policy, std::string public_base_url,
                std::optional<S3Client> s3_client = std::nullopt,
@@ -67,12 +74,14 @@ public:
                BitonalMethod bitonal_method = BitonalMethod::threshold,
                cache::MaskCacheLimits mask_limits = {},
                cache::VariantCacheLimits variant_limits = {},
-               JpegOptions jpeg_options = {});
+               JpegOptions jpeg_options = {},
+               std::size_t queue_limit = default_queue_limit,
+               int webp_quality = default_webp_quality);
     ~IiifWorker();
     IiifWorker(const IiifWorker&) = delete;
     IiifWorker& operator=(const IiifWorker&) = delete;
 
-    /** Queue at most 64 waiting requests; false means full or shutting down.
+    /** Queue at most queue_limit waiting requests; false means full or shutting down.
      * Callback is copied only on acceptance and must retain required HTTP state. */
     bool submit(Request request, const Callback& callback);
     /** Called by the owning thread, never from a completion; repeated calls are safe. */
@@ -89,8 +98,11 @@ private:
     iiif::SizePolicy size_policy_;
     std::string public_base_url_;
     const JpegOptions jpeg_options_; // Same immutable settings for cache and encoder.
+    const int webp_quality_; // Likewise shared by cache identity and encoder.
+    const std::size_t queue_limit_;
     BitonalMethod bitonal_method_; // Immutable rendering policy shared by workers.
     std::shared_ptr<cache::ResultCache> result_cache_;
+    std::once_flag cache_write_error_; // Concurrent in-flight failures log only once.
     cache::MetadataCache metadata_cache_; // Protected by metadata_mutex_; no I/O under this lock.
     std::mutex metadata_mutex_;
     cache::MaskCache mask_cache_; // Protected by mask_mutex_; decoding stays outside the lock.

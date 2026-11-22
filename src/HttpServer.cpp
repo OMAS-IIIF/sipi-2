@@ -1,4 +1,7 @@
 #include "HttpServer.h"
+#include <atomic>
+#include <trantor/net/EventLoop.h>
+#include <trantor/net/TcpConnection.h>
 #include <algorithm>
 #include "http/IiifWorker.h"
 #include "http/HttpProtocol.h"
@@ -86,6 +89,33 @@ std::string_view component_name(iiif::Component component) {
     return "unknown";
 }
 
+/** Observe liveness only on the connection's I/O loop. Drogon 1.9.13 does not
+ * forward lifecycle callbacks on macOS, so use a bounded-frequency observation
+ * while a worker request owns the token. Weak captures stop the timer chain
+ * after completion and never retain the connection. A delayed observation may
+ * allow unnecessary work, but workers never read Trantor's non-atomic status.
+ */
+void observe_connection(std::weak_ptr<trantor::TcpConnection> connection,
+                        std::weak_ptr<std::atomic<bool>> state) {
+    const auto token = state.lock();
+    if (!token) return;
+    const auto live = connection.lock();
+    if (!live || !live->connected()) {
+        token->store(false, std::memory_order_relaxed);
+        if (live) spdlog::debug("IIIF connection closed: peer_port={}", live->peerAddr().toPort());
+        return;
+    }
+    live->getLoop()->runAfter(0.05, [connection, state] { observe_connection(connection, state); });
+}
+
+/** Start observation from the HTTP route (the connection's I/O thread).
+ * Only the returned probe, backed by an atomic flag, crosses to workers. */
+std::function<bool()> connection_probe(const drogon::HttpRequestPtr& request) {
+    auto token = std::make_shared<std::atomic<bool>>(true);
+    observe_connection(request->getConnectionPtr(), token);
+    return [token] { return token->load(std::memory_order_relaxed); };
+}
+
 /** Parse the original encoded path exactly once. Successful syntax currently
  * invokes optional preflight before source lookup and metadata/geometry handling.
  * Results stay local; only the response is retained for asynchronous sending.
@@ -134,8 +164,16 @@ void iiif_request(const drogon::HttpRequestPtr& request,
     http::IiifWorker::ParsedRequest query = std::get_if<iiif::ImageRequest>(&result)
         ? http::IiifWorker::ParsedRequest{std::get<iiif::ImageRequest>(result)}
         : http::IiifWorker::ParsedRequest{std::get<iiif::InfoRequest>(result)};
-    // Retain the HTTP request until completion, including after disconnect.
-    http::IiifWorker::Callback complete = [request, callback](const auto& response) { callback(response); };
+    // Drogon 1.9.13 reads non-atomic connection state before its own response
+    // dispatch. Invoke the entire framework callback on the I/O loop, retaining
+    // request, connection and response until it runs (including after disconnect).
+    const auto connection = request->getConnectionPtr().lock();
+    http::IiifWorker::Callback complete = [request, callback, connection](const auto& response) {
+        if (!connection) return;
+        connection->getLoop()->queueInLoop([request, callback, connection, response] {
+            if (connection->connected()) callback(response);
+        });
+    };
     http::IiifWorker::Request input{std::move(query), header("authorization"), header("cookie")};
     input.accept = header("accept");
     input.redirect_to_info = routed.redirect_to_info;
@@ -145,12 +183,15 @@ void iiif_request(const drogon::HttpRequestPtr& request,
         ? preflight::RequestMethod::head : preflight::RequestMethod::get;
     if (routed.redirect_to_info) input.redirect_query = request->query();
     for (const auto& [name, value] : request->cookies()) input.cookies.emplace(name, value);
+    input.client_connected = connection_probe(request);
     if (!worker->submit(std::move(input), complete)) {
         auto response = json_error(drogon::k503ServiceUnavailable, "iiif_busy",
                                    "Image request processing is temporarily busy");
         response->addHeader("Cache-Control", "no-store");
         response->addHeader("Retry-After", "1");
         callback(response);
+    } else {
+        spdlog::debug("IIIF request queued: peer_port={}", request->getPeerAddr().toPort());
     }
     return;
 }
@@ -169,7 +210,7 @@ void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPre
     const auto public_base_url = config.public_base_url.value_or("http://127.0.0.1:" + std::to_string(config.port));
     std::optional<S3Client> s3_client;
     if (config.s3_bucket) s3_client.emplace(config.s3);
-    auto worker = std::make_shared<http::IiifWorker>(std::move(policy), std::move(sources), size_policy, public_base_url, std::move(s3_client), std::move(result_cache), config.metadata_cache_limits, config.iiif_workers, config.bitonal_method, config.mask_cache_limits, config.variant_cache_limits, config.jpeg);
+    auto worker = std::make_shared<http::IiifWorker>(std::move(policy), std::move(sources), size_policy, public_base_url, std::move(s3_client), std::move(result_cache), config.metadata_cache_limits, config.iiif_workers, config.bitonal_method, config.mask_cache_limits, config.variant_cache_limits, config.jpeg, config.iiif_queue_limit, config.webp_quality);
     const auto port = config.port;
     auto& app = drogon::app();
     app.addListener(config.listen_address, port);

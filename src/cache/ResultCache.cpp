@@ -3,6 +3,7 @@
 #include <sqlite3.h>
 #include <algorithm>
 #include <cerrno>
+#include <cstring>
 #include <chrono>
 #include <condition_variable>
 #include <fcntl.h>
@@ -58,7 +59,8 @@ public:
     bool row() {
         const auto result = sqlite3_step(value_);
         if (result == SQLITE_ROW) return true;
-        if (result != SQLITE_DONE) throw CacheError("Cache database statement failed");
+        if (result != SQLITE_DONE)
+            throw CacheError(std::string("Cache database statement failed: ") + sqlite3_errstr(result));
         return false;
     }
     std::string bytes(int column) const {
@@ -96,10 +98,15 @@ void directory(const fs::path& path) {
     if (fs::symlink_status(path).type() != fs::file_type::directory)
         throw CacheError("Cache requires real directories");
 }
+/** Include the OS reason (for example "No space left on device") so that an
+ * operator can tell a full disk from a permission or hardware problem. */
+[[noreturn]] void system_failure(const char* what, int error) {
+    throw CacheError(std::string(what) + ": " + std::strerror(error));
+}
 void sync_file(int fd) {
     int result;
     do { result = ::fsync(fd); } while (result < 0 && errno == EINTR);
-    if (result < 0) throw CacheError("Cache synchronization failed");
+    if (result < 0) system_failure("Cache synchronization failed", errno);
 }
 /** Own the temporary pathname even when writing, syncing or closing throws.
  *
@@ -113,7 +120,7 @@ public:
     explicit TemporaryFile(const fs::path& parent) {
         auto pattern = (parent / ".tmp-XXXXXX").string();
         descriptor_.value = ::mkstemp(pattern.data());
-        if (descriptor_.value < 0) throw CacheError("Cache temporary file could not be created");
+        if (descriptor_.value < 0) system_failure("Cache temporary file could not be created", errno);
         path_ = std::move(pattern);
         if (::fcntl(descriptor_.value, F_SETFD, FD_CLOEXEC) < 0)
         {
@@ -131,14 +138,15 @@ public:
             const auto count = ::write(descriptor_.value, bytes.data(),
                 std::min(bytes.size(), static_cast<std::size_t>(1048576)));
             if (count < 0 && errno == EINTR) continue;
-            if (count <= 0) throw CacheError("Cache file write failed");
+            if (count < 0) system_failure("Cache file write failed", errno);
+            if (count == 0) throw CacheError("Cache file write made no progress");
             bytes = bytes.subspan(static_cast<std::size_t>(count));
         }
         // Body data must be durable before its final name can appear: a name
         // surviving a crash must never refer to unwritten blocks.
         sync_file(descriptor_.value);
         const auto fd = std::exchange(descriptor_.value, -1);
-        if (::close(fd) != 0) throw CacheError("Cache file close failed");
+        if (::close(fd) != 0) system_failure("Cache file close failed", errno);
     }
     /** Atomically give the written body its final name. Requires write(). */
     void publish(const fs::path& final) {

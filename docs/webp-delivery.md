@@ -18,9 +18,9 @@ and follow existing authorization, HEAD, output-limit and cache behavior.
 
 libwebp 1.6.0 is pinned through Conan and conan.lock. The independent webpwriter
 target exposes write_webp with an explicit lossless flag and quality integer.
-The HTTP layer currently supplies these fixed choices:
+The HTTP layer supplies these defaults; quality/effort is configurable:
 
-| Result | Mode | Quality/effort | Method |
+| Result | Mode | Default quality/effort | Method |
 | --- | --- | --- | --- |
 | Color default/color | Lossy | 85 | 4 |
 | Native grayscale, gray quality, bitonal | Lossless | 85 | 4 |
@@ -28,7 +28,11 @@ The HTTP layer currently supplies these fixed choices:
 In lossless mode quality controls compression effort rather than fidelity. Alpha
 compression is lossless in both modes. exact=1 preserves hidden transparent color
 in lossless encoding. Codec internal threading is off because SIPI's worker pool
-already bounds concurrent render jobs. These WebP settings are fixed; there are no CLI/env/TOML WebP encoding options.
+already bounds concurrent render jobs. Quality is configurable server-wide with
+`webp-quality` / `--webp-quality` / `SIPI_WEBP_QUALITY` (1–100, default 85); in
+lossless mode it selects compression effort, the pixels stay identical. The
+quality is part of the cache identity, so changing it never reuses old entries.
+Method, alpha and lossless selection remain fixed.
 JPEG has separate [configurable quality/sampling](jpeg-delivery.md).
 Lossless refers to prepared encoder pixels, not to undoing resize/color conversion.
 Gray is stored as RGB, and bitonal WebP is not a one-bit PNG representation.

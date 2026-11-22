@@ -108,19 +108,42 @@ drogon::HttpResponsePtr response(drogon::HttpStatusCode status,
     result->addHeader("Cache-Control", "no-store");
     return result;
 }
+/** Transient refusal; Retry-After tells clients and proxies to try again. */
+drogon::HttpResponsePtr retryable(const char* code, const char* message, unsigned seconds = 1) {
+    auto result = response(drogon::k503ServiceUnavailable, code, message);
+    result->addHeader("Retry-After", std::to_string(seconds));
+    return result;
+}
+/** True when the HTTP layer reports that the client has already gone away.
+ * Skipping its work frees the worker for live requests (for example when a
+ * viewer cancels tile requests during fast zooming). No probe means connected. */
+bool client_gone(const IiifWorker::Request& request) {
+    return request.client_connected && !request.client_connected();
+}
+/** Nobody receives this response; it only completes Drogon's request cycle. */
+drogon::HttpResponsePtr skipped_for_disconnected_client() {
+    spdlog::debug("IIIF client disconnected; skipping remaining work");
+    return retryable("client_disconnected", "The client connection was closed");
+}
 } // namespace
 
 IiifWorker::IiifWorker(std::optional<preflight::LuaPreflight> policy, SourceResolver sources,
                        iiif::SizePolicy size_policy, std::string public_base_url, std::optional<S3Client> s3_client,
-                       std::shared_ptr<cache::ResultCache> result_cache, cache::MetadataCacheLimits metadata_limits, unsigned worker_count, BitonalMethod bitonal_method, cache::MaskCacheLimits mask_limits, cache::VariantCacheLimits variant_limits, JpegOptions jpeg_options)
+                       std::shared_ptr<cache::ResultCache> result_cache, cache::MetadataCacheLimits metadata_limits, unsigned worker_count, BitonalMethod bitonal_method, cache::MaskCacheLimits mask_limits, cache::VariantCacheLimits variant_limits, JpegOptions jpeg_options,
+                       std::size_t queue_limit, int webp_quality)
     : policy_(std::move(policy)), sources_(std::move(sources)), s3_client_(std::move(s3_client)), size_policy_(bounded_output_policy(size_policy)),
-      public_base_url_(std::move(public_base_url)), jpeg_options_(jpeg_options), bitonal_method_(bitonal_method), result_cache_(std::move(result_cache)),
+      public_base_url_(std::move(public_base_url)), jpeg_options_(jpeg_options), webp_quality_(webp_quality),
+      queue_limit_(queue_limit), bitonal_method_(bitonal_method), result_cache_(std::move(result_cache)),
       metadata_cache_(metadata_limits), mask_cache_(mask_limits), variant_cache_(variant_limits) {
     if (!jpeg_options_.valid())
         throw std::invalid_argument("Invalid JPEG encoding options");
     if (!worker_count || worker_count > maximum_worker_count)
         throw std::invalid_argument("IIIF worker count must be between 1 and 32");
-    spdlog::info("IIIF processing pool: {} workers", worker_count);
+    if (!queue_limit_ || queue_limit_ > maximum_queue_limit)
+        throw std::invalid_argument("IIIF queue limit must be between 1 and 1024");
+    if (webp_quality_ < 1 || webp_quality_ > 100)
+        throw std::invalid_argument("WebP quality must be between 1 and 100");
+    spdlog::info("IIIF processing pool: {} workers, queue limit {}", worker_count, queue_limit_);
     threads_.reserve(worker_count);
     try {
         for (unsigned i = 0; i < worker_count; ++i) threads_.emplace_back([this] { run(); });
@@ -146,7 +169,7 @@ IiifWorker::~IiifWorker() { stop(); }
 
 bool IiifWorker::submit(Request request, const Callback& callback) {
     std::lock_guard lock(mutex_);
-    if (stopping_ || jobs_.size() >= 64) return false;
+    if (stopping_ || jobs_.size() >= queue_limit_) return false;
     jobs_.push_back({std::move(request), callback});
     ready_.notify_one();
     return true;
@@ -172,7 +195,8 @@ void IiifWorker::run() {
             job = std::move(jobs_.front());
             jobs_.pop_front();
         }
-        auto result = resolve(job.request);
+        // Queued work can outlive its client; check before any policy/storage work.
+        auto result = client_gone(job.request) ? skipped_for_disconnected_client() : resolve(job.request);
         if (result->statusCode() == drogon::k200OK) {
             const auto existing = result->getHeader("link");
             result->addHeader("Link", existing.empty() ? std::string(level2_link)
@@ -420,7 +444,6 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
             const bool webp = image->format == iiif::Format::webp;
             const bool webp_lossless = native_gray || image->quality == iiif::Quality::gray ||
                                        image->quality == iiif::Quality::bitonal;
-            const int webp_quality = 85;
             validate_budget(plan, image->rotation);
             const auto dimensions = rotated_size(plan.output_width, plan.output_height, image->rotation.degrees);
             if (webp && (dimensions.width > webp_maximum_dimension || dimensions.height > webp_maximum_dimension))
@@ -443,7 +466,7 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                         .rotation = image->rotation,
                         .quality = image->quality,
                         .input_layout = input_layout,
-                        .encoding = webp ? cache::Encoding{cache::WebpEncoding{webp_lossless, webp_quality}}
+                        .encoding = webp ? cache::Encoding{cache::WebpEncoding{webp_lossless, webp_quality_}}
                                         : png ? cache::Encoding{cache::PngEncoding{}}
                                         : cache::Encoding{jpeg_options_},
                         .watermark = watermark_identity,
@@ -470,6 +493,10 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                     spdlog::warn("IIIF result cache lookup failed; rendering without cache");
                 }
             }
+
+            // Decoding/encoding is the expensive part; skip it for a vanished client.
+            // Returning releases any fill lock so another request may render.
+            if (client_gone(request)) return skipped_for_disconnected_client();
 
             // Each format selects and reads its own resolution. The owning raster
             // and exact window then enter one shared processing/encoding pipeline.
@@ -531,7 +558,7 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                 }
                 encoded.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
             };
-            if (webp) write_webp(pixels, sink, webp_lossless, webp_quality);
+            if (webp) write_webp(pixels, sink, webp_lossless, webp_quality_);
             else if (png) write_png(pixels, sink, image->quality == iiif::Quality::bitonal
                 ? PngBitDepth::one : PngBitDepth::eight);
             else {
@@ -543,8 +570,14 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
                     const bool stored = result_cache_->put(*cache_key, output,
                         std::as_bytes(std::span{encoded}));
                     spdlog::debug(stored ? "IIIF result cache stored" : "IIIF result cache admission declined");
-                } catch (const std::exception&) {
-                    spdlog::warn("IIIF result cache publication failed; delivering uncached image");
+                } catch (const std::exception& error) {
+                    // Several writes can already be in flight when the first fails.
+                    std::call_once(cache_write_error_, [&] {
+                        spdlog::error("IIIF result cache publication failed ({}); delivering the "
+                            "image uncached. Result-cache writes stay disabled until restart; "
+                            "existing entries are still served. Check free space and permissions "
+                            "of the cache directory.", error.what());
+                    });
                 }
             }
             return image_response(std::move(encoded), output.media_type, canonical);
@@ -568,9 +601,12 @@ drogon::HttpResponsePtr IiifWorker::resolve(const Request& request) {
             return response(drogon::k500InternalServerError, "source_error", "Image source could not be accessed");
         }
     } catch (const ByteSourceError& error) {
-        if (error.code() == ByteSourceErrorCode::not_found)
-            return response(drogon::k404NotFound, "image_not_found", "Image source was not found");
-        return response(drogon::k500InternalServerError, "source_error", "Image source could not be read consistently");
+        const auto failure = storage_failure(error.code());
+        if (failure.retry_after) {
+            spdlog::warn("IIIF source changed while it was read; client may retry");
+            return retryable(failure.code, failure.message, *failure.retry_after);
+        }
+        return response(static_cast<drogon::HttpStatusCode>(failure.status), failure.code, failure.message);
     } catch (const PngUnsupportedError&) {
         return response(drogon::k501NotImplemented, "not_implemented", "PNG precision, color encoding, EXIF or animation is not supported");
     } catch (const PngReadError&) {

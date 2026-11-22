@@ -10,6 +10,7 @@
 #include "image/Bitonal.h"
 #include "image/OutputLimits.h"
 #include "imgformats/JpegOptions.h"
+#include "imgformats/WebpWriter.h"
 #include "preflight/ScriptConfig.h"
 
 #include <cstdint>
@@ -43,6 +44,8 @@ struct ServerConfig {
     cache::MaskCacheLimits mask_cache_limits;
     cache::VariantCacheLimits variant_cache_limits;
     unsigned iiif_workers = http::default_worker_count();
+    // Waiting requests beyond the active workers; a full queue answers 503.
+    std::size_t iiif_queue_limit = http::default_queue_limit;
     BitonalMethod bitonal_method = BitonalMethod::threshold;
     LogLevel log_level = LogLevel::info;
     std::uint16_t port = 8080;
@@ -51,6 +54,7 @@ struct ServerConfig {
     bool size_upscaling = false;
     OutputLimits output_limits;
     JpegOptions jpeg; // Server-wide encoding settings, immutable after startup.
+    int webp_quality = default_webp_quality; // 1..100; lossless outputs: effort.
     // Wildcard is exclusive; explicit origins are matched exactly, never reflected blindly.
     std::vector<std::string> cors_origins{"*"};
     bool cors_credentials = false;
@@ -123,6 +127,11 @@ struct JpegEnvironment {
     std::optional<std::string_view> quality, sampling;
 };
 
+/** Caller-owned SIPI_IIIF_QUEUE_LIMIT and SIPI_WEBP_QUALITY snapshots. */
+struct DeliveryEnvironment {
+    std::optional<std::string_view> queue_limit, webp_quality;
+};
+
 /**
  * Resolve startup options in CLI > environment > TOML file > default order.
  *
@@ -152,6 +161,8 @@ struct JpegEnvironment {
  * cache_environment supplies the optional cache directory and capacity settings.
  * Parsing validates syntax only; persistent cache initialization belongs to startup.
  * jpeg_environment supplies quality (1..100) and sampling (4:4:4 or 4:2:0).
+ * delivery_environment supplies the IIIF queue limit (1..1024, default 64) and
+ * the WebP quality (1..100, default 85).
  * Input views need only live for this call. The returned result owns its data.
  * Reads only an explicitly requested --config file; does not print, log, mutate
  * the environment, or set logging levels. CLI errors are checked even for help
@@ -177,6 +188,7 @@ struct JpegEnvironment {
     CorsEnvironment cors_environment = {},
     std::span<const std::string_view> preflight_environment = {},
     std::optional<std::string_view> env_listen_address = std::nullopt,
-    JpegEnvironment jpeg_environment = {});
+    JpegEnvironment jpeg_environment = {},
+    DeliveryEnvironment delivery_environment = {});
 
 } // namespace sipi

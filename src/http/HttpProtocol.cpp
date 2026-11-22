@@ -191,4 +191,16 @@ bool allowed_cors_preflight(std::string_view method,std::string_view headers) {
     }
     return !split(headers,',').empty();
 }
+StorageFailure storage_failure(ByteSourceErrorCode code) noexcept {
+    switch (code) {
+    case ByteSourceErrorCode::not_found:
+        return {404, "image_not_found", "Image source was not found", std::nullopt};
+    case ByteSourceErrorCode::changed:
+        return {503, "source_changed", "Image source changed while it was read; retry the request", 1};
+    case ByteSourceErrorCode::invalid_argument:
+    case ByteSourceErrorCode::io:
+        break;
+    }
+    return {500, "source_error", "Image source could not be read consistently", std::nullopt};
+}
 } // namespace sipi::http

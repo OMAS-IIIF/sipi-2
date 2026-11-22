@@ -91,8 +91,9 @@ after authorization.
 | Small representative image GET | Policy, source and delivery for that request | All formats/regions or cold decoding after a cache hit |
 | Expected-denied request | That policy still refuses this identity/credential case | Every authorization rule |
 
-Run host-side probes or an external monitor; the published image contains no curl
-and defines no Docker HEALTHCHECK. A HEAD image request can perform rendering and
+Run host-side probes or an external monitor for readiness. The image defines a
+Docker HEALTHCHECK for liveness only (`/health`; see [Docker](docker.md#health-check)).
+It contains no curl. A HEAD image request can perform rendering and
 fill the cache before suppressing the body, so it is not a cheap readiness shortcut.
 A healthy HTTP loop can coexist with a full image-worker queue.
 
@@ -142,7 +143,8 @@ request headers, tokens, secret values or permission-service bodies from Lua.
 | --- | --- |
 | Startup exits 2 | Selected CLI/environment/TOML, existing repository, readable script/secret files and Lua initialization diagnostic |
 | Proxy 502/504 | Backend process/listen address, host versus container network, port and upstream timeout; then direct private probe |
-| Healthy `/health`, image 503 `iiif_busy` | Worker saturation/64 waiting requests, slow storage or Lua HTTP backend; reduce incoming load before raising workers |
+| Healthy `/health`, image 503 `iiif_busy` | Worker saturation (`iiif-queue-limit` waiting requests, default 64), slow storage or Lua HTTP backend; reduce incoming load before raising workers or the queue |
+| Image 503 `source_changed` | The source was replaced while being read; a retry reads the new version. Frequent cases suggest in-place writes |
 | 403 `access_denied` | Lua's prefix/identifier mapping and credentials, including token expiry/clock; info/base/HEAD also run policy |
 | 403 `source_not_allowed` | Relative path containment and symlinks escaping the root |
 | 404 `image_not_found` | Resolved filename/key, case, source existence and regular-file status; prefix is not automatically part of storage mapping |
@@ -154,6 +156,7 @@ request headers, tokens, secret values or permission-service bodies from Lua.
 | Wrong origin, missing/duplicated `/iiif` | Explicit public-base-url and whether the proxy strips its mount |
 | Browser fails while curl works | CORS Origin/credential settings, viewer credential forwarding, cookie policy and HTTPS |
 | Cache warning but 200 image | Storage/lock/schema/capacity issue; delivery may continue uncached |
+| Error `IIIF result cache publication failed` | Cause in parentheses (e.g. `No space left on device`). Cache writes stay off until restart; hits continue. Fix the cause, then restart |
 
 Separate proxy-generated responses from SIPI JSON errors. Do not convert all
 backend failures into anonymous access or retry denied requests indefinitely.
@@ -164,7 +167,9 @@ See the [feature catalog](features.md), [HTTP contract](iiif-http.md) and
 
 Set `iiif-workers` explicitly for the resources allocated to the service. The
 default is logical CPUs clamped to 1–4; accepted values are 1–32. The queue holds
-64 waiting jobs globally; overload returns 503 `iiif_busy` with `Retry-After: 1`.
+`iiif-queue-limit` waiting jobs globally (default 64, range 1–1024); overload
+returns 503 `iiif_busy` with `Retry-After: 1`. A longer queue absorbs bursts but
+lets clients wait longer; it does not add processing capacity.
 More workers multiply active decoder/raster/Lua memory and storage traffic. Output
 limits and cache byte budgets do not bound total process RSS. Measure your real
 image sizes/formats and cold/warm mix before increasing concurrency.
@@ -172,7 +177,8 @@ image sizes/formats and cold/warm mix before increasing concurrency.
 Align proxy/client timeouts with permitted image work and Lua HTTP limits. Lua's
 instruction budget does not bound native decoding or storage wall-clock time;
 outbound Lua HTTP has its own [timeouts and aggregate budgets](lua-http.md).
-A client timeout/disconnect is not a promise of immediate work cancellation.
+Queued work for a client that has disconnected is skipped, which helps when a
+viewer abandons many tile requests; work already in progress is not cancelled.
 Avoid aggressive retries that increase saturation.
 
 For planned maintenance, remove the instance from proxy/load-balancer rotation

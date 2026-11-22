@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(sipi-2 VERSION 1.0.1 LANGUAGES CXX)
+project(sipi-2 VERSION 1.0.2 LANGUAGES CXX)
 
 find_package(Threads REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -276,8 +276,9 @@ if(BUILD_TESTING)
     set_target_properties(byte-source-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME byte-source COMMAND byte-source-tests "${CMAKE_CURRENT_BINARY_DIR}/byte-source-test-data")
     set_tests_properties(byte-source PROPERTIES TIMEOUT 15)
-    add_executable(iiif-worker-tests tests/http/IiifWorkerTests.cpp src/http/IiifWorker.cpp src/http/HttpProtocol.cpp src/http/DeliveryPolicy.cpp src/http/IiifInfo.cpp src/http/ImageUri.cpp)
-    target_link_libraries(iiif-worker-tests PRIVATE variantcache maskcache metadatacache resultcache preflight imagesource imagestorage s3storage tiffreader j2kreader jpegreader pngreader jpegwriter pngwriter webpwriter imageprocessing iiifparser Drogon::Drogon spdlog::spdlog Threads::Threads)
+    add_executable(iiif-worker-tests tests/http/IiifWorkerTests.cpp src/cache/ResultCache.cpp src/http/IiifWorker.cpp src/http/HttpProtocol.cpp src/http/DeliveryPolicy.cpp src/http/IiifInfo.cpp src/http/ImageUri.cpp)
+    target_compile_definitions(iiif-worker-tests PRIVATE SIPI_RESULT_CACHE_TEST_HOOKS)
+    target_link_libraries(iiif-worker-tests PRIVATE cachekey SQLite::SQLite3 variantcache maskcache metadatacache preflight imagesource imagestorage s3storage tiffreader j2kreader jpegreader pngreader jpegwriter pngwriter webpwriter imageprocessing iiifparser Drogon::Drogon spdlog::spdlog Threads::Threads)
     set_target_properties(iiif-worker-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME iiif-worker COMMAND iiif-worker-tests
              "${CMAKE_CURRENT_BINARY_DIR}/worker-test-data" "${CMAKE_CURRENT_BINARY_DIR}/http-test-data")
@@ -436,6 +437,10 @@ if(BUILD_TESTING)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/parallel_http.py"
         "$<TARGET_FILE:sipi-2>" "${CMAKE_CURRENT_BINARY_DIR}/http-test-data")
     set_tests_properties(parallel-http PROPERTIES TIMEOUT 60 FIXTURES_REQUIRED "http_images;j2k_images")
+    add_test(NAME worker-queue-http COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/worker_queue_http.py"
+        "$<TARGET_FILE:sipi-2>" "${CMAKE_CURRENT_BINARY_DIR}/http-test-data")
+    set_tests_properties(worker-queue-http PROPERTIES TIMEOUT 60 FIXTURES_REQUIRED http_images)
     add_test(NAME rotation-http COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/rotation_http.py" $<TARGET_FILE:sipi-2>
         "${CMAKE_CURRENT_BINARY_DIR}/http-test-data")

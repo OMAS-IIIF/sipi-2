@@ -94,8 +94,9 @@ mapped to 501 `not_implemented`. Detected corruption and decoded-byte limit erro
 map to 500 `invalid_image_source`. Encoder failures and encoded-byte limit errors
 map to 500 `encoding_failed`. No codec diagnostics or local paths reach clients.
 Metadata planning and pixel reads borrow the same opened [byte source](byte-source.md).
-Atomic path replacement is safe; in-place file writes remain prohibited. Storage
-read failures map to 500 `source_error`.
+Atomic path replacement is safe; in-place file writes remain prohibited. A source
+that changes while it is read maps to 503 `source_changed` with `Retry-After: 1`;
+other storage read failures map to 500 `source_error`.
 
 HEAD currently performs the same decoding/encoding as GET, so status and content
 length match, then Drogon suppresses its body. A future optimization needs to keep

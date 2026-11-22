@@ -129,7 +129,10 @@ files and unindexed hash-named bodies, and drops rows with missing/nonregular or
 wrong-sized bodies. It only traverses the reserved hash namespace and never follows
 shard symlinks. Unrelated filenames are preserved. After publication failure,
 further puts return false until reopen/reconciliation; uncertain orphan usage
-cannot lead to continued unaccounted admissions. Reads remain available.
+cannot lead to continued unaccounted admissions. Reads remain available. The
+server logs this once at error level, including the cause (OS or SQLite reason
+such as `No space left on device` or `database or disk is full`) and the hint
+that writes stay disabled until restart.
 
 The schema has `application_id = 0x53495049` (SIPI) and `user_version = 1`.
 Foreign/nonempty unidentified databases and unsupported versions fail initialization

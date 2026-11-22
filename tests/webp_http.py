@@ -70,7 +70,22 @@ def main():
             assert get(port,'/wide.png/full/max/0/default.webp')[0]==400
             assert get(port,'/wide.png/full/max/0/default.png')[0]==200
             assert get(port,'/wide.png/full/1000,1/0/default.webp')[0]==200
-    print('WebP HTTP, decoder, cache restart and limits passed')
+        # Configured lossy quality (CLI and environment) changes the encoding and
+        # is part of the cache identity: no stale default-quality hit is reused.
+        lossy='/rgb.png/full/max/0/default.webp'
+        def count_webp():
+            with sqlite3.connect(root/'cache'/'cache.sqlite3') as db:
+                return db.execute("SELECT count(*) FROM entries WHERE media=?",(b'image/webp',)).fetchone()[0]
+        before=count_webp()
+        for options,variables in ((['--webp-quality=10'],None),([],{'SIPI_WEBP_QUALITY':'10'})):
+            with server(executable,root,options,variables=variables) as (port,log):
+                status,_,low=get(port,lossy)
+                assert status==200 and b'VP8 ' in chunks(low) and low!=webp,(status,len(low),len(webp))
+            assert 'IIIF processing pool' in log[0]
+        assert count_webp()==before+1
+        with server(executable,root) as (port,_):
+            assert get(port,lossy)[2]==webp
+    print('WebP HTTP, decoder, cache restart, quality setting and limits passed')
 
 
 if __name__=='__main__':

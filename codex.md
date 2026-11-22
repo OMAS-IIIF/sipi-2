@@ -10,12 +10,11 @@ Supported pixel/layout subsets matter: consult the [feature catalog](docs/featur
 not a container extension alone. No upload/import API, original-download API,
 streaming encoder response or application login service is implemented.
 
-CMake defines version **1.0.1**, the cleanup patch following the prepared 1.0.0
-baseline. The owner authorized committing/pushing the cleanup and publishing
-`lrosenth/sipi-2:1.0.1` and `latest` through the verified multi-platform Docker
-workflow. The remote is `OMAS-IIIF/sipi-2`. Publication outcome and immutable
-digests are recorded under `build/releases/`; authorization is not evidence of
-successful publication. No Git tag is created by that workflow. The
+CMake defines version **1.0.2**, the operational patch adding retryable changed-source
+responses, configurable queue/WebP quality, safe disconnected-client handling and
+Docker liveness checks. The remote is `OMAS-IIIF/sipi-2`. Git publication and Docker
+publication are separate workflows; image verification reports and immutable
+digests live under `build/releases/`. No Git tag is created automatically. The
 [release notes](CHANGELOG.md) define the 1.x compatibility scope; broader release
 gates remain in [readiness](docs/release-readiness.md).
 
@@ -65,7 +64,9 @@ sandbox. HTTP/cache helpers are request-only; JSON/JWT and configuration have th
 own contracts. Native Lua callback boundaries must respect longjmp and C++ lifetimes.
 
 The worker pool has 1–32 workers (default detected CPUs clamped to 1–4) and 64
-waiting jobs. Drogon's HTTP loop remains separate; `/health` is liveness only.
+waiting jobs by default (`iiif-queue-limit`, 1–1024). Workers skip queued work of
+clients that already disconnected. Drogon's HTTP loop remains separate; `/health`
+is liveness only and backs the Docker HEALTHCHECK.
 Workers, codec handles and shared immutable snapshots have explicit lifetimes;
 stop discards queued work and joins active jobs. No immediate I/O cancellation or
 whole-process memory quota is promised. See [worker ownership](docs/worker-pool.md).

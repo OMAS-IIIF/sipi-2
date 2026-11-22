@@ -1,5 +1,6 @@
 #pragma once
 #include "iiifparser/IIIFParser.h"
+#include "storage/ByteSource.h"
 #include <optional>
 #include <map>
 #include <string>
@@ -40,6 +41,19 @@ enum class InfoMediaType { json, json_ld };
  * Authorization, Accept, Content-Type headers. Origin/credentials policy is applied
  * separately to responses. Never grants image authorization. */
 [[nodiscard]] bool allowed_cors_preflight(std::string_view method, std::string_view headers);
+
+/** Client-facing description of a storage read failure. Diagnostics and
+ * source paths stay internal; retry_after is in seconds when present. */
+struct StorageFailure {
+    int status;
+    const char* code;    // Static, stable JSON error name.
+    const char* message; // Static text without paths or credentials.
+    std::optional<unsigned> retry_after;
+};
+/** not_found -> 404. changed -> 503 with Retry-After: the source was replaced
+ * while it was being read, and a new request opens the new version. Any other
+ * storage failure -> 500. retry_after is set exactly for 503. No I/O or shared state. */
+[[nodiscard]] StorageFailure storage_failure(ByteSourceErrorCode code) noexcept;
 
 inline constexpr std::string_view jsonld_content_type =
     "application/ld+json;profile=\"http://iiif.io/api/image/3/context.json\"";

@@ -90,8 +90,12 @@ COPY examples/oldap/ /opt/sipi/examples/oldap/
 # Ubuntu's per-package copyright files remain in /usr/share/doc.
 RUN dpkg-query -W -f='${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n' \
     > /opt/sipi/licenses/ubuntu-packages.tsv
+COPY --chmod=0755 docker/healthcheck.sh /opt/sipi/healthcheck.sh
 ENV LD_LIBRARY_PATH=/opt/sipi/lib SIPI_LISTEN_ADDRESS=0.0.0.0
 USER sipi
 WORKDIR /home/sipi
 EXPOSE 8080
+# Liveness only (GET /health). Follows SIPI_PORT; see docs/docker.md.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["/opt/sipi/healthcheck.sh"]
 ENTRYPOINT ["/opt/sipi/sipi-2"]

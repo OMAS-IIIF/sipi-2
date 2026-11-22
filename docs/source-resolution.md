@@ -64,7 +64,8 @@ image-request geometry validation away from the HTTP I/O thread.
 The probe recognizes little/big-endian classic TIFF, BigTIFF, JP2 and raw J2K from bytes, without
 requiring a filename extension. Other/unrecognized formats return
 501 source_format_not_supported. A recognized TIFF/JPEG 2000 source with unreadable/corrupt metadata
-returns 500 invalid_image_source. Storage read failures return 500 source_error;
+returns 500 invalid_image_source. A source changing during the read returns 503
+source_changed with Retry-After; other storage read failures return 500 source_error;
 a source disappearing before open returns 404 image_not_found. Information requests do not check pixel integrity; TIFF image output validates the accessed tiles or strips.
 
 For image requests, orientation-normalized width/height are passed to the existing

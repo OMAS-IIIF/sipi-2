@@ -14,13 +14,15 @@ using WebpSink = std::function<void(std::span<const std::uint8_t>)>;
  * 2.2 D50. RGB without ICC remains untagged; explicit sRGB gets an RGB ICC.
  * Gray expansion preserves alpha. No grayscale ICC is placed on RGB pixels.
  * lossless preserves prepared samples including hidden transparent color; lossy
- * uses quality 1..100, method 4 and lossless alpha. No EXIF/IPTC or animation.
+ * uses quality 1..100, method 4 and lossless alpha. In lossless mode quality
+ * selects compression effort instead of fidelity. No EXIF/IPTC or animation.
  * Dimensions <=16383; input + codec ARGB + ICC <=256 MiB, ICC <=16 MiB;
  * encoded and final mux buffers each <=64 MiB. Native codec scratch is additional.
  * Complete muxed output is emitted in <=16KiB borrowed blocks. Sink exceptions
  * propagate. Discard partial output on failure; no global state or input mutation.
  */
+inline constexpr int default_webp_quality = 85;
 void write_webp(const RasterImage8& image, const WebpSink& sink,
-                bool lossless, int quality = 85);
+                bool lossless, int quality = default_webp_quality);
 inline constexpr std::uint32_t webp_maximum_dimension = 16383;
 }

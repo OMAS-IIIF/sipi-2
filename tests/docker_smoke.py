@@ -25,6 +25,8 @@ def runtime_contents(image):
     """Inspect the final image, not a builder stage; it must contain only runtime assets."""
     inspected = json.loads(subprocess.check_output(['docker','image','inspect',image],text=True))[0]
     assert inspected['Config']['User'] == 'sipi', inspected['Config']['User']
+    assert inspected['Config']['Healthcheck']['Test'] == ['CMD', '/opt/sipi/healthcheck.sh'], \
+        inspected['Config'].get('Healthcheck')
     platform = os.environ.get('DOCKER_DEFAULT_PLATFORM')
     if platform:
         assert inspected['Os']+'/'+inspected['Architecture'] == platform
@@ -186,6 +188,11 @@ end
             else:
                 raise AssertionError('Container health timeout')
             assert json.loads(request('/health')[2])['version'] == expected_version
+            # The image HEALTHCHECK probe follows SIPI_PORT (8182 here) and fails
+            # cleanly when nothing listens on the selected port.
+            subprocess.run(['docker','exec',name,'/opt/sipi/healthcheck.sh'],check=True)
+            assert subprocess.run(['docker','exec','-e','SIPI_PORT=1',name,'/opt/sipi/healthcheck.sh'],
+                                  capture_output=True).returncode != 0
             base = '/iiif/3/asset'
             status, _, body = request(base+'/info.json?token='+token)
             assert status == 200, (status,body)

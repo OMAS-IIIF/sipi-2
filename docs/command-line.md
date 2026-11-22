@@ -142,8 +142,10 @@ also overrides a TOML bind setting. Native SIPI has no such injected default.
 | `max-area` | `SIPI_MAX_AREA` | `8388608` | Decimal integer 1–8388608; output pixel-area ceiling |
 | `jpeg-quality` | `SIPI_JPEG_QUALITY` | `90` | Decimal integer 1–100; JPEG quantization, not a lossless mode |
 | `jpeg-sampling` | `SIPI_JPEG_SAMPLING` | `4:4:4` | String: 4:4:4 or 4:2:0; ignored for one-channel JPEG |
+| `webp-quality` | `SIPI_WEBP_QUALITY` | `85` | Decimal integer 1–100; lossy quality, compression effort for lossless WebP |
 | `bitonal-method` | `SIPI_BITONAL_METHOD` | `threshold` | String: threshold or floyd-steinberg |
 | `iiif-workers` | `SIPI_IIIF_WORKERS` | Logical CPUs clamped to 1–4 | Decimal integer 1–32; image workers, not an automatic memory quota |
+| `iiif-queue-limit` | `SIPI_IIIF_QUEUE_LIMIT` | `64` | Decimal integer 1–1024; waiting requests before 503 `iiif_busy` |
 
 ### Cache capacity
 

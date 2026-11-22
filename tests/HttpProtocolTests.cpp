@@ -69,6 +69,19 @@ void run() {
         const auto r=route_iiif_path(path);
         check(!r.redirect_to_info && std::holds_alternative<sipi::iiif::ParseError>(r.query),"malformed image stays error");
     }
+    // A source replaced during reading is transient: retry, not a server fault.
+    using sipi::ByteSourceErrorCode;
+    const auto changed=storage_failure(ByteSourceErrorCode::changed);
+    check(changed.status==503 && changed.retry_after==1u &&
+          std::string_view(changed.code)=="source_changed","changed source is retryable");
+    const auto missing=storage_failure(ByteSourceErrorCode::not_found);
+    check(missing.status==404 && !missing.retry_after &&
+          std::string_view(missing.code)=="image_not_found","missing source");
+    for (const auto code : {ByteSourceErrorCode::io, ByteSourceErrorCode::invalid_argument}) {
+        const auto failure=storage_failure(code);
+        check(failure.status==500 && !failure.retry_after &&
+              std::string_view(failure.code)=="source_error","other storage failures stay 500");
+    }
 }
 }
 int main() {

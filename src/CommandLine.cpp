@@ -81,7 +81,8 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
                                 CorsEnvironment cors_environment,
                                 std::span<const std::string_view> preflight_environment,
                                 std::optional<std::string_view> env_listen_address,
-                                JpegEnvironment jpeg_environment) {
+                                JpegEnvironment jpeg_environment,
+                                DeliveryEnvironment delivery_environment) {
     StartupOptions result;
     bool help = false;
     bool version = false;
@@ -174,12 +175,18 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
     auto* jpeg_sampling_option = app.add_option("--jpeg-sampling", jpeg_sampling,
         "JPEG chroma sampling (SIPI_JPEG_SAMPLING; default: 4:4:4)")
         ->check(CLI::IsMember({"4:4:4", "4:2:0"}));
+    auto* webp_quality_option = app.add_option("--webp-quality", result.config.webp_quality,
+        "WebP quality; effort for lossless output (SIPI_WEBP_QUALITY; default: 85; range: 1..100)")
+        ->check(unsigned_decimal)->check(CLI::Range(1, 100));
     auto* bitonal_option = app.add_option("--bitonal-method", bitonal_method,
         "Bitonal method (SIPI_BITONAL_METHOD; default: threshold)")
         ->check(CLI::IsMember({"threshold", "floyd-steinberg"}));
     auto* workers_option = app.add_option("--iiif-workers", result.config.iiif_workers,
         "IIIF workers (SIPI_IIIF_WORKERS; default: CPU count capped at 4; range: 1..32)")
         ->check(unsigned_decimal)->check(CLI::Range(1u, http::maximum_worker_count));
+    auto* queue_option = app.add_option("--iiif-queue-limit", result.config.iiif_queue_limit,
+        "Waiting IIIF requests before 503 (SIPI_IIIF_QUEUE_LIMIT; default: 64; range: 1..1024)")
+        ->check(unsigned_decimal)->check(CLI::Range(std::size_t{1}, http::maximum_queue_limit));
     auto* cache_max_option = app.add_option("--cache-max-bytes", result.config.cache_limits.max_bytes,
         "Encoded cache byte limit (SIPI_CACHE_MAX_BYTES; default: 1073741824)")
         ->check(unsigned_decimal)->check(CLI::Range(std::uint64_t{1}, std::uint64_t{INT64_MAX}/2));
@@ -382,6 +389,8 @@ ParseResult load_startup_options(std::span<const std::string_view> arguments,
         load_setting(bitonal_option, env_bitonal_method);
         load_setting(jpeg_quality_option, jpeg_environment.quality);
         load_setting(jpeg_sampling_option, jpeg_environment.sampling);
+        load_setting(queue_option, delivery_environment.queue_limit);
+        load_setting(webp_quality_option, delivery_environment.webp_quality);
         load_setting(width_option, output_environment.width);
         load_setting(height_option, output_environment.height);
         load_setting(area_option, output_environment.area);

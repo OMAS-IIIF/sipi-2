@@ -96,8 +96,11 @@ int main(int argc, char* argv[]) {
     if (const char* value = std::getenv("SIPI_JPEG_SAMPLING")) jpeg_environment.sampling = value;
     std::optional<std::string_view> env_listen_address;
     if (const char* value = std::getenv("SIPI_LISTEN_ADDRESS")) env_listen_address = value;
+    sipi::DeliveryEnvironment delivery_environment;
+    if (const char* value = std::getenv("SIPI_IIIF_QUEUE_LIMIT")) delivery_environment.queue_limit = value;
+    if (const char* value = std::getenv("SIPI_WEBP_QUALITY")) delivery_environment.webp_quality = value;
     const auto parsed = sipi::load_startup_options(arguments, env_log_level, env_port,
-        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment, env_iiif_workers, env_bitonal_method, output_environment, cors_environment, preflight_environment, env_listen_address, jpeg_environment);
+        env_size_upscaling, env_preflight_script, env_iiif_root, env_public_base_url, s3_environment, repository_environment, cache_environment, env_iiif_workers, env_bitonal_method, output_environment, cors_environment, preflight_environment, env_listen_address, jpeg_environment, delivery_environment);
     if (const auto* error = std::get_if<sipi::ParseError>(&parsed)) {
         std::cerr << "Configuration error: " << error->message << '\n';
         return 2;

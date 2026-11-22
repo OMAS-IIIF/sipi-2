@@ -15,6 +15,7 @@
 !examples/oldap/docker-entrypoint.sh
 !docker/
 !docker/conan-profile
+!docker/healthcheck.sh
 !scripts/
 !scripts/collect_licenses.py
 !LICENSE

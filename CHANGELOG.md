@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.2 — 2026-11-23
+
+- A source that changes while it is being read (shrunk local file, new S3
+  version) now answers 503 `source_changed` with `Retry-After: 1` instead of
+  500 `source_error`; a retry reads the new version.
+- A failed result-cache write is logged once at error level with its cause
+  (OS or SQLite reason, e.g. `No space left on device`) and the hint that cache
+  writes stay disabled until restart. Behavior is unchanged.
+- New settings `iiif-queue-limit` (`SIPI_IIIF_QUEUE_LIMIT`, 1–1024, default 64)
+  and `webp-quality` (`SIPI_WEBP_QUALITY`, 1–100, default 85). Defaults keep the
+  previous behavior; WebP quality is part of the cache identity.
+- Workers skip queued requests whose client has already disconnected, checked
+  before policy evaluation and again before decoding on a cache miss.
+- The Docker image defines a `HEALTHCHECK` (`/opt/sipi/healthcheck.sh`, GET
+  `/health` via bash, following `SIPI_PORT`).
+
 ## 1.0.1 — 2026-11-22
 
 - Removed the diagnostic `/hello` route. It echoed the request URL and Host

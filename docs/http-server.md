@@ -69,12 +69,17 @@ level, validates an optional script, and transfers it to `run_http_server(config
 functions, a method-checking advice, and an IIIF handler retaining the optional worker. Each handler
 creates a response and invokes Drogon's callback; shared ownership keeps it alive for transmission.
 IIIF processing uses a bounded worker pool in `src/http/IiifWorker.*`,
-with at most 64 queued requests. Lua, filesystem checks, TIFF metadata, and geometry run there, not on the
+with at most `iiif-queue-limit` (default 64) queued requests. Lua, filesystem checks, TIFF metadata, and geometry run there, not on the
 I/O thread. Queued jobs own decoded request data and a completion retaining the
-HTTP request. Drogon's response callback schedules transmission on its I/O loop.
+HTTP request. The adapter dispatches the entire completion callback to the
+connection's I/O loop: Drogon 1.9.13 reads connection state before its own
+internal response dispatch, so invoking it directly on a worker is unsafe.
 After app.run returns, stop rejects new jobs, discards queued jobs, and joins all
-active jobs; the worker owns the script snapshot throughout. Disconnected clients
-may still incur evaluation; cancellation-aware delivery is deferred.
+active jobs; the worker owns the script snapshot throughout. A worker checks
+whether the client is still connected when it takes a job and again before
+decoding after a cache miss; work for a client that already disconnected is
+skipped (debug log `IIIF client disconnected`). Work already in progress is not
+interrupted.
 
 Drogon may create its default `uploads/` runtime directory in the working
 folder. It is ignored by Git; this route does not process uploaded files.
@@ -115,6 +120,7 @@ semantics; raw header ordering/duplicates cannot be recovered by this adapter.
 | Required iiif-root absent | 500 / source_not_configured |
 | Forbidden relative path / escaping symlink | 403 / source_not_allowed |
 | Missing source or non-regular file | 404 / image_not_found |
+| Source changed while it was read | 503 / source_changed, Retry-After: 1 |
 | Other filesystem status/open/read failure | 500 / source_error |
 | Unsupported source format | 501 / source_format_not_supported |
 | Invalid TIFF metadata | 500 / invalid_image_source |
@@ -127,6 +133,7 @@ semantics; raw header ordering/duplicates cannot be recovered by this adapter.
 | Corrupt TIFF pixels / decoder limit failure | 500 / invalid_image_source |
 | JPEG/PNG codec or encoded-response limit failure | 500 / encoding_failed |
 | Worker queue full or stopping | 503 / iiif_busy, Retry-After: 1 |
+| Client disconnected before the work started | Skipped; 503 / client_disconnected is never delivered |
 
 All preflight-dependent responses carry Cache-Control: no-store. Lua diagnostics,
 credentials, and local paths are not included in responses; logs record error
