@@ -3,6 +3,8 @@
 For isolated resampling and decode/resize/JPEG stage attribution, see the
 [2026-10-11 scaling baseline](benchmarks/2026-10-11-resize.md) and the
 [2026-10-12 cached-weight comparison](benchmarks/2026-10-12-axis-weights.md).
+The specialized kernel and JPEG region decoding are compared with 1.0.2 in the
+[2026-11-23 resampling/JPEG record](benchmarks/2026-11-23-resize-jpeg.md).
 
 For the four-server Docker comparison, see [server comparison](server-comparison.md).
 

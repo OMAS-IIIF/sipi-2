@@ -34,7 +34,10 @@ silently inferred from the presence of three channels. RGBA uses alpha-weighted 
 The function takes an owning `RasterImage8` by value. Pass `std::move(image)` to
 transfer ownership without copying the input. An identity resize returns the same
 pixel allocation. A reduction allocates only its output raster; ICC storage moves
-unchanged. There is no expanded raster, intermediate image or weight table.
+unchanged. There is no expanded raster or intermediate image. When it fits the
+remaining budget, the horizontal supports are expanded into one flat weight table
+(about 16 bytes per output column plus 8 bytes per source sample of each support);
+otherwise supports are computed per pixel with the same values.
 Concurrent independent calls have no shared state.
 
 Validate positive dimensions, exact layout-dependent byte count and size arithmetic before
@@ -84,8 +87,32 @@ arithmetic, splitting the extent before multiplication. This avoids overflowing
 Boundary fractions are converted to double relative to each source pixel when
 accumulating overlap weights. Quantization uses `floor(value + 0.5)`; floating-point
 accumulation at exact half-integer ties may change the last byte by one. There is
-still no intermediate raster or weight table. ICC, budgets and stored-channel
+still no intermediate raster; the optional horizontal weight table shares the
+remaining memory budget. ICC, budgets and stored-channel
 semantics are the same as for the full-raster overload.
+
+## Implementation and performance
+
+All three paths (full-image area, fractional window, linear enlargement) share one
+kernel, `resample`, specialized at compile time for 1–4 channels. Per output pixel
+it adds `weight_y * weight_x` times every covered sample in source order and
+divides once. The floating-point expressions and their order are exactly those of
+the earlier generic kernel, so results are bit-identical on every platform,
+including compilers that contract `a * b + c` into FMA. Only per-sample runtime
+branches (channel count, support edges) and a libm `floor` call per channel were
+removed; rounding is still `floor(value + 0.5)` clamped to 0..255.
+
+Compared with 1.0.2 (x86-64, GCC 13 Release, median of three alternating runs of
+the `resize-benchmark` cases), reduction is 1.6–1.9× faster for tiles and
+previews, 1.3–1.6× for 1/8 thumbnails and about 1.7–1.9× for enlargement. A
+separable variant (rows first, then a vectorized vertical pass) was measured and
+rejected: on these sizes its extra memory passes made it slower. See the
+[benchmark record](benchmarks/2026-11-23-resize-jpeg.md).
+
+A one-off differential check (not part of CTest) compared 120,000 random
+resizes (all layouts and paths, with and without the weight table, denominators
+up to 2^32−1) and 48 full-image reductions up to 3000×2000: byte-identical
+output against the 1.0.2 kernel with GCC and with Clang using FMA contraction.
 
 ## Verification
 

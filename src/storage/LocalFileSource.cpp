@@ -6,6 +6,9 @@
 #include <limits>
 #include <sys/stat.h>
 #include <unistd.h>
+#if defined(__APPLE__)
+#include <sys/param.h> // MAXPATHLEN
+#endif
 
 namespace sipi {
 
@@ -48,6 +51,30 @@ LocalFileSource::LocalFileSource(const std::filesystem::path& path) {
     info_.version = "stat-v1:" + std::to_string(info_.size) + ':' +
         std::to_string(modified.tv_sec) + ':' + std::to_string(modified.tv_nsec) + ':' +
         std::to_string(changed.tv_sec) + ':' + std::to_string(changed.tv_nsec);
+}
+
+std::filesystem::path LocalFileSource::opened_path() const {
+    struct stat status{};
+    if (::fstat(descriptor_.value, &status) < 0)
+        throw ByteSourceError(ByteSourceErrorCode::io, "Local image source status could not be read");
+    // An unlinked file has no path; a replacement under the old name is a
+    // different file. Report it like any other change during the request.
+    if (status.st_nlink == 0)
+        throw ByteSourceError(ByteSourceErrorCode::changed, "Local image source was removed while open");
+#if defined(__APPLE__)
+    char buffer[MAXPATHLEN]{};
+    if (::fcntl(descriptor_.value, F_GETPATH, buffer) < 0)
+        throw ByteSourceError(ByteSourceErrorCode::io, "Local image source path could not be determined");
+    return std::filesystem::path(buffer);
+#elif defined(__linux__)
+    std::error_code error;
+    auto path = std::filesystem::read_symlink("/proc/self/fd/" + std::to_string(descriptor_.value), error);
+    if (error || !path.is_absolute())
+        throw ByteSourceError(ByteSourceErrorCode::io, "Local image source path could not be determined");
+    return path;
+#else
+#error "LocalFileSource::opened_path is implemented for macOS and Linux only"
+#endif
 }
 
 std::size_t LocalFileSource::read_at(std::uint64_t offset, std::span<std::byte> destination) const {

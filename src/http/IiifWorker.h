@@ -12,8 +12,11 @@
 #include "image/SourceResolver.h"
 #include "storage/S3ByteSource.h"
 #include "iiifparser/IIIFGeometry.h"
+#include "http/Metrics.h"
 #include <drogon/HttpResponse.h>
+#include <atomic>
 #include <condition_variable>
+#include <exception>
 #include <deque>
 #include <functional>
 #include <mutex>
@@ -86,11 +89,46 @@ public:
     bool submit(Request request, const Callback& callback);
     /** Called by the owning thread, never from a completion; repeated calls are safe. */
     void stop();
+    /** Prometheus text for this pool (counters, latencies, queue state).
+     * Safe from any thread, including Drogon's I/O loop; never waits for a worker. */
+    [[nodiscard]] std::string metrics_text(std::string_view version) const;
 
 private:
     struct Job { Request request; Callback callback; };
+    // Pipeline values; defined in IiifWorker.cpp next to the stages using them.
+    struct Watermarking;
+    struct PublicImage;
+    struct Encoding;
+    struct CacheFill;
+    struct DecodedRegion;
+
     void run();
+    /** One request through the pipeline; never throws. */
     drogon::HttpResponsePtr resolve(const Request& request);
+    // Pipeline stages, in order. They throw on failure; see failure_response.
+    drogon::HttpResponsePtr process(const Request& request);
+    std::optional<preflight::Allow> authorize(const Request& request, const iiif::Resource& resource);
+    std::unique_ptr<ByteSource> open_source(std::string_view identifier,
+                                            const std::optional<SourceOverride>& selection) const;
+    Watermarking load_watermark(std::string_view identifier, const preflight::Watermark& policy);
+    cache::MetadataPtr load_metadata(const ByteSource& source);
+    std::variant<PublicImage, drogon::HttpResponsePtr> admit(
+        cache::MetadataPtr metadata, const std::optional<preflight::ResolutionLimit>& resolution) const;
+    drogon::HttpResponsePtr info_response(const Request& request, const iiif::Resource& resource,
+                                          const PublicImage& image) const;
+    drogon::HttpResponsePtr deliver_image(const Request& request, const iiif::ImageRequest& image,
+        const ByteSource& source, const PublicImage& canvas, const Watermarking& watermark,
+        const std::optional<preflight::Watermark>& watermark_policy);
+    CacheFill lookup_cached(const ByteSource& source, const PublicImage& canvas,
+        const iiif::ImageGeometry& plan, const iiif::ImageRequest& image, const Encoding& encoding,
+        const Watermarking& watermark, bool watermarked);
+    DecodedRegion read_public_pixels(const ByteSource& source, const PublicImage& canvas,
+                                     const iiif::ImageGeometry& plan);
+    std::string render(const ByteSource& source, const PublicImage& canvas,
+        const iiif::ImageGeometry& plan, const iiif::ImageRequest& image, const Encoding& encoding,
+        const Watermarking& watermark, const std::optional<preflight::Watermark>& watermark_policy);
+    void publish(CacheFill& fill, const cache::ResultMetadata& output, const std::string& encoded);
+    static drogon::HttpResponsePtr failure_response(std::exception_ptr failure);
 
     std::optional<preflight::LuaPreflight> policy_;
     SourceResolver sources_;
@@ -113,7 +151,9 @@ private:
     std::mutex fills_mutex_;
     std::map<std::string, std::weak_ptr<std::mutex>> fills_;
     std::shared_ptr<std::mutex> fill_mutex(const cache::CacheKey& key);
-    std::mutex mutex_;
+    Metrics metrics_;
+    std::atomic<unsigned> active_{0};
+    mutable std::mutex mutex_; // Guards jobs_ and stopping_; also read by metrics_text.
     std::condition_variable ready_;
     std::deque<Job> jobs_;
     bool stopping_ = false;

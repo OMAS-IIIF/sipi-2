@@ -97,12 +97,24 @@ bool rendering(const std::filesystem::path& fixtures, const std::filesystem::pat
         Worker parallel{std::nullopt, sipi::SourceResolver{fixtures}, {}, "http://localhost",
             std::nullopt, cached ? cache : nullptr, {}, 4};
         std::vector<std::future<drogon::HttpResponsePtr>> futures;
+        // Scrape metrics concurrently, as Drogon's I/O thread does (race check).
+        std::atomic<bool> rendering_done = false;
+        std::thread scraper([&] {
+            while (!rendering_done) (void)parallel.metrics_text("test");
+        });
         for (unsigned repeat = 0; repeat < 4; ++repeat)
             for (const auto& request : requests) futures.push_back(submit(parallel, request));
+        bool identical = true;
         for (std::size_t i = 0; i < futures.size(); ++i) {
             const auto result = futures[i].get();
-            if (result->statusCode() != drogon::k200OK || result->body() != expected[i % expected.size()]) return false;
+            identical = identical && result->statusCode() == drogon::k200OK &&
+                        result->body() == expected[i % expected.size()];
         }
+        rendering_done = true;
+        scraper.join();
+        const auto text = parallel.metrics_text("test");
+        const auto completed = "sipi_iiif_responses_total{code=\"200\"} " + std::to_string(futures.size()) + "\n";
+        if (!identical || text.find(completed) == std::string::npos) return false;
     }
     return true;
 }

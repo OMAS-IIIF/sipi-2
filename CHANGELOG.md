@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.0.3 — 2026-11-23
+
+- New `GET /metrics` endpoint (Prometheus text format): worker/queue state,
+  responses by status, queue rejections, disconnect skips, processing and
+  preflight latency histograms, result-cache lookups and stores. Labels never
+  carry request data. Like `/health`, the route is reserved and should stay
+  private; the Caddy example blocks both.
+- Local sources: repository containment is checked again on the opened file
+  descriptor (Linux `/proc/self/fd`, macOS `F_GETPATH`), closing the window in
+  which a directory swapped for a symlink could redirect `open()` outside
+  `iiif-root`. A file unlinked right after opening answers 503 `source_changed`.
+- Unexpected request failures are logged with their cause.
+- `IiifWorker` request processing is split into named pipeline stages with one
+  central exception-to-HTTP mapping; responses are unchanged (verified against
+  1.0.2 by a byte-level differential comparison).
+- Resampling kernel specialized per channel count without per-sample branches
+  or a libm `floor` call: 1.3–1.9× faster area reduction and enlargement with
+  bit-identical output (verified against 1.0.2 on 120,000 random resizes with
+  GCC and Clang, including FMA contraction).
+- JPEG sources decode only the requested region (`jpeg_skip_scanlines`,
+  `jpeg_crop_scanline` with an iMCU margin for fancy chroma upsampling):
+  decoded pixels are identical to a full decode, and tail corruption remains
+  an error. Crops use an exact-size raster and one accounted scratch row.
+  Because crops are now resampled in region coordinates, single samples can
+  round differently by one (0.02 % of samples in affected responses); these
+  renderings use the cache recipe `sipi-render-v4+jpeg-region`, all other cache
+  keys are unchanged.
+- Build: `-Wall -Wextra -Wpedantic` for SIPI-2 targets and option
+  `SIPI_WARNINGS_AS_ERRORS`; GitHub Actions CI with a GCC Debug job and an
+  ASan+UBSan job running the complete self-contained test suite.
+
 ## 1.0.2 — 2026-11-23
 
 - A source that changes while it is being read (shrunk local file, new S3

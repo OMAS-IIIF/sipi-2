@@ -139,6 +139,34 @@ IIIF validation and native container checks. It does not publish an image.
 Read the [Makefile guide](makefile.md) for prerequisites, test subsets, persistent
 MinIO data and multi-architecture release checks.
 
+## Compiler warnings and sanitizers
+
+SIPI-2's own targets compile with `-Wall -Wextra -Wpedantic` (GCC and Clang);
+`-Wmissing-field-initializers` is deliberately off because partially initialized
+aggregates with default member values are used on purpose. Dependency headers
+come from imported targets and are treated as system headers. To fail on any
+new warning, configure with:
+
+```sh
+cmake --preset conan-debug -DSIPI_WARNINGS_AS_ERRORS=ON
+```
+
+For an AddressSanitizer/UndefinedBehaviorSanitizer build, use a separate build
+directory and add
+`-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"`
+plus the same value for `CMAKE_EXE_LINKER_FLAGS`. The complete native suite runs
+under both sanitizers; dependencies themselves remain uninstrumented.
+
+## Continuous integration
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) builds on Ubuntu 24.04
+for every push to `main` and every pull request: one GCC Debug job with warnings
+as errors and one ASan+UBSan job, each running the complete self-contained CTest
+suite. Dependencies come from the same Linux Conan profile and lock procedure as
+the [Dockerfile](../Dockerfile); compiled Conan packages are cached between runs,
+so the first run takes considerably longer. MinIO/S3, external IIIF validation and
+container smoke tests are not part of CI; run `make test` before a release.
+
 ## CLion
 
 1. Install dependencies with Conan, then open this repository as a CMake project.

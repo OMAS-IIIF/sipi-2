@@ -135,7 +135,7 @@ References: [resampling](area-resize.md), [enlargement](upscaling.md),
 | --- | --- |
 | Local repository | Identifier resolves relative to `iiif-root`; default mapping does not append extensions or include prefix segments |
 | Local overrides | Lua may select a relative path within the root or an explicit absolute path; absolute paths are trusted operator overrides |
-| Repository containment | Relative/default paths reject traversal and symlinks escaping the root; repository directories must not be mutated by untrusted writers during requests |
+| Repository containment | Relative/default paths reject traversal and symlinks escaping the root; containment is checked again on the opened file, so swapping a directory for a symlink during a request cannot escape the root |
 | S3-compatible repository | Configurable bucket, endpoint, region and path-style addressing; default credential provider chain or explicit credentials with optional session token |
 | S3 source selection | Lua may select an object key in the configured bucket; it cannot supply per-request buckets, endpoints or credentials |
 | Consistent reads | Source identity/version/length bind metadata, pixel reads and cache entries; S3 uses HEAD and version/ETag-bound range reads |

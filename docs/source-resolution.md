@@ -46,9 +46,16 @@ repository. Scripts are trusted operator code, not arbitrary uploaded programs.
 Nonexistent/non-regular sources return 404; forbidden relative paths return 403;
 other filesystem errors return 500. Responses do not reveal local paths.
 
-Canonicalization and opening the source are separate operations, not an atomic
-capability-based open. Repository directories and symlinks must not be mutated by
-untrusted writers during requests. After opening, one `LocalFileSource` serves
+Canonicalization and opening the source are separate operations. A directory
+swapped for a symlink between them would redirect `open()`. The worker therefore
+checks containment a second time on the opened descriptor: it asks the kernel
+for the descriptor's canonical path (Linux `/proc/self/fd`, macOS
+`fcntl(F_GETPATH)`) and rejects a file outside the repository with 403
+`source_not_allowed` before reading a byte. A file unlinked right after opening
+answers 503 `source_changed`. Trusted absolute script overrides are not
+confined. Linux needs a mounted `/proc` (standard in containers); without it,
+local sources fail with 500 `source_error` rather than skipping the check.
+After opening, one `LocalFileSource` serves
 probing, metadata and pixel reads. Atomic replacement or unlinking of its path
 does not change that opened source; in-place writes remain prohibited. See
 [byte sources](byte-source.md).

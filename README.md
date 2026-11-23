@@ -40,7 +40,8 @@ operations, Lua integration, defaults and explicit limitations.
 Support for a file format does not imply support for every encoding in that
 format. Pixel delivery is based on 8-bit samples: 16-bit delivery, WebP input,
 CMYK JPEG, and automatic EXIF orientation normalization are not supported.
-JPEG and PNG sources are fully decoded even for small crops. Output dimensions
+PNG sources are fully decoded even for small crops; JPEG sources decode only the
+requested region (progressive JPEGs still read all coefficients). Output dimensions
 and processing budgets are bounded; enlargement is disabled by default. SIPI-2
 provides image delivery, not a IIIF Presentation API or an image-ingestion system.
 See the [format and behavior references](docs/README.md#image-formats-and-processing)

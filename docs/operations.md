@@ -87,6 +87,7 @@ after authorization.
 | Probe | What it establishes | What it does not establish |
 | --- | --- | --- |
 | Private `/health` | HTTP loop responds with status/version | Image-worker availability, repository, Lua backend or decoding |
+| Private `/metrics` | Queue occupancy, status rates, cache hit ratio, preflight latency ([metrics](metrics.md)) | Correctness of individual images or authorization rules |
 | Authorized `info.json` | Policy, source access and metadata admission | Pixel integrity of the whole source |
 | Small representative image GET | Policy, source and delivery for that request | All formats/regions or cold decoding after a cache hit |
 | Expected-denied request | That policy still refuses this identity/credential case | Every authorization rule |
@@ -117,9 +118,10 @@ Include valid monitoring credentials for protected policies and test a refused
 case separately. Do not disable authorization to make a probe pass.
 
 Track external request latency and status rates together with process restarts,
-CPU/RSS, free disk space, cache-directory growth and backend errors. SIPI has no
-built-in Prometheus/metrics endpoint or separate readiness endpoint. Avoid
-high-cardinality image IDs or credentials in metric labels. A warm thumbnail probe
+CPU/RSS, free disk space, cache-directory growth and backend errors. SIPI exports
+worker, queue, preflight and cache counters at `/metrics` in Prometheus format
+(see [metrics](metrics.md)); it has no separate readiness endpoint. Its labels
+never contain image IDs or credentials; keep it that way in your own relabeling. A warm thumbnail probe
 is useful for availability; a controlled cold render is needed to exercise decoding.
 
 ## Logs and failure diagnosis
@@ -133,8 +135,8 @@ docker compose -p sipi-demo -f docker/compose.example.yaml logs --tail=200 sipi
 ```
 
 Use the same environment and project name that created your deployment. Debug logs
-include cache hit/miss/stored/declined messages, but no public cache-status header
-or metrics counters are provided. A declined cache admission is not a delivery
+include cache hit/miss/stored/declined messages; there is no public cache-status
+header, but `/metrics` counts lookups and stores by outcome. A declined cache admission is not a delivery
 failure. Logs can contain script path/line and masked Lua diagnostics; see
 [diagnostic limits](lua-configuration.md#limits-and-diagnostics). Never log whole
 request headers, tokens, secret values or permission-service bodies from Lua.

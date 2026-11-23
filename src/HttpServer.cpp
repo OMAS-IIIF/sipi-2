@@ -233,9 +233,19 @@ void run_http_server(const ServerConfig& config, std::optional<preflight::LuaPre
         }
     });
     app.registerPreRoutingAdvice(&read_only_methods);
-    // The exact /health route wins over the IIIF catch-all, which owns every
-    // other path. Register future application routes (e.g. /upload) before it.
+    // The exact /health and /metrics routes win over the IIIF catch-all, which owns
+    // every other path. Register future application routes (e.g. /upload) before it.
     app.registerHandler("/health", &health, {drogon::Get});
+    // Prometheus scrape target. Served on the I/O loop from atomic counters and
+    // a brief queue-length read; it never waits for an image worker.
+    app.registerHandler("/metrics", [worker](const drogon::HttpRequestPtr&,
+            std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
+        auto response = drogon::HttpResponse::newHttpResponse();
+        response->setContentTypeString("text/plain; version=0.0.4; charset=utf-8");
+        response->addHeader("Cache-Control", "no-store");
+        response->setBody(worker->metrics_text(SIPI_VERSION));
+        callback(response);
+    }, {drogon::Get});
     app.registerHandlerViaRegex("/.*", [worker](const drogon::HttpRequestPtr& request,
         std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
         iiif_request(request, std::move(callback), worker);

@@ -67,14 +67,23 @@ std::filesystem::path SourceResolver::resolve(
 }
 ImageSource SourceResolver::resolve_source(std::string_view identifier,
     const std::optional<SourceOverride>& override) const {
-    if (override && std::holds_alternative<std::filesystem::path>(*override))
-        return LocalSource{resolve(identifier, std::get<std::filesystem::path>(*override))};
-    if (!override && storage_ == StorageKind::local) return LocalSource{resolve(identifier)};
+    if (override && std::holds_alternative<std::filesystem::path>(*override)) {
+        const auto& path = std::get<std::filesystem::path>(*override);
+        // Only relative selections are confined to the repository.
+        return LocalSource{resolve(identifier, path),
+                           path.is_absolute() ? std::nullopt : root_};
+    }
+    if (!override && storage_ == StorageKind::local) return LocalSource{resolve(identifier), root_};
     if (!bucket_ || bucket_->empty())
         throw SourceError(SourceErrorCode::configuration, "S3 source requires s3-bucket");
     const auto key = override ? std::get<S3Key>(*override).key : std::string(identifier);
     if (key.empty() || key.find('\0') != std::string::npos)
         throw SourceError(SourceErrorCode::invalid_path, "Invalid S3 object key");
     return S3Source{*bucket_, key};
+}
+
+void require_opened_inside(const LocalSource& source, const std::filesystem::path& opened) {
+    if (source.root && !inside(*source.root, opened))
+        throw SourceError(SourceErrorCode::invalid_path, "Image source leaves the configured repository");
 }
 } // namespace sipi

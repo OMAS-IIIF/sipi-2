@@ -179,6 +179,13 @@ A preflight-selected path must never be validated using another file's metadata.
 Authorization also applies to cache hits, image information, and HEAD requests.
 Preflight failure must not implicitly grant access.
 
+In the code, `IiifWorker::process` runs this order as named stages:
+`authorize` (step 2), `open_source` (with containment re-checked on the opened
+file), `load_watermark`, `load_metadata` (step 3), `admit` (effective image and
+delivery budgets), then `info_response` or `deliver_image` (steps 4–7:
+`lookup_cached`, `render`, `publish`). Stages throw on failure;
+`failure_response` maps every exception to the HTTP error contract in one place.
+
 The logical IIIF operation order is region, size, mirroring, rotation, quality,
 and format. Decoder optimizations must preserve these semantics. Watermark
 placement and its interaction with color/quality conversion remain to be defined.

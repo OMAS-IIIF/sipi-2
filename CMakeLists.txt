@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(sipi-2 VERSION 1.0.2 LANGUAGES CXX)
+project(sipi-2 VERSION 1.0.3 LANGUAGES CXX)
 
 find_package(Threads REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -19,6 +19,19 @@ find_package(jsoncpp CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
 find_package(jwt-cpp CONFIG REQUIRED)
 find_package(AWSSDK CONFIG REQUIRED COMPONENTS s3)
+
+# Warnings for SIPI-2's own targets. Dependencies are imported targets whose
+# headers are included as system headers, so their warnings stay silent.
+# -Wmissing-field-initializers is off on purpose: partially initialized
+# aggregates with default member values (e.g. test cases) are idiomatic here.
+# CI builds with SIPI_WARNINGS_AS_ERRORS=ON so that new warnings fail the build.
+option(SIPI_WARNINGS_AS_ERRORS "Treat compiler warnings in SIPI-2 sources as errors" OFF)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-Wall -Wextra -Wpedantic -Wno-missing-field-initializers)
+    if(SIPI_WARNINGS_AS_ERRORS)
+        add_compile_options(-Werror)
+    endif()
+endif()
 
 # Encoded-result identity only: no cache storage, HTTP, or codec dependency.
 add_library(cachekey src/cache/CacheKey.h src/cache/CacheKey.cpp)
@@ -154,7 +167,8 @@ set_target_properties(pngwriter PROPERTIES CXX_EXTENSIONS OFF)
 
 add_executable(sipi-2 src/main.cpp src/CommandLine.h
         src/CommandLine.cpp src/HttpServer.h src/HttpServer.cpp
-        src/http/IiifWorker.h src/http/IiifWorker.cpp src/http/HttpProtocol.cpp src/http/DeliveryPolicy.cpp src/http/DeliveryPolicy.h src/http/IiifInfo.h src/http/IiifInfo.cpp src/http/ImageUri.cpp)
+        src/http/IiifWorker.h src/http/IiifWorker.cpp src/http/HttpProtocol.cpp src/http/DeliveryPolicy.cpp src/http/DeliveryPolicy.h src/http/IiifInfo.h src/http/IiifInfo.cpp src/http/ImageUri.cpp
+        src/http/Metrics.h src/http/Metrics.cpp)
 target_link_libraries(sipi-2 PRIVATE variantcache maskcache metadatacache resultcache spdlog::spdlog CLI11::CLI11 Drogon::Drogon iiifparser preflight imagesource imagestorage s3storage tiffreader j2kreader jpegreader pngreader jpegwriter pngwriter webpwriter imageprocessing)
 target_compile_definitions(sipi-2 PRIVATE SIPI_VERSION="${sipi-2_VERSION}")
 
@@ -267,8 +281,17 @@ if(BUILD_TESTING)
     target_link_libraries(jpeg-writer-tests PRIVATE jpegwriter libjpeg-turbo::jpeg-static)
     set_target_properties(jpeg-writer-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME jpeg-writer COMMAND jpeg-writer-tests)
+    add_executable(jpeg-region-tests tests/JpegRegionTests.cpp)
+    target_link_libraries(jpeg-region-tests PRIVATE jpegreader imagestorage imageprocessing libjpeg-turbo::jpeg-static)
+    set_target_properties(jpeg-region-tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME jpeg-region COMMAND jpeg-region-tests "${CMAKE_CURRENT_BINARY_DIR}/jpeg-region-test-data")
+    add_executable(metrics-tests tests/MetricsTests.cpp src/http/Metrics.cpp)
+    target_include_directories(metrics-tests PRIVATE src)
+    target_link_libraries(metrics-tests PRIVATE Threads::Threads)
+    set_target_properties(metrics-tests PROPERTIES CXX_EXTENSIONS OFF)
+    add_test(NAME metrics COMMAND metrics-tests)
     add_executable(source-resolver-tests tests/SourceResolverTests.cpp)
-    target_link_libraries(source-resolver-tests PRIVATE imagesource)
+    target_link_libraries(source-resolver-tests PRIVATE imagesource imagestorage)
     set_target_properties(source-resolver-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME source-resolution COMMAND source-resolver-tests "${CMAKE_CURRENT_BINARY_DIR}/source-test-data")
     add_executable(byte-source-tests tests/ByteSourceTests.cpp)
@@ -276,7 +299,7 @@ if(BUILD_TESTING)
     set_target_properties(byte-source-tests PROPERTIES CXX_EXTENSIONS OFF)
     add_test(NAME byte-source COMMAND byte-source-tests "${CMAKE_CURRENT_BINARY_DIR}/byte-source-test-data")
     set_tests_properties(byte-source PROPERTIES TIMEOUT 15)
-    add_executable(iiif-worker-tests tests/http/IiifWorkerTests.cpp src/cache/ResultCache.cpp src/http/IiifWorker.cpp src/http/HttpProtocol.cpp src/http/DeliveryPolicy.cpp src/http/IiifInfo.cpp src/http/ImageUri.cpp)
+    add_executable(iiif-worker-tests tests/http/IiifWorkerTests.cpp src/cache/ResultCache.cpp src/http/IiifWorker.cpp src/http/HttpProtocol.cpp src/http/DeliveryPolicy.cpp src/http/IiifInfo.cpp src/http/ImageUri.cpp src/http/Metrics.cpp)
     target_compile_definitions(iiif-worker-tests PRIVATE SIPI_RESULT_CACHE_TEST_HOOKS)
     target_link_libraries(iiif-worker-tests PRIVATE cachekey SQLite::SQLite3 variantcache maskcache metadatacache preflight imagesource imagestorage s3storage tiffreader j2kreader jpegreader pngreader jpegwriter pngwriter webpwriter imageprocessing iiifparser Drogon::Drogon spdlog::spdlog Threads::Threads)
     set_target_properties(iiif-worker-tests PROPERTIES CXX_EXTENSIONS OFF)
@@ -494,3 +517,9 @@ target_link_libraries(resize-benchmark PRIVATE imageprocessing tiffreader j2krea
     imagestorage jpegwriter JsonCpp::JsonCpp)
 target_compile_features(resize-benchmark PRIVATE cxx_std_20)
 set_target_properties(resize-benchmark PROPERTIES CXX_EXTENSIONS OFF)
+
+# Reproducible full-versus-region JPEG timing; never part of ordinary builds.
+add_executable(jpeg-region-benchmark EXCLUDE_FROM_ALL benchmarks/JpegRegionBenchmark.cpp)
+target_link_libraries(jpeg-region-benchmark PRIVATE jpegreader imagestorage libjpeg-turbo::jpeg-static)
+target_compile_features(jpeg-region-benchmark PRIVATE cxx_std_20)
+set_target_properties(jpeg-region-benchmark PROPERTIES CXX_EXTENSIONS OFF)

@@ -26,6 +26,7 @@ struct Decoder {
     std::size_t remaining;
     std::exception_ptr failure;
     RasterImage8 image{};
+    std::vector<std::uint8_t> scratch_row; // Margin cropping and tail validation.
     Decoder(const ByteSource& value, std::size_t limit) : source(value), remaining(limit) {}
     ~Decoder() { if (codec.mem) jpeg_destroy_decompress(&codec); }
 };
@@ -182,22 +183,58 @@ std::uint64_t coefficient_bytes(const jpeg_decompress_struct& codec) {
     return total;
 }
 
-void decode_pixels(Decoder& state) {
+/** Decode phase 1 (own error boundary): start decompression and, for a partial
+ * region, narrow output to the iMCU-aligned columns covering [x, x + width).
+ * libjpeg-turbo moves x left to an iMCU boundary and widens width to match. */
+void start_region(Decoder& state, PixelLayout layout, std::uint32_t full_width,
+                  std::uint32_t full_height, JDIMENSION& x, JDIMENSION& width) {
     if (setjmp(state.error.jump)) {
         if (state.failure) std::rethrow_exception(state.failure);
         throw JpegReadError("Invalid JPEG pixel data");
     }
-    state.codec.out_color_space = state.image.layout == PixelLayout::gray ? JCS_GRAYSCALE : JCS_RGB;
+    state.codec.out_color_space = layout == PixelLayout::gray ? JCS_GRAYSCALE : JCS_RGB;
     // Explicit defaults form part of the rendering recipe.
     state.codec.dct_method = JDCT_ISLOW;
     state.codec.do_fancy_upsampling = TRUE;
-    if (!jpeg_start_decompress(&state.codec) || state.codec.output_width != state.image.width ||
-        state.codec.output_height != state.image.height ||
-        state.codec.output_components != static_cast<int>(state.image.channel_count()))
+    if (!jpeg_start_decompress(&state.codec) || state.codec.output_width != full_width ||
+        state.codec.output_height != full_height ||
+        state.codec.output_components != (layout == PixelLayout::gray ? 1 : 3))
         throw JpegReadError("Unexpected JPEG output layout");
-    while (state.codec.output_scanline < state.codec.output_height) {
-        JSAMPROW row = state.image.pixels.data() +
-            std::size_t(state.codec.output_scanline) * state.image.width * state.image.channel_count();
+    if (x != 0 || width != full_width) {
+        jpeg_crop_scanline(&state.codec, &x, &width);
+        if (state.codec.output_width != width) throw JpegReadError("Unexpected JPEG crop width");
+    }
+}
+
+/** Decode phase 2 (own error boundary): skip rows above the region, decode its
+ * rows into state.image, skip the rest and finish through EOI. Skipped rows are
+ * still entropy-decoded, so the whole stream is validated. */
+void decode_rows(Decoder& state, std::uint32_t first_row, std::uint32_t left_margin) {
+    if (setjmp(state.error.jump)) {
+        if (state.failure) std::rethrow_exception(state.failure);
+        throw JpegReadError("Invalid JPEG pixel data");
+    }
+    if (first_row && jpeg_skip_scanlines(&state.codec, first_row) != first_row)
+        throw JpegReadError("Incomplete JPEG scanline");
+    const std::size_t row_bytes = std::size_t(state.image.width) * state.image.channel_count();
+    while (state.codec.output_scanline < first_row + state.image.height) {
+        auto* target = state.image.pixels.data() + std::size_t(state.codec.output_scanline - first_row) * row_bytes;
+        const bool crop = state.codec.output_width != state.image.width;
+        JSAMPROW row = crop ? state.scratch_row.data() : target;
+        if (jpeg_read_scanlines(&state.codec, &row, 1) != 1)
+            throw JpegReadError("Incomplete JPEG scanline");
+        if (crop) std::memcpy(target, row + std::size_t(left_margin) * state.image.channel_count(), row_bytes);
+    }
+    const auto rest = state.codec.output_height - state.codec.output_scanline;
+    // Skipping exactly to the bottom makes libjpeg-turbo mark EOI reached
+    // without consuming the tail. Leave the last row for a real read so all
+    // entropy data and the EOI marker are still validated. Use an owned row.
+    if (rest) {
+        if (rest > 1 && jpeg_skip_scanlines(&state.codec, rest - 1) != rest - 1)
+            throw JpegReadError("Incomplete JPEG scanline");
+        // The requested rows must remain intact; the decoder owns this scratch
+        // row across the longjmp boundary (allocated before entering here).
+        JSAMPROW row = state.scratch_row.data();
         if (jpeg_read_scanlines(&state.codec, &row, 1) != 1)
             throw JpegReadError("Incomplete JPEG scanline");
     }
@@ -211,8 +248,12 @@ JpegMetadata read_jpeg_metadata(const ByteSource& source, std::size_t max_read_b
     return extract_metadata(state->codec);
 }
 
-RasterImage8 read_jpeg_image(const ByteSource& source, const JpegMetadata& metadata,
-                            std::size_t max_decoded_bytes, std::size_t max_read_bytes) {
+JpegRegion read_jpeg_region(const ByteSource& source, const JpegMetadata& metadata,
+                            const PixelRegion& region, std::size_t max_decoded_bytes,
+                            std::size_t max_read_bytes) {
+    if (!region.width || !region.height || region.x >= metadata.width || region.y >= metadata.height ||
+        region.width > metadata.width - region.x || region.height > metadata.height - region.y)
+        throw JpegReadError("JPEG region outside the image");
     const auto state = std::make_unique<Decoder>(source, std::min(max_read_bytes, std::size_t{16 * 1024 * 1024}));
     read_header(*state);
     auto actual = extract_metadata(state->codec);
@@ -221,17 +262,42 @@ RasterImage8 read_jpeg_image(const ByteSource& source, const JpegMetadata& metad
         actual.icc_profile != metadata.icc_profile || actual.coefficient_bytes != metadata.coefficient_bytes)
         throw JpegReadError("JPEG header changed since metadata planning");
     const std::uint64_t channels = actual.color == JpegColor::gray ? 1 : 3;
-    const auto pixels = std::uint64_t(actual.width) * actual.height * channels;
+    // Exact result raster plus one full-width upper bound for the scratch row.
+    // No padded raster survives into later resize/watermark budget checks.
+    const bool has_tail = region.y + region.height < actual.height;
+    const bool needs_scratch = has_tail || region.width != actual.width;
+    const auto pixels = (std::uint64_t(region.width) * region.height +
+                         (needs_scratch ? actual.width : 0u)) * channels;
     const auto coefficients = actual.coefficient_bytes;
     if (pixels > max_decoded_bytes || coefficients > max_decoded_bytes - pixels ||
         actual.icc_profile.size() > max_decoded_bytes - pixels - coefficients)
         throw JpegReadError("JPEG decoding exceeds working memory limit");
-    state->image = {actual.width, actual.height, std::vector<std::uint8_t>(static_cast<std::size_t>(pixels)),
-        std::move(actual.icc_profile), channels == 1 ? PixelLayout::gray : PixelLayout::rgb};
+    const auto layout = channels == 1 ? PixelLayout::gray : PixelLayout::rgb;
     // The header remains capped at 16 MiB; the total decode uses the larger
     // cumulative input budget, including already-prefetched bytes.
     state->remaining = max_read_bytes - static_cast<std::size_t>(state->offset);
-    decode_pixels(*state);
-    return std::move(state->image);
+    // Fancy upsampling of horizontally subsampled chroma interpolates with the
+    // neighboring chroma column, which a crop does not decode. One extra iMCU on
+    // each side keeps those edge effects outside the requested columns.
+    // One iMCU: the widest horizontal sampling factor times the block size.
+    const JDIMENSION margin = static_cast<JDIMENSION>(std::max(1, state->codec.max_h_samp_factor)) * DCTSIZE;
+    const JDIMENSION left = region.x > margin ? region.x - margin : 0;
+    const JDIMENSION right = std::min<JDIMENSION>(actual.width, region.x + region.width + margin);
+    JDIMENSION x = left, width = right - left;
+    start_region(*state, layout, actual.width, actual.height, x, width);
+    // Allocate outside the codec error boundaries (no C++ objects across longjmp).
+    state->image = {region.width, region.height,
+        std::vector<std::uint8_t>(static_cast<std::size_t>(region.width) * region.height * channels),
+        {}, layout};
+    if (needs_scratch) state->scratch_row.resize(static_cast<std::size_t>(width) * channels);
+    decode_rows(*state, region.y, region.x - x);
+    state->image.icc_profile = std::move(actual.icc_profile);
+    return {std::move(state->image), region.x, region.y};
+}
+
+RasterImage8 read_jpeg_image(const ByteSource& source, const JpegMetadata& metadata,
+                            std::size_t max_decoded_bytes, std::size_t max_read_bytes) {
+    return read_jpeg_region(source, metadata, {0, 0, metadata.width, metadata.height},
+                            max_decoded_bytes, max_read_bytes).image;
 }
 } // namespace sipi

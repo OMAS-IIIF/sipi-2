@@ -83,6 +83,20 @@ def read_status(client):
     return int(data.split(b" ", 2)[1])
 
 
+def metrics(port):
+    """Scrape /metrics; return {sample name with labels: value}."""
+    status, headers, body = get(port, "/metrics")
+    headers = {k.lower(): v for k, v in headers.items()}
+    assert status == 200 and headers["content-type"].startswith("text/plain; version=0.0.4"), headers
+    assert headers["cache-control"] == "no-store"
+    values = {}
+    for line in body.decode().splitlines():
+        if line and not line.startswith("#"):
+            name, value = line.rsplit(" ", 1)
+            values[name] = float(value)
+    return values
+
+
 def gate_option(gate):
     return f"--preflight-config=gate_url=http://127.0.0.1:{gate.server_port}/slow"
 
@@ -99,6 +113,13 @@ def disconnected_clients(executable, root, gate):
         observed(log, [f"IIIF connection closed: peer_port={p}" for p in ports])
         held.release()
         assert success(get(port, IMAGE))  # The pool still serves live clients.
+        counters = metrics(port)
+        assert counters["sipi_iiif_disconnected_skips_total"] == DISCONNECTED, counters
+        # 5 skipped (503) plus the held info request and the live image (200).
+        assert counters['sipi_iiif_responses_total{code="503"}'] == DISCONNECTED, counters
+        assert counters['sipi_iiif_responses_total{code="200"}'] == 2, counters
+        assert counters['sipi_preflight_evaluations_total{outcome="allow"}'] == 2, counters
+        assert counters["sipi_iiif_queue_length"] == 0 and counters["sipi_iiif_workers"] == 1, counters
     skipped = log[0].count("IIIF client disconnected; skipping remaining work")
     rendered = log[0].count("Resolved IIIF crop")
     assert skipped == DISCONNECTED, (skipped, log[0][-2000:])
@@ -115,6 +136,9 @@ def queue_limit(executable, root, gate):
         headers = {k.lower(): v for k, v in headers.items()}
         assert status == 503 and headers.get("retry-after") == "1", (status, headers)
         assert b"iiif_busy" in body, body
+        busy = metrics(port)  # Served while the only worker is still held.
+        assert busy["sipi_iiif_queue_length"] == 2 and busy["sipi_iiif_active_workers"] == 1, busy
+        assert busy["sipi_iiif_queue_rejections_total"] == 1 and busy["sipi_iiif_queue_limit"] == 2, busy
         held.release()
         assert [read_status(client) for client in waiting] == [200, 200]
     assert "IIIF processing pool: 1 workers, queue limit 2" in log[0], log[0][:500]

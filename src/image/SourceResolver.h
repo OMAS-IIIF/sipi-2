@@ -31,8 +31,9 @@ private:
  * Relative sources require a configured root and stay inside its canonical path.
  * Only explicit absolute script overrides may bypass that root. Prefixes do not
  * participate in default mapping. No second URL decoding or image I/O occurs.
- * Repository directories/symlinks must not be changed by untrusted writers while
- * serving: canonicalization is not an atomic open and cannot defeat rename races.
+ * Canonicalization is not an atomic open: a directory could be swapped for a
+ * symlink between this check and open(). Callers therefore re-check the path of
+ * the opened descriptor with require_opened_inside before reading.
  */
 class SourceResolver {
 public:
@@ -56,4 +57,10 @@ private:
     std::optional<std::string> bucket_;
     std::optional<std::filesystem::path> root_;
 };
+
+/** Second containment check, on the file actually opened. opened is the
+ * kernel's canonical path of the open descriptor (LocalFileSource::opened_path).
+ * Throws SourceError(invalid_path) if a rooted source escaped its repository
+ * after resolution; sources without root (trusted overrides) always pass. */
+void require_opened_inside(const LocalSource& source, const std::filesystem::path& opened);
 } // namespace sipi

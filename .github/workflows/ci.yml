@@ -1,0 +1,84 @@
+# Native build and self-contained CTests on Linux.
+#
+# Mirrors the Linux Conan path of the Dockerfile (docker/conan-profile and the
+# same partial lock), so CI exercises the dependency graph that is shipped.
+# Not covered here: MinIO/S3 suites (SIPI_TEST_S3), the external IIIF validator
+# and container smoke tests; run those with `make test` before a release.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CONAN_VERSION: "2.33.0"
+
+jobs:
+  build-test:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Warnings are errors; the complete self-contained suite must pass.
+          - name: GCC Debug
+            flags: ""
+          # The same suite with an instrumented server and test binaries.
+          # UBSan findings abort; dependencies themselves are not instrumented.
+          - name: GCC ASan+UBSan
+            flags: "-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config autoconf automake libtool nasm openssl
+          # Ubuntu 24.04 forbids system pip installs (PEP 668); pipx is preinstalled.
+          pipx install "conan==${CONAN_VERSION}"
+
+      - name: Restore Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ runner.os }}-debug-${{ hashFiles('conanfile.txt', 'conan.lock', 'docker/conan-profile', 'conan/recipes/**') }}
+
+      - name: Install dependencies
+        run: |
+          conan profile detect --force
+          conan export conan/recipes/grok
+          conan lock create . -pr:h docker/conan-profile -pr:b docker/conan-profile \
+            --lockfile=conan.lock --lockfile-partial --lockfile-out="${RUNNER_TEMP}/ci.lock"
+          conan install . -pr:h docker/conan-profile -pr:b docker/conan-profile \
+            --lockfile="${RUNNER_TEMP}/ci.lock" --build=missing \
+            -s build_type=Debug -s compiler.cppstd=20 -c tools.build:jobs=4
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/Debug -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=build/Debug/generators/conan_toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DSIPI_WARNINGS_AS_ERRORS=ON \
+            -DCMAKE_CXX_FLAGS="${{ matrix.flags }}" \
+            -DCMAKE_EXE_LINKER_FLAGS="${{ matrix.flags }}"
+
+      - name: Build
+        run: cmake --build build/Debug --parallel 4
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: ctest --test-dir build/Debug --output-on-failure --parallel 2

@@ -10,6 +10,7 @@ are later steps. No TLS listener or certificates are configured in SIPI-2.
 | Request | Result |
 | --- | --- |
 | GET `/health` | JSON: `{"status":"ok","message":"I'm alive","version":"0.1.0"}` |
+| GET `/metrics` | Prometheus text format; see [metrics](metrics.md) |
 | GET `/id/full/max/0/default.jpg` | 200 JPEG for supported tiled or strip-based gray/RGB/RGBA8 TIFF; otherwise explicit error |
 | GET `/project/id/info.json` | 200 JSON: authorized TIFF dimensions and public service identity |
 | GET an invalid IIIF path, including `/` | 400 JSON with error, component, and message |
@@ -22,7 +23,7 @@ The version in `/health` comes from `SIPI_VERSION`, defined by CMake; it is not
 hardcoded in the handler. Health is a **liveness** check, not a check of storage,
 codecs, or readiness to process images.
 
-Exact `/health` wins over the IIIF `/.*` catch-all, which owns every other path.
+Exact `/health` and `/metrics` win over the IIIF `/.*` catch-all, which owns every other path.
 `/health/id/info.json` is an IIIF request with prefix `health`; only the exact
 health route is reserved; `/health/` currently produces 400. The former
 diagnostic `/hello` route was removed before 1.0.0:
@@ -187,8 +188,8 @@ lifecycle, tests and deferred streaming work.
 
 JPEG input also supports `info.json` and HEAD using the shared metadata cache.
 Only 8-bit gray/RGB/YCbCr and absent/Top-left EXIF orientation are accepted. JPEG
-pixels use full decode followed by the existing crop/resize/transform/encode and
-result-cache pipeline; malformed source data returns 500.
+pixels are decoded for the requested region only, followed by the existing
+resize/transform/encode and result-cache pipeline; malformed source data returns 500.
 See [JPEG input](jpeg-input.md) for the supported subset and limits.
 
 

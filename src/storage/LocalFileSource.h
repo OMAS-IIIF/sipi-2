@@ -23,6 +23,14 @@ public:
     [[nodiscard]] const SourceInfo& info() const noexcept override { return info_; }
     std::size_t read_at(std::uint64_t offset, std::span<std::byte> destination) const override;
 
+    /** Canonical path of the file behind the open descriptor, as the kernel
+     * reports it now (Linux /proc/self/fd, macOS F_GETPATH). Unlike the path
+     * given to the constructor, it cannot be redirected by later renames or
+     * symlink swaps of the directories that were traversed by open().
+     * Throws ByteSourceError(changed) if the file has been unlinked, and
+     * ByteSourceError(io) if the platform cannot report the path. */
+    [[nodiscard]] std::filesystem::path opened_path() const;
+
 private:
     /** Member ownership also closes the descriptor if construction throws. */
     struct Descriptor {

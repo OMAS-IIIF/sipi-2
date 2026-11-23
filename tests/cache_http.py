@@ -132,6 +132,13 @@ def main():
             assert status == 200 and not body
             assert int({k.lower():v for k,v in headers.items()}["content-length"]) == len(original)
             assert rows(root) == first
+            # One miss stored the result; 3 aliases and HEAD were hits (/metrics).
+            counters = {line.rsplit(" ", 1)[0]: float(line.rsplit(" ", 1)[1])
+                        for line in get(port, "/metrics")[2].decode().splitlines()
+                        if line and not line.startswith("#")}
+            assert counters['sipi_result_cache_lookups_total{outcome="miss"}'] == 1, counters
+            assert counters['sipi_result_cache_lookups_total{outcome="hit"}'] == 4, counters
+            assert counters['sipi_result_cache_stores_total{outcome="stored"}'] == 1, counters
             assert get(port, path, authorization="denied")[0] == 403
             assert get(port, path, "HEAD", "denied")[0] == 403
             assert get(port, "/tiled.tif/info.json", authorization="denied")[0] == 403

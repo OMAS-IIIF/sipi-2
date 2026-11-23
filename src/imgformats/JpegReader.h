@@ -1,6 +1,7 @@
 #pragma once
 #include "storage/ByteSource.h"
 #include "image/RasterImage.h"
+#include "image/PixelRegion.h"
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
@@ -54,5 +55,24 @@ struct JpegMetadata {
  */
 [[nodiscard]] RasterImage8 read_jpeg_image(const ByteSource& source, const JpegMetadata& metadata,
     std::size_t max_decoded_bytes = 256 * 1024 * 1024,
+    std::size_t max_read_bytes = 256 * 1024 * 1024);
+
+/** A decoded rectangle and its top-left corner in full-image coordinates. */
+struct JpegRegion {
+    RasterImage8 image;
+    std::uint32_t x = 0, y = 0;
+};
+/** Decode exactly region (non-empty, inside the image; x/y echo its corner).
+ * The pixels are identical to the same pixels of read_jpeg_image. Internally
+ * the region's rows, a final validation row, and columns plus one iMCU margin
+ * (needed by fancy chroma upsampling) pass through IDCT, upsampling and color
+ * conversion. The entropy stream is still decoded through EOI: libjpeg-turbo
+ * skips rows (jpeg_skip_scanlines) and columns (jpeg_crop_scanline) after
+ * Huffman decoding, so corruption anywhere is detected as before. Budgets and
+ * errors as above; the pixel budget covers the exact requested raster
+ * plus one full-width scratch row when
+ * cropping columns or validating a tail. No padded output raster is allocated. */
+[[nodiscard]] JpegRegion read_jpeg_region(const ByteSource& source, const JpegMetadata& metadata,
+    const PixelRegion& region, std::size_t max_decoded_bytes = 256 * 1024 * 1024,
     std::size_t max_read_bytes = 256 * 1024 * 1024);
 }

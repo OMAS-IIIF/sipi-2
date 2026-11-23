@@ -24,6 +24,12 @@ namespace sipi::cache {
  * of sampling retaining the original 4:4:4 behavior.
  * This is independent of the cache serialization schema. */
 inline constexpr std::string_view current_render_recipe = "sipi-render-v4";
+/** v4 for JPEG sources decoded per region (jpeg_crop/skip_scanlines). Decoded
+ * pixels are unchanged, but crops are resampled in region coordinates, which
+ * can round single samples differently (by one) than full-raster coordinates.
+ * Only original/watermarked JPEG renderings use it; restricted public variants
+ * still decode the whole image and keep current_render_recipe. */
+inline constexpr std::string_view jpeg_region_render_recipe = "sipi-render-v4+jpeg-region";
 
 /** Use the same value settings for the key and the actual encoder. */
 using JpegEncoding = JpegOptions;

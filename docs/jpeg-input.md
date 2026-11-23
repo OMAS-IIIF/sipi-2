@@ -1,9 +1,43 @@
 # JPEG input
 
 JPEG sources support information JSON and JPEG/PNG/WebP image delivery, locally and
-through S3. The reader fully decodes an owning `RasterImage8`; the existing window
-resampler then crops and reduces it, followed by mirroring/rotation and encoding (see [arbitrary angles](arbitrary-rotation.md)).
-There is no ROI decoding or scaled IDCT yet: even a small crop requires the full raster.
+through S3. `read_jpeg_region` decodes exactly the requested rectangle into an
+owning `RasterImage8`; the window resampler then reduces it, followed by
+mirroring/rotation and encoding (see [arbitrary angles](arbitrary-rotation.md)).
+There is no scaled IDCT: DCT-domain reduction would change pixels.
+
+## Region decoding
+
+libjpeg-turbo skips rows above and below the region (`jpeg_skip_scanlines`) and
+restricts IDCT, upsampling and color conversion to the region's columns
+(`jpeg_crop_scanline`). Fancy upsampling of horizontally subsampled chroma
+(4:2:2, 4:2:0, 4:1:1) interpolates with the neighboring chroma column, which a
+crop would not decode; the reader therefore crops with one iMCU of margin on each
+side and returns exactly the requested columns. The result is pixel-identical to
+the same rectangle of a full decode (`jpeg-region` test: 4:4:4, 4:2:2, 4:2:0,
+4:4:0, 4:1:1, gray, progressive and restart-coded images, hundreds of random
+regions each). Skipped data is still Huffman-decoded and the stream is finished
+through EOI, so corruption outside the region is detected as before.
+
+The corrected reader was remeasured against full decoding on Apple M5 Max with
+6000×4000 synthetic RGB JPEGs (quality 90, 4:2:0): baseline crops were 1.21–1.24×
+faster and progressive crops 1.05–1.07×, over 21 paired measurements per case.
+These are decode-only, warm-file-cache results; see the [benchmark record](benchmarks/2026-11-23-resize-jpeg.md#corrected-jpeg-reader-complete-tail-validation-native-arm64)
+for raw samples, methodology and limitations. The earlier VM timings bypassed
+tail validation and remain superseded.
+
+The reader skips only to the penultimate row, reads the final row into one
+accounted scratch row, and finishes through EOI. Requested columns are copied
+from one scratch row into an exact-size raster; no padded raster or its excess
+allocation survives into subsequent processing.
+
+Resampling now runs in region coordinates instead of full-image coordinates.
+That is mathematically the same operation, but single samples can round
+differently by one: compared with 1.0.2, 0.02 % of the samples of affected JPEG
+crop responses differ by exactly 1. Such results therefore use their own cache
+recipe, `sipi-render-v4+jpeg-region`, so old and new renderings never share a key;
+TIFF, JPEG 2000 and PNG keys are unchanged. Restricted public variants of JPEG
+sources still decode the whole image and keep the general recipe.
 
 ## Accepted headers
 
@@ -85,9 +119,12 @@ The rendering recipe is unchanged because existing output bytes are unaffected a
 JPEG input previously had no cached results. JPEG decoding fixes JDCT_ISLOW and fancy
 upsampling explicitly; future output-affecting changes must update that recipe.
 
-`read_jpeg_image` rechecks header facts/ICC against the metadata snapshot, then decodes
-all rows and requires successful completion through EOI. Warnings are fatal, including
-truncation outside the requested crop. Defaults are 256 MiB cumulative compressed
+`read_jpeg_region` (and `read_jpeg_image`, which reads the full region) rechecks
+header facts/ICC against the metadata snapshot, then decodes or skips all rows and
+requires successful completion through EOI. Warnings are fatal, including
+truncation outside the requested crop. The pixel budget covers the exact requested
+raster plus one full-width scratch row when cropping columns or validating a
+tail. Defaults are 256 MiB cumulative compressed
 input and 256 MiB for pixels, ICC and estimated retained coefficient arrays for
 progressive/multiscan images. These checks precede pixel allocation and decompressor
 startup. Header reads retain the 16 MiB cap. Native scratch, markers, metadata copies

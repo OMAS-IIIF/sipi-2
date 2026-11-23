@@ -1,4 +1,7 @@
 #include "image/SourceResolver.h"
+#include "storage/LocalFileSource.h"
+#include <array>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 
@@ -66,6 +69,48 @@ int main(int argc, char** argv) {
             SourceErrorCode::configuration, "S3 override requires bucket");
     rejects([&] { SourceResolver invalid({}, sipi::StorageKind::s3); },
             SourceErrorCode::configuration, "S3 default requires bucket");
+    // Race between resolution and open(): a resolved directory is swapped for a
+    // symlink to outside. The path check already passed; the descriptor check
+    // must reject the file that was actually opened.
+    fs::create_directories(root / "swap");
+    { std::ofstream(root / "swap" / "image.tif") << "inside"; }
+    { std::ofstream(base / "images-other" / "image.tif") << "outside"; }
+    const auto before_swap = std::get<sipi::LocalSource>(sources.resolve_source("swap/image.tif"));
+    check(before_swap.root == fs::canonical(root), "relative source carries its repository");
+    {
+        sipi::LocalFileSource unchanged(before_swap.path);
+        require_opened_inside(before_swap, unchanged.opened_path());
+        check(unchanged.opened_path() == fs::canonical(root / "swap" / "image.tif"), "descriptor path is canonical");
+    }
+    fs::remove_all(root / "swapped-away");
+    fs::rename(root / "swap", root / "swapped-away");
+    fs::create_directory_symlink(base / "images-other", root / "swap");
+    {
+        sipi::LocalFileSource redirected(before_swap.path); // Follows the new symlink.
+        std::array<std::byte, 7> bytes{};
+        check(redirected.read_at(0, bytes) == 7 &&
+              std::memcmp(bytes.data(), "outside", 7) == 0, "stale path really reaches outside");
+        rejects([&] { require_opened_inside(before_swap, redirected.opened_path()); },
+                SourceErrorCode::invalid_path, "symlink swap after resolution is rejected");
+        // Trusted absolute overrides are not confined to the repository.
+        const sipi::LocalSource trusted{before_swap.path};
+        require_opened_inside(trusted, redirected.opened_path());
+        check(!trusted.root, "absolute override has no repository bound");
+    }
+    fs::remove(root / "swap");
+    fs::rename(root / "swapped-away", root / "swap");
+    check(!std::get<sipi::LocalSource>(sources.resolve_source("ignored",
+          sipi::SourceOverride{fs::canonical(root / "sample.tif")})).root, "absolute override unbounded");
+    {
+        // An unlinked file has no path: report a change, never a stale name.
+        { std::ofstream(root / "removed.tif") << "gone"; }
+        sipi::LocalFileSource removed(root / "removed.tif");
+        fs::remove(root / "removed.tif");
+        try { (void)removed.opened_path(); check(false, "unlinked file reports change"); }
+        catch (const sipi::ByteSourceError& error) {
+            check(error.code() == sipi::ByteSourceErrorCode::changed, "unlinked file reports change");
+        }
+    }
     std::cout << checks << " checks, " << failures << " failures\n";
     return failures ? 1 : 0;
 }

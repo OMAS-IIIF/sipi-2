@@ -10,9 +10,10 @@ Supported pixel/layout subsets matter: consult the [feature catalog](docs/featur
 not a container extension alone. No upload/import API, original-download API,
 streaming encoder response or application login service is implemented.
 
-CMake defines version **1.0.2**, the operational patch adding retryable changed-source
-responses, configurable queue/WebP quality, safe disconnected-client handling and
-Docker liveness checks. The remote is `OMAS-IIIF/sipi-2`. Git publication and Docker
+CMake defines version **1.0.3**, adding operational metrics, descriptor-based local
+source containment, named worker pipeline stages, specialized resampling and
+JPEG region decoding with complete tail validation and bounded raster storage.
+The remote is `OMAS-IIIF/sipi-2`. Git publication and Docker
 publication are separate workflows; image verification reports and immutable
 digests live under `build/releases/`. No Git tag is created automatically. The
 [release notes](CHANGELOG.md) define the 1.x compatibility scope; broader release
@@ -39,8 +40,8 @@ become grants. HTTP responses retain `Cache-Control: no-store`.
 | Startup/configuration | `src/main.cpp`, `src/CommandLine.*`; typed settings, environment snapshots, explicit TOML and startup validation |
 | HTTP | `src/HttpServer.*`, `src/http/HttpProtocol.*`, `IiifInfo.*`, `ImageUri.*`; routing, queries, CORS, public identity and responses |
 | IIIF syntax/geometry | `src/iiifparser/`; owning value types and pure parsing/geometry, separate from codecs/storage/HTTP |
-| Delivery | `src/http/IiifWorker.*`, `DeliveryPolicy.*`; request admission and ordered composition of storage, policy, caches and rendering |
-| Storage | `src/storage/`; `ByteSource` positioned reads, local RAII handles and version-bound S3 ranges; `src/image/SourceResolver.*` owns mapping/containment |
+| Delivery | `src/http/IiifWorker.*`, `DeliveryPolicy.*`; request admission and ordered composition of storage, policy, caches and rendering as named pipeline stages; `Metrics.*` counters behind `/metrics` |
+| Storage | `src/storage/`; `ByteSource` positioned reads, local RAII handles and version-bound S3 ranges; `src/image/SourceResolver.*` owns mapping/containment, re-checked on the opened descriptor |
 | Codecs | `src/imgformats/`; TIFF/libtiff, JPEG/libjpeg-turbo, PNG/libpng, JPEG 2000/Grok and output encoders; third-party types stay behind adapters |
 | Pixel processing | `src/image/`; owning raster types, resize/rotation, alpha, grayscale/bitonal, watermarks and restricted public variants |
 | Color | `src/image/SrgbProfiles.*`, `GrayConversion.*` and `WatermarkColor.*`; LittleCMS and embedded profiles with explicit preservation/conversion contracts |

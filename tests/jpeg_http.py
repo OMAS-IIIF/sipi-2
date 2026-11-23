@@ -56,6 +56,17 @@ end
             # Geometry remains format-neutral.
             assert get(port, '/rgb.jpg/100,0,5,5/max/0/default.jpg')[0] == 400
             assert rows(root)
+            # JPEG sources decoded per region carry their own rendering recipe;
+            # a TIFF rendering keeps the general one (no cache invalidation).
+            shutil.copyfile(tiffs / 'tiled.tif', images / 'tiled.tif')
+            assert get(port, '/tiled.tif/full/max/0/default.png')[0] == 200
+            import sqlite3
+            with sqlite3.connect(root / 'cache' / 'cache.sqlite3') as db:
+                identities = [bytes(row[0]) for row in db.execute('SELECT identity FROM entries')]
+            jpeg_keys = [i for i in identities if b'jpeg-region' in i]
+            plain_keys = [i for i in identities if b'recipe:14:sipi-render-v4\n' in i]
+            assert jpeg_keys and len(plain_keys) == 1, (len(jpeg_keys), len(plain_keys))
+            assert all(b'recipe:26:sipi-render-v4+jpeg-region\n' in i for i in jpeg_keys)
             before = len(rows(root))
             assert get(port, '/header-only.jpg/0,0,1,1/max/0/default.png')[0] == 500
             assert len(rows(root)) == before

@@ -1,13 +1,19 @@
 #pragma once
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <variant>
 
 namespace sipi {
 /** Default identifier mapping. IIIF URL prefixes never participate. */
 enum class StorageKind { local, s3 };
-/** Owning source selected after authorization; no credentials or open handles. */
-struct LocalSource { std::filesystem::path path; };
+/** Owning source selected after authorization; no credentials or open handles.
+ * root is the canonical repository the OPENED file must still lie in; it is
+ * absent only for trusted absolute script overrides. See require_opened_inside. */
+struct LocalSource {
+    std::filesystem::path path;
+    std::optional<std::filesystem::path> root = std::nullopt;
+};
 struct S3Source { std::string bucket; std::string key; };
 using ImageSource = std::variant<LocalSource, S3Source>;
 /** Trusted Lua override: a local path or an object key in the configured bucket.

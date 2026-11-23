@@ -68,7 +68,7 @@ int main() {
                                                     sum += input.pixels[3*(sy*5+sx)+c];
                                                 }
                                             const auto expected = (2*sum + ex*ey) / (2*ex*ey);
-                                            const auto actual = out.pixels[3*(y*w+x)+c];
+                                            const decltype(expected) actual = out.pixels[3*(y*w+x)+c];
                                             // Floating point accumulation can differ by one
                                             // at a mathematical half-integer quantization tie.
                                             const bool tie = 2 * (sum % (ex*ey)) == ex*ey;
