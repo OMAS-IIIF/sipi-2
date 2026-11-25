@@ -112,6 +112,16 @@ def main():
                 assert get(headers={'Cookie':'media_capability='+good})[0] == 200
                 assert get('?token='+good, {'Authorization':'invalid'})[0] == 200  # Query wins.
                 assert get('?token='+token(permval=1))[0] == 200
+                # A freshly issued capability may be ahead of this host's clock.
+                # Exact temporal boundaries are tested with an injected clock in
+                # jwt_check.py; the real policy must opt into its bounded leeway.
+                for field in ('iat', 'nbf'):
+                    assert get('?token='+token(**{field:int(time.time())+2}))[0] == 200
+                    assert get('?token='+token(**{field:int(time.time())+30}))[0] == 403
+                assert get('?token='+token(exp=int(time.time())-30))[0] == 403
+                body, signature = good.rsplit('.', 1)
+                bad_signature = ('A' if signature[0] != 'A' else 'B') + signature[1:]
+                assert get('?token='+body+'.'+bad_signature)[0] == 403
                 for bad in ('', 'wrong', token(id='other'), token(id=None), token(assetId='other'),
                             token(typ='access'), token(iss='other'), token(aud='other'), token(exp=0),
                             token(permval=0), token(permval='2'), token(permval=7),

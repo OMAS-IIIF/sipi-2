@@ -1,3 +1,15 @@
+### Update 2026-11-25 23:02
+- Decisions: Deploy the reviewed OLDAP policy through the supported external-script mount on production; keep SIPI 1.0.3 and all peers unchanged.
+- Implementation: Installed policy SHA-256 2251cd464871997ab7b1aa64f128e6350686d543e8a4c8183c41273833f3921b at /opt/oldap-mediaserver/compose/sipi-preflight.lua. Effective Compose comparison permits only the policy path and read-only mount; image identity, health and all five peer container IDs verified. Previous configuration retained in story-policy-20261125T215953Z.
+- Open: Frontend 0.1.55 publication/deployment proceeds separately; Home unchanged.
+- Risks/Assumptions: No binary release or data changes. Future media deployments must retain the custom policy until a bundled release contains the fix.
+
+### Update 2026-11-25 22:51
+- Decisions: Allow a fixed 2-second clock tolerance only in the OLDAP media-token policy; keep the generic JWT verifier's zero-leeway default.
+- Implementation: OLDAP verification supplies leeway=2 for iat/nbf/exp. Documented precise bounds; added real policy HTTP checks for slightly future capabilities, larger offsets, expired and bad-signature tokens, plus deterministic JWT temporal-boundary cases. Existing permission/asset-binding rejection coverage remains passing.
+- Open: Commit/release/deployment are separate; no live configuration changed.
+- Risks/Assumptions: Expiry is also relaxed by less than 2 seconds. Signature, issuer, audience, asset and permission checks remain enforced; clocks should remain synchronized. Focused lua-jwt and oldap-preflight-http CTests pass (2/2); git diff --check clean. Existing log edits preserved.
+
 ### Update 2026-11-23 20:54
 - Decisions: Owner authorized patch bump, Git commit/push and the established multi-platform Docker release workflow.
 - Implementation: Bumped CMake1.0.2 to1.0.3; finalized reviewed release notes and current project context. Includes review corrections, reproducible JPEG benchmark and its raw samples. The supplied Claude outputs patch remains unchanged local reference material and is excluded locally from Git status.

@@ -179,7 +179,11 @@ function preflight(request)
         if not token then return {decision = "deny"} end
         object = sipi.jwt.verify(token, {
             algorithm = "HS256", key = secrets.media_jwt_key,
-            issuer = issuer, audience = audience
+            issuer = issuer, audience = audience,
+            -- Independent API/media clocks can cross a second boundary while a
+            -- fresh capability is in flight. Bound tolerance for iat/nbf/exp;
+            -- the application-independent verifier keeps its strict default.
+            leeway = 2
         })
         if not object or object.typ ~= "media" or object.id ~= request.identifier then
             return {decision = "deny"}

@@ -73,6 +73,12 @@ additional binding policy.
 The current OLDAP issuer in `oldaplib/src/authentication.py` emits integer `iat`
 and `exp`, matching sipi-2's JWT contract. Legacy fractional/string NumericDates
 are deliberately rejected, even though the old Ruby delegate coerced them.
+This policy explicitly allows **2 seconds of clock skew**: `iat` and `nbf` may
+be at most 2 seconds ahead of the image server; `exp` must be greater than the
+server time minus 2 seconds. This avoids intermittent rejection when a fresh
+capability crosses the API/media hosts' second boundary. Keep both hosts' clocks
+synchronized. Signature, issuer, audience, asset binding and permission checks
+are unchanged; the generic JWT verifier still defaults to zero leeway.
 
 ## Anonymous REST lookup
 

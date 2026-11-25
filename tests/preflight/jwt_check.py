@@ -70,10 +70,12 @@ def main():
         case("post2038", token({"exp": 2200000100}), now=2200000000)
         case("max int64 exp", token({"exp": 9223372036854775807}))
         for exp, leeway, error in [(NOW, 0, "expired"), (NOW-1, 0, "expired"), (NOW+1, 0, ""),
-                                    (NOW, 1, ""), (NOW-1, 1, "expired")]:
+                                    (NOW, 1, ""), (NOW-1, 1, "expired"),
+                                    (NOW-1, 2, ""), (NOW-2, 2, "expired")]:
             case(f"expiry boundary {exp}/{leeway}", token({"exp": exp}), error, leeway=leeway)
         for field in ["nbf", "iat"]:
-            for offset, leeway, error in [(0, 0, ""), (1, 0, "not_yet_valid"), (1, 1, "")]:
+            for offset, leeway, error in [(0, 0, ""), (1, 0, "not_yet_valid"), (1, 1, ""),
+                                         (2, 2, ""), (3, 2, "not_yet_valid")]:
                 case(f"{field} boundary {offset}/{leeway}", token({"exp": NOW+100, field: NOW+offset}), error, leeway=leeway)
             for value in [None, "123", 1.5, -1, True]:
                 case(f"{field} wrong type {value}", token({"exp": NOW+100, field: value}), "claims")
